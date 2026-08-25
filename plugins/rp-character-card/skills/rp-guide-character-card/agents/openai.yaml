@@ -1,0 +1,4 @@
+interface:
+  display_name: "角色卡扮演指导"
+  short_description: "应用角色卡，或按明确要求创建、修改和绑定角色卡"
+  default_prompt: "Use $rp-guide-character-card to inspect a Roleplay character card with rp_asset_read and explicitly manage it with rp_asset."

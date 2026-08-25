@@ -1,0 +1,4 @@
+interface:
+  display_name: "世界书连续性指导"
+  short_description: "应用世界设定，或按明确要求创建、修改、排序和绑定世界书"
+  default_prompt: "Use $rp-guide-lorebook to inspect Roleplay world books with rp_asset_read and explicitly manage them with rp_asset."

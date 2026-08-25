@@ -1,0 +1,4 @@
+interface:
+  display_name: "文风落地指导"
+  short_description: "落实有序文风，或按明确要求创建、修改、排序和绑定文风"
+  default_prompt: "Use $rp-guide-writing-style to inspect Roleplay writing styles with rp_asset_read and explicitly manage their order or content with rp_asset."

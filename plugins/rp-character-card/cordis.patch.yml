@@ -1,0 +1,9 @@
+- insert:
+    - id: rp-character-card
+      name: dsh-roleplay-rp-character-card
+      config:
+        libraryDir: ./.dsh-roleplay/characters
+        maxInputBytes: 8388608
+        maxTextCharacters: 1000000
+        registerTool: true
+        exposeBrowser: false

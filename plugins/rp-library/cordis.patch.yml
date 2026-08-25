@@ -1,0 +1,4 @@
+- insert:
+    - id: rp-library
+      name: dsh-roleplay-rp-library
+      config: {}

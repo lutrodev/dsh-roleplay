@@ -1,0 +1,11 @@
+- insert:
+    - id: rp-subagent-manager
+      name: dsh-roleplay-rp-subagent-manager
+      config:
+        catalogDir: ./.dsh-roleplay/subagents
+        maxSubagents: 32
+        maxNameCharacters: 80
+        maxDescriptionCharacters: 240
+        maxInstructionsCharacters: 20000
+        initialSubagents: []
+        exposeBrowser: true

@@ -1,0 +1,52 @@
+{
+  "name": "dsh-roleplay-rp-asset-tools",
+  "version": "0.1.0",
+  "description": "Compact model-facing adapter for Roleplay shared assets",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/**/*.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/asset-adapter.js",
+    "test": "node --test",
+    "verify": "pnpm run check && pnpm test"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "@deepseek-ai/dsh-tools": "^0.1.1-rc.2",
+    "dsh-roleplay-rp-core": "^0.1.0",
+    "dsh-roleplay-rp-session": "^0.1.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/schemastery": "3.18.1",
+    "@deepseek-ai/dsh-tools": "0.1.1-rc.2",
+    "dsh-roleplay-rp-core": "workspace:^",
+    "dsh-roleplay-rp-session": "workspace:^",
+    "dsh-roleplay-rp-character-card": "workspace:^",
+    "dsh-roleplay-rp-lore-book": "workspace:^",
+    "dsh-roleplay-rp-persona": "workspace:^",
+    "dsh-roleplay-rp-preset": "workspace:^",
+    "dsh-roleplay-rp-writing-style": "workspace:^"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@11.7.0"
+}

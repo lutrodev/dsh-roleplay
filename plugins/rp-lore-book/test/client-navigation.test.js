@@ -1,0 +1,93 @@
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import test from 'node:test'
+
+test('世界书列表点击后推进到独立详情视图', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
+  assert.match(client, /selected === null \? h\(LoreList/)
+  assert.match(client, /返回世界书列表/)
+  assert.match(client, /dsh-roleplay\.asset-modal-scroll-lock/)
+  assert.match(client, /body\.style\.overflow = 'hidden'/)
+  assert.doesNotMatch(client, /className: css\.grid/)
+  assert.match(styles, /\.view\s*\{[^}]*flex:1;[^}]*min-height:0;[^}]*overflow:hidden;/)
+  assert.match(styles, /\.content>:last-child\s*\{[^}]*flex:1;[^}]*min-width:0;[^}]*min-height:0;[^}]*overflow:hidden;/)
+  assert.match(styles, /\.content>:first-child\s*\{[^}]*min-height:48px;[^}]*box-sizing:border-box;/)
+  assert.match(styles, /100dvh/)
+  assert.match(styles, /overscroll-behavior:contain/)
+  assert.match(client, /label: '扮演指导', short: '指导'/)
+  assert.doesNotMatch(client, /人物设定/)
+})
+
+test('世界书导入由覆盖按钮区域的原生文件输入直接打开', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
+  assert.match(client, /className: css\.fileInput, type: 'file'/)
+  assert.match(client, /'aria-label': '导入世界书 JSON'/)
+  assert.doesNotMatch(client, /\.current\?\.click\(\)|hidden: true/)
+  assert.match(styles, /\.fileInput\s*\{[^}]*position:absolute;[^}]*inset:0;[^}]*width:100%;[^}]*height:100%;[^}]*opacity:0;/)
+  assert.match(styles, /\.importButton:focus-within/)
+})
+
+test('世界书操作只展示用户能理解的结果和影响', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  assert.match(client, /世界书修改尚未保存/)
+  assert.match(client, /删除后无法恢复/)
+  assert.doesNotMatch(client, /所有使用这本世界书的对话都会从下一条回复开始使用新内容/)
+  assert.doesNotMatch(client, /templateError|无法识别的变量写法|有错误/)
+  assert.doesNotMatch(client, /\$\{error\.code\}|版本 \$\{detail\.revision\}|这个 Session|当前 Session|楼层/)
+})
+
+test('世界书详情使用三种内容类型 Tab 并只展示当前分类', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
+  assert.match(client, /const \[activeLevel, setActiveLevel\] = useState\(LEVELS\[0\]\.id\)/)
+  assert.match(client, /role: 'tablist', 'aria-label': '世界书内容类型'/)
+  assert.match(client, /role: 'tab'/)
+  assert.match(client, /role: 'tabpanel'/)
+  assert.match(client, /filter\(entry => entry\.level === activeLevel\)/)
+  assert.match(client, /addEntry\(activeLevel\)/)
+  assert.match(client, /key: activeLevel, id: `lore-panel-/)
+  assert.match(styles, /\.levelTabs button\[aria-selected="true"\]/)
+  assert.match(styles, /\.detail\s*\{[^}]*overflow-y:auto;[^}]*overscroll-behavior:contain;/)
+  assert.match(styles, /\.detail\s*\{[^}]*padding:0 28px 90px;/)
+  assert.match(styles, /\.detail>header\s*\{[^}]*padding:22px 0 14px;/)
+  assert.match(styles, /\.levelTabs\s*\{[^}]*position:sticky;[^}]*z-index:10;[^}]*background:var\(--dsw-alias-bg-base\);/)
+  assert.match(styles, /\.levelPanel\s*\{[^}]*min-height:220px;/)
+  assert.doesNotMatch(client, /css\.slotDashboard|css\.impactNotice/)
+})
+
+test('世界书详情以整本草稿提供条目管理、冲突保留和脏数据确认', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  assert.match(client, /newLoreEntry\(level, draft\.entries\)/)
+  assert.match(client, /crypto\.randomUUID\(\)/)
+  assert.match(client, /duplicateEntry/)
+  assert.match(client, /moveEntryInLevel/)
+  assert.match(client, /setEntryById/)
+  assert.match(client, /h\(Inspector/)
+  assert.match(client, /h\(DirtyBar/)
+  assert.match(client, /h\(EntryRow/)
+  assert.match(client, /h\(DeleteLoreBookDialog/)
+  assert.match(client, /window\.confirm\('修改还没有保存/)
+  assert.doesNotMatch(client, /世界书内容（JSON）/)
+})
+
+test('变量启用条件使用可访问的原生编辑控件并保留键盘与 reduced-motion 能力', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  assert.match(client, /label: '变量启用条件'/)
+  assert.match(client, /state\("story", "\/characters\/李钰\/好感度"\) > 50/)
+  assert.match(client, /placeholder: '仅在当前故事状态满足条件时使用这条设定'/)
+  assert.match(client, /onChange: event => onChange\(\{ stateCondition:/)
+  assert.match(client, /h\(RpMotionProvider/)
+  assert.match(client, /\{ id: 'move-up', label: '上移' \}/)
+  assert.match(client, /\{ id: 'move-down', label: '下移' \}/)
+  assert.match(client, /'aria-label': `拖动排序 \$\{entry\.name\}`/)
+})
+
+test('世界书插件向会话编排注册唯一的整本创建与编辑界面', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  assert.match(client, /export const inject = \['slots', 'connection', 'rpAssetEditors'\]/)
+  assert.match(client, /ctx\.rpAssetEditors\.register\('lorebook', LoreSessionEditor\)/)
+  assert.match(client, /function LoreSessionEditor/)
+  assert.match(client, /return h\(LoreDetail/)
+})

@@ -1,0 +1,53 @@
+{
+  "name": "dsh-roleplay-rp-macro",
+  "version": "0.1.0",
+  "description": "Session-scoped character and user identity macros for Roleplay",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./syntax": "./src/syntax.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/**/*.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/syntax.js",
+    "test": "node --test",
+    "verify": "pnpm run check && pnpm test"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "dsh-roleplay-rp-core": "^0.1.0",
+    "dsh-roleplay-rp-session": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "dsh-roleplay-rp-core": {
+      "optional": true
+    },
+    "dsh-roleplay-rp-session": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "dsh-roleplay-rp-core": "workspace:^",
+    "dsh-roleplay-rp-session": "workspace:^"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@11.7.0"
+}

@@ -1,0 +1,179 @@
+# The Roleplay preset contributes a focused narrative persona plus selected
+# agentic capabilities. It does not expose coding, shell, filesystem, planning,
+# goal, todo, or workflow tools.
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: __RP_PERSONA_TEXT__
+    includeRuntimeContext: false
+
+# Roleplay always exposes native provider tools, independent of the host-wide
+# DSH_TOOLS_MODE selection.
+- id: tool-presentation
+  name: __TOOL_PRESENTATION_MODULE__
+  config:
+    mode: native
+
+# Agent execution mode may use live web search. Chat execution mode masks this
+# tool at the Agent scope and sees only rp_write_turn, rp_commit_turn and
+# explicitly registered read-only tools such as rp_asset_read.
+- id: tool-web
+  name: __TOOL_WEB_MODULE__
+  config:
+    fetch: false
+    searchTimeoutMs: 60000
+
+# Agent execution mode can pause for a user-owned decision. Chat mode masks
+# this tool together with every optional capability below.
+- id: tool-ask-user
+  name: __TOOL_ASK_USER_MODULE__
+
+# Skills are discovered in the same scoped registry layer as this preset, then
+# exposed through the model-facing catalog and loader.
+- id: skill-filesystem
+  name: __SKILL_FILESYSTEM_MODULE__
+  config:
+    customSkillDirs:
+      - __ROLEPLAY_SKILL_DIR__
+
+- id: tool-skill
+  name: __TOOL_SKILL_MODULE__
+
+# The replay-safe pruner runs before broader compaction when context pressure
+# qualifies. Both services share one preset-local realm.
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: __COMPACTION_BASIC_MODULE__
+
+    - id: tool-result-pruner
+      name: __TOOL_RESULT_PRUNER_MODULE__
+      config:
+        thresholdChars: 8192
+        headChars: 4096
+        tailChars: 1024
+
+# RP services share one entry-local realm. The standing preset mount is reused
+# by every Roleplay session, while service state remains keyed by Agent/Session.
+- id: rp-runtime
+  name: cordis:group
+  group: true
+  isolate:
+    rpRuntime: true
+    rpSubagentManager: true
+    rpSessions: true
+    rpCharacterCards: true
+    rpState: true
+    rpLoreBooks: true
+    rpPersonas: true
+    rpPresets: true
+    rpWritingStyles: true
+  config:
+    - id: rp-core
+      name: __RP_CORE_MODULE__
+      config:
+        chatMaxStepsPerRun: __CHAT_MAX_STEPS__
+        agentMaxStepsPerRun: __AGENT_MAX_STEPS__
+        maxContextCharacters: __MAX_CONTEXT_CHARACTERS__
+        maxEffectsPerCommit: __MAX_EFFECTS__
+        maxArtifactBytes: __MAX_ARTIFACT_BYTES__
+        maxNarrativeCharacters: __MAX_NARRATIVE_CHARACTERS__
+        maxWriterBriefCharacters: __MAX_WRITER_BRIEF_CHARACTERS__
+        maxSubagentPromptCharacters: __MAX_SUBAGENT_PROMPT_CHARACTERS__
+
+    - id: rp-subagent-manager
+      name: __RP_SUBAGENT_MANAGER_MODULE__
+      disabled: __RP_SUBAGENT_MANAGER_DISABLED__
+      config:
+        catalogDir: __SUBAGENT_CATALOG_DIR__
+        maxSubagents: __MAX_SUBAGENTS__
+        maxNameCharacters: __MAX_SUBAGENT_NAME_CHARACTERS__
+        maxDescriptionCharacters: __MAX_SUBAGENT_DESCRIPTION_CHARACTERS__
+        maxInstructionsCharacters: __MAX_SUBAGENT_INSTRUCTIONS_CHARACTERS__
+        initialSubagents: __INITIAL_SUBAGENTS__
+        exposeBrowser: false
+
+    - id: rp-session
+      name: __RP_SESSION_MODULE__
+      config:
+        defaultMode: __DEFAULT_MODE__
+        defaultExecutionMode: __DEFAULT_EXECUTION_MODE__
+        maxProfileCommandBytes: __MAX_SESSION_PROFILE_BYTES__
+
+    - id: rp-character-card
+      name: __RP_CHARACTER_CARD_MODULE__
+      disabled: __RP_CHARACTER_CARD_DISABLED__
+      config:
+        libraryDir: __CHARACTER_LIBRARY_DIR__
+        maxInputBytes: __MAX_CARD_INPUT_BYTES__
+        maxTextCharacters: __MAX_CARD_TEXT_CHARACTERS__
+        registerTool: true
+        exposeBrowser: false
+
+    - id: rp-state
+      name: __RP_STATE_MODULE__
+      disabled: __RP_STATE_DISABLED__
+      config:
+        maxNamespacesInContext: __MAX_STATE_NAMESPACES__
+
+    - id: rp-compat-mvu
+      name: __RP_COMPAT_MVU_MODULE__
+      disabled: __RP_COMPAT_MVU_DISABLED__
+      config: {}
+
+    - id: rp-lore-book
+      name: __RP_LORE_BOOK_MODULE__
+      disabled: __RP_LORE_BOOK_DISABLED__
+      config:
+        libraryDir: __LORE_LIBRARY_DIR__
+        maxInputBytes: __MAX_LORE_INPUT_BYTES__
+        maxTokens: __MAX_LORE_TOKENS__
+        maxEntries: __MAX_LORE_ENTRIES__
+        maxRecursiveDepth: __MAX_LORE_DEPTH__
+        registerTool: true
+        exposeBrowser: false
+
+    - id: rp-persona
+      name: __RP_PERSONA_MODULE__
+      disabled: __RP_PERSONA_DISABLED__
+      config:
+        libraryDir: __PERSONA_LIBRARY_DIR__
+        maxTextCharacters: __MAX_PERSONA_TEXT_CHARACTERS__
+        maxAvatarInputBytes: 5242880
+        maxAvatarPixels: 16777216
+        avatarMaxEdgePixels: 512
+        avatarWebpQuality: 85
+        exposeBrowser: false
+
+    - id: rp-macro
+      name: __RP_MACRO_MODULE__
+      config: {}
+
+    - id: rp-preset
+      name: __RP_PROMPT_PRESET_MODULE__
+      disabled: __RP_PRESET_DISABLED__
+      config:
+        libraryDir: __PROMPT_PRESET_LIBRARY_DIR__
+        maxTextCharacters: __MAX_PRESET_TEXT_CHARACTERS__
+        maxFields: __MAX_PRESET_FIELDS__
+        exposeBrowser: false
+
+    - id: rp-writing-style
+      name: __RP_WRITING_STYLE_MODULE__
+      disabled: __RP_WRITING_STYLE_DISABLED__
+      config:
+        libraryDir: __WRITING_STYLE_LIBRARY_DIR__
+        maxTextCharacters: __MAX_WRITING_STYLE_TEXT_CHARACTERS__
+        maxStylesPerSession: __MAX_WRITING_STYLES_PER_SESSION__
+        exposeBrowser: false
+
+    - id: rp-asset-tools
+      name: __RP_ASSET_TOOLS_MODULE__
+      disabled: __RP_ASSET_TOOLS_DISABLED__
+      config: {}

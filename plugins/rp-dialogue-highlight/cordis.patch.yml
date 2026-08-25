@@ -1,0 +1,4 @@
+- insert:
+    - id: rp-dialogue-highlight
+      name: dsh-roleplay-rp-dialogue-highlight
+      config: {}

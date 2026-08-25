@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: dsh-roleplay
+    steps:
+      - name: Check out dsh-roleplay
+        uses: actions/checkout@v6
+        with:
+          path: dsh-roleplay
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: dsh-roleplay/.node-version
+          cache: pnpm
+          cache-dependency-path: dsh-roleplay/pnpm-lock.yaml
+
+      - name: Install dsh-roleplay dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify dsh-roleplay
+        run: pnpm run verify

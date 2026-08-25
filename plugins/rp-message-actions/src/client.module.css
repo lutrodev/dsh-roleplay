@@ -1,0 +1,446 @@
+.floorActionHost {
+  width: 100%;
+  font-family: var(--dsw-font-family);
+}
+
+/* Deleted messages can orphan generation rows inside their Turn. Keep those
+   rows in the Session log and trajectory, but remove the now-unowned context,
+   reasoning, tool, and failure chrome from the chat transcript. */
+[data-rp-floor-hidden-by-message-delete],
+[data-rp-message-actions-hidden-trace],
+[data-rp-message-actions-hidden-suffix],
+[data-rp-message-actions-hidden-deleted-user],
+[data-rp-message-actions-hidden-deleted-assistant],
+[data-rp-message-actions-hidden-commit],
+[data-rp-message-actions-hidden-native-branch],
+[data-rp-message-actions-hidden-opening],
+[data-chat-flow-kind="rp-floor-assistant-actions"]:has(.deletedAssistantMarker),
+[data-chat-flow-kind="rp-floor-failed-assistant"]:has(.deletedAssistantMarker),
+[data-chat-flow-kind="rp-message-suffix-action"]:has(.suffixEffectAnchor),
+[data-chat-flow-kind="rp-floor-user-actions"]:has(.inactiveActionNodeMarker),
+[data-chat-flow-kind="rp-floor-assistant-actions"]:has(.inactiveActionNodeMarker),
+[data-chat-flow-kind="rp-floor-opening-actions"]:has(.inactiveActionNodeMarker),
+[data-chat-flow-kind="rp-floor-assistant-actions"]:has(.assistantEffectNodeMarker),
+[data-chat-flow-kind="rp-floor-opening-actions"]:has(.assistantEffectNodeMarker),
+[data-chat-flow-kind="rp-floor-failed-assistant"]:has(.assistantEffectNodeMarker),
+[data-chat-flow-kind="rp-floor-opening-actions"]:has(.deletedOpeningMarker) {
+  display: none;
+}
+
+.deletedAssistantMarker,
+.deletedUserMarker,
+.deletedOpeningMarker,
+.inactiveActionNodeMarker,
+.assistantEffectNodeMarker,
+.traceEffectAnchor,
+.nativeUserEffectAnchor,
+.nativeBranchEffectAnchor,
+.suffixEffectAnchor,
+.commitToolMarker,
+[data-chat-flow-kind="tool-call"]:has(.commitToolMarker[data-rp-commit-tool-status="running"]),
+[data-chat-flow-kind="tool-call"]:has(.commitToolMarker[data-rp-commit-tool-status="succeeded"]),
+[data-chat-flow-kind="rp-floor-user-actions"]:has(.deletedUserMarker) {
+  display: none;
+}
+
+.commitFailure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--dsw-alias-state-error-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
+  font-family: var(--dsw-font-family);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.commitFailure strong { font-weight: 550; }
+
+.failedTurnStatus {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 2px 0;
+  font-family: var(--dsw-font-family);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.failedTurnStatusDot { margin-top: 5px; }
+
+.failedTurnStatusCopy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.failedTurnStatusCopy strong {
+  margin-right: 6px;
+  font-weight: 600;
+}
+
+.failedTurnStatusCopy strong[data-tone="error"] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.failedTurnStatusCopy strong[data-tone="warning"] {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.failedTurnStatusCopy strong[data-tone="ongoing"] {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.failedTurnStatusCopy span { color: var(--dsw-alias-label-secondary); }
+
+.failedTurnRecoveryActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-left: 18px;
+}
+
+.failedTurnStatus > .failedTurnRecoveryActions { margin-left: 0; }
+
+.failedTurnDeleteAction:not(:disabled) { color: var(--dsw-alias-state-error-primary); }
+
+.assistantActionHost {
+  display: contents;
+}
+
+/* The editor is portaled into the message body; hide the native footer until
+   editing finishes so its unrelated controls do not compete with the form. */
+[data-chat-flow-kind="turn-tail"]:has(.assistantActionHost[data-rp-message-actions-editing-native]) {
+  display: none;
+}
+
+/* The Slot outlet inserts a display:contents anchor between the flow item and
+   the user renderer, so the message root is a descendant, not a direct child.
+   Require a real mounted plugin host in the adjacent projection before hiding
+   the resident time/copy row; declined standard-session projections stay out. */
+[data-chat-flow-kind="user"]:has(
+  + [data-chat-flow-kind="rp-floor-user-actions"] .userFloorActionHost
+)
+  [data-time-hover-root]
+  > :last-child:not(.inlineEditor),
+[data-chat-flow-kind="user"]:has(
+  + [data-chat-flow-kind="rp-message-avatar-user"]
+  + [data-chat-flow-kind="rp-floor-user-actions"] .userFloorActionHost
+)
+  [data-time-hover-root]
+  > :last-child:not(.inlineEditor) {
+  display: none;
+}
+
+/* JS ownership covers arbitrary public Conversation Nodes inserted between
+   the native user row and this plugin's projected action row. */
+[data-chat-flow-kind="user"][data-rp-message-actions-user-native-hidden]
+  [data-time-hover-root]
+  > :last-child:not(.inlineEditor),
+[data-chat-flow-kind="steering"][data-rp-message-actions-user-native-hidden]
+  [data-time-hover-root]
+  > :last-child:not(.inlineEditor) {
+  display: none;
+}
+
+/* Pull back only the Chat column's 16px gap so the replacement operation row
+   sits 2px below the bubble and reads as part of the same message. */
+.userFloorActionHost {
+  width: 100%;
+  margin-top: -14px;
+  font-family: var(--dsw-font-family);
+}
+
+.userFloorActionHost .floorActions {
+  margin-top: 0;
+  margin-bottom: 2px;
+}
+
+.userFloorTime {
+  margin-right: 12px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 14px;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .userFloorTime {
+    opacity: 0;
+    transition: opacity 80ms ease;
+  }
+
+  .userFloorActionHost:hover .userFloorTime,
+  .userFloorActionHost:focus-within .userFloorTime,
+  [data-chat-flow-kind="user"]:has(
+    + [data-chat-flow-kind="rp-floor-user-actions"] .userFloorActionHost
+  ):hover
+    + [data-chat-flow-kind="rp-floor-user-actions"]
+    .userFloorTime,
+  [data-chat-flow-kind="user"]:has(
+    + [data-chat-flow-kind="rp-message-avatar-user"]
+    + [data-chat-flow-kind="rp-floor-user-actions"] .userFloorActionHost
+  ):hover
+    + [data-chat-flow-kind="rp-message-avatar-user"]
+    + [data-chat-flow-kind="rp-floor-user-actions"]
+    .userFloorTime {
+    opacity: 1;
+  }
+}
+
+.floorActions {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 2px 0 7px;
+  padding-right: 2px;
+}
+
+.floorActionHost .floorActions {
+  justify-content: flex-start;
+  padding-right: 0;
+  padding-left: 0;
+  margin-left: -6px;
+}
+
+.floorAction {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 28px;
+  outline: none;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.floorAction:hover {
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.floorAction:disabled {
+  cursor: default;
+  opacity: .4;
+}
+
+.floorAction[data-tone="danger"]:hover {
+  color: var(--dsw-alias-state-error-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
+}
+
+@media (max-width: 600px) {
+  .floorActionHost .floorActions {
+    flex-wrap: wrap;
+  }
+}
+
+.inlineEditorPortalAnchor,
+.editedMessagePortalAnchor { display: none; }
+
+[data-chat-flow-kind="rp-floor-user-actions"]:has(.inlineEditorPortalAnchor),
+[data-chat-flow-kind="rp-floor-assistant-actions"]:has(.inlineEditorPortalAnchor),
+[data-chat-flow-kind="rp-floor-opening-actions"]:has(.inlineEditorPortalAnchor) {
+  display: none;
+}
+
+[data-rp-message-actions-original-hidden] {
+  display: none;
+}
+
+.editedUserMessage {
+  max-width: 100%;
+  align-self: flex-end;
+  padding: 10px 16px;
+  border-radius: 22px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-bubble);
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.editedAssistantMessage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 16px;
+  line-height: 28px;
+}
+
+.inlineEditor {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-radius: 22px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-tip);
+  font-family: var(--dsw-font-family);
+}
+
+.inlineEditor[data-surface="user"] {
+  align-self: stretch;
+  background: var(--dsw-specific-bubble);
+}
+
+.inlineEditor label { display: contents; }
+
+.inlineEditor textarea {
+  display: block;
+  width: 100%;
+  height: 72px;
+  min-height: 72px;
+  max-height: 144px;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  resize: none;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  outline: none;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font: 16px/24px var(--dsw-font-family);
+}
+
+.inlineEditor textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.inlineEditorFooter {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.inlineEditorFooter > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.inlineEditorFooter button {
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  cursor: pointer;
+  font: 12px/20px var(--dsw-font-family);
+  white-space: nowrap;
+}
+
+.inlineEditorFooter button[data-primary] {
+  border-color: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-primary-foreground);
+  background: var(--dsw-alias-button-primary-fill);
+}
+
+.inlineEditorFooter button:disabled { cursor: not-allowed; opacity: .5; }
+
+.editorNotice,
+.inlineEditor .assetNotice {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.inlineEditor .error { margin-top: 0; }
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.dialog {
+  width: min(540px, calc(100vw - 32px));
+}
+
+.deleteConfirm {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.deleteSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 18%, var(--dsw-alias-border-l2));
+  border-radius: 12px;
+  color: var(--dsw-alias-label-secondary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 4%, var(--dsw-alias-bg-layer-1));
+}
+
+.deleteSummary strong {
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 19px;
+  font-weight: 550;
+}
+
+.deleteSummary span {
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.assetNotice {
+  margin: 12px 0 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.deleteAction:not(:disabled) {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.notice,
+.error {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.notice {
+  color: var(--dsw-alias-state-warn-label);
+  background: var(--dsw-alias-state-warn-tertiary);
+}
+
+.error {
+  color: var(--dsw-alias-state-error-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
+}
+
+@media (max-width: 600px) {
+  .floorActions { min-height: 28px; gap: 10px; }
+  .inlineEditor { padding: 14px; }
+  .failedTurnStatus { grid-template-columns: 10px minmax(0, 1fr); }
+  .failedTurnStatus > .failedTurnRecoveryActions {
+    grid-column: 2;
+    margin-top: 4px;
+  }
+}

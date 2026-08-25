@@ -1,0 +1,65 @@
+{
+  "name": "dsh-roleplay-rp-state",
+  "version": "0.1.0",
+  "description": "Schema-owned event-sourced state for roleplay agents",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./condition": "./src/condition.js",
+    "./definition": "./src/definition.js",
+    "./protocol": "./src/protocol.js",
+    "./schema": "./src/schema.js",
+    "./update": "./src/update.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/**/*.js",
+    "skills/**",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/condition.js && node --check src/definition.js && node --check src/json-pointer.js && node --check src/protocol.js && node --check src/schema.js && node --check src/update.js",
+    "test": "node --test",
+    "verify": "pnpm run check && pnpm test"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-commands": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-session-projection": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-tools": "^0.1.1-rc.2",
+    "dsh-roleplay-rp-core": "^0.1.0",
+    "dsh-roleplay-rp-session": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "dsh-roleplay-rp-core": {
+      "optional": true
+    },
+    "dsh-roleplay-rp-session": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-commands": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-session-projection": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-tools": "0.1.1-rc.2",
+    "dsh-roleplay-rp-core": "workspace:^",
+    "dsh-roleplay-rp-session": "workspace:^"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@11.7.0"
+}

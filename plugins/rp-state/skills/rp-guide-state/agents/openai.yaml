@@ -1,0 +1,4 @@
+interface:
+  display_name: "会话变量指导"
+  short_description: "设计、检查和配置 rp.state，并诊断世界书条件或 MVU 转换"
+  default_prompt: "Use $rp-guide-state to inspect rp.state, validate its native protocol, and make only explicitly requested configuration changes."

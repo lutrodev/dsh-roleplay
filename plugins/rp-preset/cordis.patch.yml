@@ -1,0 +1,8 @@
+- insert:
+    - id: rp-preset
+      name: dsh-roleplay-rp-preset
+      config:
+        libraryDir: ./.dsh-roleplay/presets
+        maxTextCharacters: 100000
+        maxFields: 32
+        exposeBrowser: true

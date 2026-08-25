@@ -1,0 +1,51 @@
+.anchor {
+  display: none;
+}
+
+[data-chat-flow-kind="rp-dialogue-highlight"] {
+  display: none;
+}
+
+::highlight(rp-dialogue) {
+  color: #a94d00;
+}
+
+body[data-ds-dark-theme] ::highlight(rp-dialogue) {
+  color: #ffbd7a;
+}
+
+/* When CSS Custom Highlight is unavailable, the behavior-only plugin renders a
+   non-interactive clone under the top-level body and makes only matched glyphs
+   visible. It never wraps or replaces React's native assistant DOM. */
+[data-rp-dialogue-overlay] {
+  position: fixed !important;
+  z-index: 1;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none !important;
+  user-select: none !important;
+  contain: layout style paint;
+}
+
+[data-rp-dialogue-overlay],
+[data-rp-dialogue-overlay] * {
+  color: transparent !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-decoration-color: transparent !important;
+}
+
+[data-rp-dialogue-overlay] :where(img, picture, svg, canvas, video, button, input, select, textarea) {
+  visibility: hidden !important;
+}
+
+[data-rp-dialogue-overlay] [data-rp-dialogue-span] {
+  color: #a94d00 !important;
+  -webkit-text-stroke: 0.2px currentcolor;
+  text-decoration-color: currentcolor !important;
+}
+
+body[data-ds-dark-theme] [data-rp-dialogue-overlay] [data-rp-dialogue-span] {
+  color: #ffbd7a !important;
+}

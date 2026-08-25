@@ -1,0 +1,15 @@
+packages:
+  - packages/*
+  - plugins/*
+
+# pnpm 10+ blocks dependency lifecycle scripts unless they are reviewed here.
+# Harness needs the PTY/FFI helpers; the two remaining scripts are known no-ops.
+allowBuilds:
+  '@deepseek-ai/dsh-subprocess-local': true
+  '@google/genai': false
+  koffi: true
+  node-pty: true
+  protobufjs: false
+
+linkWorkspacePackages: true
+preferWorkspacePackages: true

@@ -1,0 +1,4 @@
+interface:
+  display_name: "用户人设与主权指导"
+  short_description: "应用用户人设并尊重主权，或按明确要求创建、修改和绑定人设"
+  default_prompt: "Use $rp-guide-persona to inspect a user persona with rp_asset_read and explicitly manage it with rp_asset while preserving user agency."

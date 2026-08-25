@@ -1,0 +1,5 @@
+- insert:
+    - id: rp-state
+      name: dsh-roleplay-rp-state
+      config:
+        maxNamespacesInContext: 32

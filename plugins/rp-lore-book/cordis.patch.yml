@@ -1,0 +1,7 @@
+- insert:
+    - id: rp-lore-book
+      name: dsh-roleplay-rp-lore-book
+      config:
+        libraryDir: ./.dsh-roleplay/lorebooks
+        registerTool: true
+        exposeBrowser: false

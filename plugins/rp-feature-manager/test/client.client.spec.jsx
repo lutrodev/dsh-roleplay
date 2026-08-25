@@ -1,0 +1,295 @@
+// @vitest-environment jsdom
+import React from 'react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
+  IconCheckOutline16: () => null,
+  IconChevronDownOutline14: () => null,
+  IconCodeOutline16: () => null,
+  IconDataOutline16: () => null,
+  IconEditOutline16: () => null,
+  IconRefreshOutline16: () => null,
+  IconSkillOutline16: () => null,
+}))
+
+vi.mock('motion/react', async () => {
+  const ReactModule = await vi.importActual('react')
+  return {
+    AnimatePresence: ({ children }) => children,
+    LazyMotion: ({ children }) => children,
+    MotionConfig: ({ children }) => children,
+    domAnimation: {},
+    useReducedMotion: () => true,
+    m: new Proxy({}, {
+      get: (_target, tag) => ({
+        children,
+        layout: _layout,
+        layoutId: _layoutId,
+        transition: _transition,
+        initial: _initial,
+        animate: _animate,
+        exit: _exit,
+        ...props
+      }) => ReactModule.createElement(tag, props, children),
+    }),
+  }
+})
+
+import { FEATURE_CATALOG, ROLEPLAY_SKILL_CATALOG } from '../src/catalog.js'
+import { RoleplaySettingsSection, apply } from '../src/client.js'
+import { buildRoleplayPromptPreview } from 'dsh-roleplay-rp-core/prompts'
+
+afterEach(cleanup)
+
+const copy = {
+  nav: 'Roleplay', title: 'Roleplay', description: '管理 Roleplay 功能及其向 Agent 提供的 Skills。',
+  featuresTab: '功能', skillsTab: 'Skills', promptsTab: '系统提示词', featuresTitle: 'Roleplay 功能',
+  featuresDescription: '这些功能已随 Roleplay 组合提供。启用只控制是否加载，不会改变已提供的代码，也不会删除资料。',
+  coreTitle: '核心运行时', coreDescription: '核心能力', alwaysEnabled: '始终启用',
+  enabled: '已启用', disabled: '未启用', enabling: '正在更新…', loading: '正在读取 Roleplay 设置…',
+  loadError: '暂时无法读取 Roleplay 设置。', retry: '重试', compatible: '版本兼容', incompatible: '版本不兼容',
+  versionProblem: '版本不兼容', roleplayVersion: 'Roleplay', dshVersion: 'DSH', versionDetails: '查看核心组件版本',
+  applies: '下一次对话生效。', saveError: '启用状态没有保存，请稍后重试。',
+  skillsTitle: 'Roleplay Skills', skillsDescription: '逐项选择 Roleplay 插件向 Agent 提供的工作指南。',
+  skillsScope: '这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。',
+  visibilityTitle: '可见性预览', parentAgent: 'Agent 模式父代理',
+  parentAgentVisibility: '可以看到当前已启用的 Roleplay Skills。', customSubagents: '自定义子代理',
+  customSubagentsVisibility: '仅当“子代理”功能已启用，且该子代理允许使用 Skills 时可见。',
+  writer: 'Writer', writerVisibility: '始终不可见。启用或停用“子代理”功能都不会改变 Writer。',
+  pluginDisabled: '插件未启用', waitingForPlugin: '等待插件启用', sourcePlugin: '来自',
+  visibleParent: '当前可见：Agent 模式父代理', visibleSubagents: '、允许 Skills 的自定义子代理',
+  subagentsUnavailable: '；“子代理”功能当前未启用', invisibleSkill: '当前不可见：此 Skill 未启用。',
+  invisiblePlugin: '当前不可见：请先在“功能”中启用对应插件。',
+  promptsTitle: '代理提示词', promptsDescription: '查看提示词拼接顺序。', promptsScope: '这里显示运行时来源和模板。',
+  promptsLoading: '正在读取代理提示词…', promptsLoadError: '暂时无法读取代理提示词。', promptRoles: '选择代理',
+  identityTitle: 'Roleplay 统一身份', identityDescription: '所有 Roleplay 代理共用。', identityDefault: '使用 Harness 默认值',
+  identityCustomized: '已自定义', identityEdit: '编辑统一身份', identityField: '统一身份 System 提示词',
+  identityHelper: '下一次模型请求生效。', identityCharacters: '字符', identityRequired: '统一身份不能为空。',
+  identityTooLong: '统一身份超过允许的最大长度。', identityCancel: '取消', identitySave: '保存统一身份',
+  identitySaving: '正在保存…', identityReset: '恢复 Harness 默认值', identitySaved: '已更新 Roleplay 统一身份；下一次模型请求开始使用。',
+  identityResetDone: '已恢复 Harness 默认身份。', identitySaveError: '统一身份没有保存，请稍后重试。',
+  parentChatPrompt: 'Chat 父代理', parentChatHint: 'Writer 直接交付正文', parentAgentPrompt: 'Agent 父代理',
+  parentAgentHint: '规划并审阅正文', writerPrompt: 'Writer', writerPromptHint: '只负责本轮正文',
+  customPrompt: '自定义子代理', customPromptHint: '独立完成一个任务', customPromptSelect: '选择自定义子代理',
+  noCustomPrompts: '当前没有可预览的自定义子代理。', promptOrder: '模型接收顺序', modelRoute: '模型',
+  sessionModel: '当前对话模型', inheritedModel: '继承父代理模型', systemRole: 'System', userRole: 'User', toolsRole: 'Tools',
+  exactPrompt: '完整内容', templatePrompt: '动态模板', dynamicPrompt: '运行时生成', externalPrompt: 'Harness 提供',
+  derivedPrompt: '按权限筛选', promptSource: '来源', externalPromptBody: 'Harness 动态提供。',
+  dynamicPromptBody: '当前对话动态生成。', derivedPromptBody: '只保留可用工具。', noTools: '不向这个代理提供工具。',
+  promptTools: '可见工具', promptLayerHarness: 'Harness 身份', promptLayerHarnessSource: 'Harness 源码环境',
+  promptLayerWebSurface: 'Web 运行环境', promptLayerParentPersona: 'Roleplay 通用规则',
+  promptLayerRuntime: '当前模式工作流', promptLayerToolGuidance: '可用工具规则', promptLayerConversation: '当前对话输入',
+  promptLayerWriterReady: 'Roleplay 运行上下文', promptLayerToolSchema: '工具清单', promptLayerWriterPersona: '正文写作规则',
+  promptLayerWriterSlots: 'Writer 写作材料', promptLayerTaskPersona: '自定义工作指令', promptLayerTaskCall: '本次独立任务',
+  sourceHarness: 'Harness', sourceHarnessBoot: 'Harness App Boot', sourceHarnessWeb: 'Harness Web',
+  sourceParent: 'Roleplay 通用模板', sourceRuntime: 'Roleplay 运行时', sourceTools: '当前可用工具',
+  sourceConversation: '当前对话', sourceSubagent: '自定义子代理设置', noteChatRelay: 'Writer 正文直接交付。',
+  noteAgentRevision: '父代理审阅 Writer 初稿。', noteFreshChild: '每次创建全新上下文。', notePersonaShadowed: '替换父代理身份。',
+  noteRuntimeSkipped: '不注入父代理模式规则。', noteNoTools: 'Writer 不接收工具。', noteExplicitInput: '只接收显式输入。',
+}
+
+function t(key) { return copy[key] ?? key }
+
+function statusView(enabledFeatures, enabledSkills) {
+  return {
+    roleplay: { version: '0.1.0' },
+    dsh: { version: '0.1.1-rc.2', compatible: true },
+    compatible: true,
+    problems: [],
+    enabledFeatures: [...enabledFeatures],
+    enabledSkills: [...enabledSkills],
+    core: [{ label: '回复运行时', packageVersion: '0.1.0', versionCompatible: true }],
+    features: FEATURE_CATALOG.map(item => ({
+      ...item,
+      enabled: enabledFeatures.includes(item.id),
+      active: enabledFeatures.includes(item.id),
+      packageVersion: '0.1.0',
+      versionCompatible: true,
+    })),
+    skills: ROLEPLAY_SKILL_CATALOG.map(item => ({
+      id: item.id,
+      label: item.label,
+      description: item.description,
+      featureId: item.featureId,
+      featureLabel: item.featureLabel,
+      selected: enabledSkills.includes(item.id),
+      featureEnabled: enabledFeatures.includes(item.featureId),
+      enabled: enabledSkills.includes(item.id) && enabledFeatures.includes(item.featureId),
+      packageVersion: '0.1.0',
+      versionCompatible: true,
+    })),
+  }
+}
+
+function harness(enabledFeatures = ['lore-book'], enabledSkills = ['rp-guide-lorebook', 'rp-guide-state']) {
+  let status = statusView(enabledFeatures, enabledSkills)
+  let snapshot = {
+    status: 'ready',
+    writable: true,
+    revision: 0,
+    value: { enabledFeatures: [...enabledFeatures], enabledSkills: [...enabledSkills], harnessIdentity: '' },
+  }
+  const listeners = new Set()
+  const scope = {
+    subscribe: listener => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    getSnapshot: () => snapshot,
+    set: vi.fn(async (field, value) => {
+      const stored = Array.isArray(value) ? [...value] : value
+      snapshot = {
+        ...snapshot,
+        revision: snapshot.revision + 1,
+        value: { ...snapshot.value, [field]: stored },
+      }
+      status = statusView(snapshot.value.enabledFeatures, snapshot.value.enabledSkills)
+      for (const listener of listeners) listener()
+    }),
+    unset: vi.fn(async field => {
+      snapshot = {
+        ...snapshot,
+        revision: snapshot.revision + 1,
+        value: { ...snapshot.value, [field]: field === 'harnessIdentity' ? '' : undefined },
+      }
+      for (const listener of listeners) listener()
+    }),
+  }
+  const connection = {
+    rpc: {
+      call: vi.fn(async (_path, endpoint) => ({
+        ok: true,
+        value: {
+          ok: true,
+          value: structuredClone(endpoint === 'prompts'
+            ? promptView(snapshot.value.enabledFeatures, snapshot.value.harnessIdentity)
+            : status),
+        },
+      })),
+    },
+  }
+  return { scope, connection }
+}
+
+function promptView(enabledFeatures, identityOverride = '') {
+  const defaultIdentity = 'You are an AI agent powered by DeepSeek Harness.'
+  const identity = identityOverride.trim() || defaultIdentity
+  return buildRoleplayPromptPreview({
+    stateEnabled: enabledFeatures.includes('state'),
+    subagentsEnabled: true,
+    assetToolsEnabled: true,
+    harnessSections: [
+      { id: 'harness-identity', name: 'harness:identity', order: -100, source: 'dsh-system-prompt', text: identity },
+      { id: 'harness-source', name: 'harness:source', order: -99, source: 'dsh-app-boot', text: 'The Harness checkout is available at /source.' },
+      { id: 'app-web-surface', name: 'app:web-surface', order: -98, source: 'dsh-web-app', text: 'You are using the Harness Web GUI.' },
+    ],
+    harnessIdentity: {
+      sectionName: 'harness:identity', value: identity, defaultValue: defaultIdentity,
+      customized: identityOverride.trim().length > 0, maxCharacters: 4000,
+    },
+    taskSubagents: [{
+      id: 'continuity',
+      label: '连续性检查',
+      description: '核对事实与角色知识边界。',
+      persona: '只返回连续性问题。',
+      toolFilter: { allow: ['web_search'] },
+    }],
+  })
+}
+
+describe('Roleplay 一级设置与 Skill 管理', () => {
+  it('在 Agent 预设之后注册一级 Roleplay 入口，不再注册插件页签', () => {
+    let registration
+    const inject = vi.fn((_name, setup) => setup())
+    const ctx = {
+      connection: {},
+      effect: vi.fn(),
+      locale: { register: vi.fn(), bind: () => t },
+      settingsScope: { bind: vi.fn(() => ({})) },
+      slots: {
+        inject,
+        register: vi.fn(options => { registration = options }),
+      },
+    }
+    apply(ctx)
+    expect(inject).toHaveBeenCalledWith('settings.section', expect.any(Function))
+    expect(registration).toMatchObject({ name: 'settings.section', id: 'roleplay', order: 25 })
+    expect(registration.label()).toBe('Roleplay')
+  })
+
+  it('通过顶部页签展示 Skill 精细选择和真实可见性', async () => {
+    const { scope, connection } = harness()
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+    expect(await screen.findByRole('heading', { name: 'Roleplay' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '功能' }).getAttribute('aria-selected')).toBe('true')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Skills' }))
+    expect(screen.getByRole('heading', { name: 'Roleplay Skills' })).toBeTruthy()
+    expect(screen.getByText('始终不可见。启用或停用“子代理”功能都不会改变 Writer。')).toBeTruthy()
+    expect(screen.getByText(/项目目录和用户目录中的其他 Skills 不受影响/)).toBeTruthy()
+
+    const loreSwitch = screen.getByRole('switch', { name: '停用世界书指南 Skill' })
+    const stateSwitch = screen.getByRole('switch', { name: '停用会话变量指南 Skill' })
+    expect(loreSwitch.disabled).toBe(false)
+    expect(stateSwitch.disabled).toBe(true)
+    expect(screen.getByText('等待插件启用')).toBeTruthy()
+
+    fireEvent.click(loreSwitch)
+    await waitFor(() => expect(scope.set).toHaveBeenCalledWith('enabledSkills', ['rp-guide-state']))
+    expect(await screen.findByText('已停用世界书指南。')).toBeTruthy()
+  })
+
+  it('在系统提示词页签展示 Chat、Agent、Writer 与自定义子代理的真实拼接来源，且各层默认收起', async () => {
+    const { scope, connection } = harness(['lore-book', 'state', 'subagent-manager'])
+    const { container } = render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+    fireEvent.click(await screen.findByRole('tab', { name: '系统提示词' }))
+
+    expect(await screen.findByRole('heading', { name: '代理提示词' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Roleplay 统一身份' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Chat 父代理/ }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getAllByText('You are an AI agent powered by DeepSeek Harness.').length).toBeGreaterThan(1)
+    expect(screen.getByText('The Harness checkout is available at /source.')).toBeTruthy()
+    expect(screen.getByText('You are using the Harness Web GUI.')).toBeTruthy()
+    expect(screen.getAllByText('harness:identity').length).toBeGreaterThan(1)
+    expect(screen.getByText('harness:source')).toBeTruthy()
+    expect(screen.getByText('app:web-surface')).toBeTruthy()
+    expect(screen.getByText(/Handle the current request within an ongoing roleplay conversation/)).toBeTruthy()
+    expect(screen.getByText(/Chat mode is the direct narrative path/)).toBeTruthy()
+    const promptLayers = [...container.querySelectorAll('ol details')]
+    expect(promptLayers.length).toBeGreaterThan(0)
+    expect(promptLayers.every(layer => !layer.open)).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: /^Writer/ }))
+    expect(await screen.findByText(/Write the next user-visible narrative passage/)).toBeTruthy()
+    expect(screen.getByText('不向这个代理提供工具。')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /自定义子代理/ }))
+    expect(await screen.findByRole('combobox', { name: '选择自定义子代理' })).toBeTruthy()
+    expect(screen.getByText(/只返回连续性问题/)).toBeTruthy()
+    expect(screen.getAllByText('web_search').length).toBeGreaterThan(0)
+  })
+
+  it('在提示词页统一编辑并恢复所有 Roleplay 代理使用的 Harness 身份', async () => {
+    const { scope, connection } = harness(['lore-book', 'subagent-manager'])
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+    fireEvent.click(await screen.findByRole('tab', { name: '系统提示词' }))
+    await screen.findByRole('heading', { name: 'Roleplay 统一身份' })
+
+    fireEvent.click(screen.getByRole('button', { name: '编辑统一身份' }))
+    const field = screen.getByRole('textbox', { name: '统一身份 System 提示词' })
+    fireEvent.change(field, { target: { value: 'You are the shared Roleplay identity.' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存统一身份' }))
+
+    await waitFor(() => expect(scope.set).toHaveBeenCalledWith('harnessIdentity', 'You are the shared Roleplay identity.'))
+    expect(await screen.findByText('已更新 Roleplay 统一身份；下一次模型请求开始使用。')).toBeTruthy()
+    expect(screen.getAllByText('You are the shared Roleplay identity.').length).toBeGreaterThan(1)
+    expect(screen.getByText('已自定义')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '编辑统一身份' }))
+    fireEvent.click(screen.getByRole('button', { name: '恢复 Harness 默认值' }))
+    await waitFor(() => expect(scope.unset).toHaveBeenCalledWith('harnessIdentity'))
+    expect(await screen.findByText('已恢复 Harness 默认身份。')).toBeTruthy()
+    expect(screen.getByText('使用 Harness 默认值')).toBeTruthy()
+  })
+})

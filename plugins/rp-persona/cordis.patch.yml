@@ -1,0 +1,11 @@
+- insert:
+    - id: rp-persona
+      name: dsh-roleplay-rp-persona
+      config:
+        libraryDir: ./.dsh-roleplay/personas
+        maxTextCharacters: 30000
+        maxAvatarInputBytes: 5242880
+        maxAvatarPixels: 16777216
+        avatarMaxEdgePixels: 512
+        avatarWebpQuality: 85
+        exposeBrowser: true

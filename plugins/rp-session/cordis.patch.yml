@@ -1,0 +1,6 @@
+- insert:
+    - id: rp-session
+      name: dsh-roleplay-rp-session
+      config:
+        defaultMode: adaptive
+        defaultExecutionMode: chat

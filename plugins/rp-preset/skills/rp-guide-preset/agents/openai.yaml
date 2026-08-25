@@ -1,0 +1,4 @@
+interface:
+  display_name: "创作预设执行指导"
+  short_description: "应用、管理创作预设，并按需迁移 SillyTavern 预设"
+  default_prompt: "Use $rp-guide-preset to inspect, manage, or semantically import a Roleplay creation preset with the available Roleplay asset tools."

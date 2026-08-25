@@ -1,0 +1,8 @@
+- insert:
+    - id: rp-writing-style
+      name: dsh-roleplay-rp-writing-style
+      config:
+        libraryDir: ./.dsh-roleplay/writing-styles
+        maxTextCharacters: 30000
+        maxStylesPerSession: 16
+        exposeBrowser: true

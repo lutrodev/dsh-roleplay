@@ -1,0 +1,76 @@
+{
+  "name": "dsh-roleplay-rp-compat-mvu",
+  "version": "0.1.0",
+  "description": "Safe MVU compatibility adapter for Roleplay character cards and lorebooks",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./convert": "./src/convert.js",
+    "./lore-adapter": "./src/lore-adapter.js",
+    "./materialize": "./src/materialize.js",
+    "./native-state": "./src/native-state.js",
+    "./state-template": "./src/state-template.js"
+  },
+  "files": [
+    "src/**/*.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/convert.js && node --check src/initial-value.js && node --check src/lore-adapter.js && node --check src/materialize.js && node --check src/mvu-control.js && node --check src/mvu-type.js && node --check src/native-state.js && node --check src/opening-command-parser.js && node --check src/opening-operations.js && node --check src/semantic-rules.js && node --check src/state-template.js",
+    "test": "node --test",
+    "verify": "pnpm run check && pnpm test"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "yaml": "2.9.0"
+  },
+  "peerDependencies": {
+    "dsh-roleplay-rp-character-card": "^0.1.0",
+    "dsh-roleplay-rp-core": "^0.1.0",
+    "dsh-roleplay-rp-library": "^0.1.0",
+    "dsh-roleplay-rp-lore-book": "^0.1.0",
+    "dsh-roleplay-rp-state": "^0.1.0",
+    "dsh-roleplay-rp-session": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "dsh-roleplay-rp-character-card": {
+      "optional": true
+    },
+    "dsh-roleplay-rp-core": {
+      "optional": true
+    },
+    "dsh-roleplay-rp-library": {
+      "optional": true
+    },
+    "dsh-roleplay-rp-lore-book": {
+      "optional": true
+    },
+    "dsh-roleplay-rp-state": {
+      "optional": true
+    },
+    "dsh-roleplay-rp-session": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "dsh-roleplay-rp-character-card": "workspace:^",
+    "dsh-roleplay-rp-core": "workspace:^",
+    "dsh-roleplay-rp-library": "workspace:^",
+    "dsh-roleplay-rp-lore-book": "workspace:^",
+    "dsh-roleplay-rp-state": "workspace:^",
+    "dsh-roleplay-rp-session": "workspace:^"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@11.7.0"
+}

@@ -1,0 +1,3 @@
+name: Roleplay 模式
+description: 专注角色扮演：Chat 可只读查询资料；创建、修改或绑定资料请切换 Agent，Agent 还可搜索网页、调用 Skills、向你确认并按各自调用契约运行独立子代理。
+order: 3.5

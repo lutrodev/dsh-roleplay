@@ -1,0 +1,42 @@
+.portalAnchor { display: none; }
+
+[data-chat-flow-kind="rp-message-avatar-user"],
+[data-chat-flow-kind="rp-message-avatar-assistant"],
+[data-chat-flow-kind="rp-message-avatar-opening"] {
+  display: none;
+}
+
+[data-rp-message-avatar-host] { position: relative; }
+
+.messageAvatar {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--dsw-specific-bubble);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.userAvatar { left: calc(100% + 12px); }
+.assistantAvatar { right: calc(100% + 11px); }
+[data-chat-flow-kind="rp-opening"] > .assistantAvatar { top: 2px; }
+
+.messageAvatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+[data-conversation-scroll] { container: rp-conversation / inline-size; }
+@container rp-conversation (max-width: 843px) {
+  .messageAvatar { display: none; }
+}

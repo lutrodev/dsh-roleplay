@@ -1,0 +1,13 @@
+- insert:
+    - id: rp-core
+      name: dsh-roleplay-rp-core
+      config:
+        chatMaxStepsPerRun: 5
+        agentMaxStepsPerRun: 20
+        maxContextCharacters: 60000
+        maxEffectsPerCommit: 64
+        maxArtifactBytes: 262144
+        maxNarrativeCharacters: 200000
+        maxWriterBriefCharacters: 4096
+        maxSubagentPromptCharacters: 20000
+        subagentProvider: spawn

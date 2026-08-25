@@ -1,0 +1,4 @@
+- insert:
+    - id: rp-macro
+      name: dsh-roleplay-rp-macro
+      config: {}

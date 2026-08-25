@@ -1,0 +1,4 @@
+- insert:
+    - id: rp-message-actions
+      name: dsh-roleplay-rp-message-actions
+      config: {}

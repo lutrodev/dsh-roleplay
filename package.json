@@ -1,0 +1,37 @@
+{
+  "name": "@lutrodev/dsh-roleplay",
+  "version": "0.1.0",
+  "description": "Open-source roleplay plugin suite for DeepSeek Harness",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:compat": "node tools/check-harness-compat.mjs",
+    "check:dev": "node --check scripts/dev.mjs",
+    "test:dev": "node --test scripts/dev.test.mjs",
+    "check": "pnpm run check:compat && pnpm run check:dev && pnpm -r --if-present run check",
+    "test": "pnpm run test:dev && pnpm -r --if-present run test",
+    "build": "pnpm -r --if-present run build:client",
+    "build:package": "pnpm run build && node scripts/build-npm-package.mjs",
+    "pack:package": "pnpm run build:package && npm pack ./.npm-package",
+    "publish:package": "pnpm run build:package && npm publish ./.npm-package --access public",
+    "verify": "pnpm run check:compat && pnpm run check:dev && pnpm run test:dev && pnpm -r --if-present run verify",
+    "dev": "node scripts/dev.mjs",
+    "dev:config": "node scripts/dev.mjs --dump-config"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh": "0.1.1-rc.2"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lutrodev/dsh-roleplay.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lutrodev/dsh-roleplay/issues"
+  },
+  "homepage": "https://github.com/lutrodev/dsh-roleplay#readme",
+  "packageManager": "pnpm@11.7.0"
+}
