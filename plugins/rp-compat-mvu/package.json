@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-compat-mvu",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Safe MVU compatibility adapter for Roleplay character cards and lorebooks",
   "license": "MIT",
   "private": true,
