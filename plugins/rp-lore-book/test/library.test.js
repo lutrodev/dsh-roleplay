@@ -29,6 +29,28 @@ test('imports, rejects duplicates, searches, pages and reads lorebook details', 
   }
 })
 
+test('lists imported world books by import time with the newest first', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-lore-import-order-'))
+  const ctx = new Context()
+  const books = new RpLoreBooks(ctx, { libraryDir: root, maxInputBytes: 4096, maxTokens: 128, maxEntries: 16, maxRecursiveDepth: 2 })
+  try {
+    const older = await books.import({ name: 'A 旧世界', entries: [] })
+    const newer = await books.import({ name: 'Z 新世界', entries: [] })
+    await setLorebookImportedAt(root, older.id, '2026-01-01T00:00:00.000Z')
+    await setLorebookImportedAt(root, newer.id, '2026-02-01T00:00:00.000Z')
+    await books.update(older.id, { name: 'A 旧世界（后来编辑）' }, 1)
+
+    const firstPage = await books.list({ limit: 1 })
+    const secondPage = await books.list({ cursor: firstPage.nextCursor, limit: 1 })
+    assert.deepEqual(firstPage.items.map(item => item.id), [newer.id])
+    assert.equal(firstPage.items[0].importedAt, '2026-02-01T00:00:00.000Z')
+    assert.deepEqual(secondPage.items.map(item => item.id), [older.id])
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('uses each imported book scan depth and preserves it across native edits', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-lore-scan-depth-'))
   const ctx = new Context()
@@ -69,6 +91,12 @@ test('uses each imported book scan depth and preserves it across native edits', 
     await rm(root, { recursive: true, force: true })
   }
 })
+
+async function setLorebookImportedAt(root, id, importedAt) {
+  const path = join(root, `${id}.json`)
+  const book = JSON.parse(await readFile(path, 'utf8'))
+  await writeFile(path, `${JSON.stringify({ ...book, importedAt }, null, 2)}\n`)
+}
 
 test('treats deleted bound cards and lorebooks as absent during context assembly', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-lore-deleted-bindings-'))

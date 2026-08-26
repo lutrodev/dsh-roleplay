@@ -628,7 +628,7 @@ function mergeSerializedLoreBooks(serialized, books) {
     }))),
   }
 }
-function summary(book) { return { id: book.id, name: book.name, revision: book.revision, hash: book.sourceHash, entries: book.entries.length, slots: slotCounts(book.entries), status: 'ready', sourceCharacterId: book.sourceCharacterId ?? null, sourceCharacterName: book.sourceCharacterName ?? null, embedded: book.embedded === true } }
+function summary(book) { return { id: book.id, name: book.name, revision: book.revision, hash: book.sourceHash, importedAt: typeof book.importedAt === 'string' ? book.importedAt : null, entries: book.entries.length, slots: slotCounts(book.entries), status: 'ready', sourceCharacterId: book.sourceCharacterId ?? null, sourceCharacterName: book.sourceCharacterName ?? null, embedded: book.embedded === true } }
 function removalSummary(id, raw) {
   const stored = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
   const entries = Array.isArray(stored.entries) ? stored.entries : []
@@ -659,7 +659,17 @@ function pageOptions(query, cursor, limit) {
   if (!Number.isSafeInteger(offset) || offset < 0 || (cursor !== undefined && cursor !== null && String(offset) !== String(cursor))) throw coded('INVALID_REQUEST', 'cursor is invalid')
   return { query: query.trim().toLocaleLowerCase(), limit, offset }
 }
-function compareAssets(left, right) { return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id) }
+function compareAssets(left, right) {
+  const leftImportedAt = importTimestamp(left.importedAt)
+  const rightImportedAt = importTimestamp(right.importedAt)
+  if (leftImportedAt !== rightImportedAt) return rightImportedAt > leftImportedAt ? 1 : -1
+  return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id)
+}
+function importTimestamp(value) {
+  if (typeof value !== 'string') return Number.NEGATIVE_INFINITY
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY
+}
 function assertId(id) { if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/.test(id)) throw coded('INVALID_REQUEST', 'invalid lorebook id') }
 function assertCharacterId(id) { if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/.test(id)) throw coded('INVALID_REQUEST', 'invalid source character id') }
 function coded(code, message, cause) { const error = new Error(message, { cause }); error.code = code; return error }

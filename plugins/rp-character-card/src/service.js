@@ -440,6 +440,7 @@ function cardSummary(manifest, character) {
     hash: character.sourceHash,
     format: manifest.format,
     specVersion: manifest.specVersion,
+    importedAt: typeof manifest.importedAt === 'string' ? manifest.importedAt : null,
     tags: Array.isArray(character.tags) ? character.tags.filter(tag => typeof tag === 'string') : [],
     hasAvatar: typeof manifest.avatarPath === 'string',
     lorebookEntries: Number(manifest.lorebookEntries ?? 0),
@@ -458,7 +459,17 @@ function pageOptions(query, cursor, limit) {
   return { query: query.trim().toLocaleLowerCase(), limit, offset }
 }
 
-function compareAssets(left, right) { return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id) }
+function compareAssets(left, right) {
+  const leftImportedAt = importTimestamp(left.importedAt)
+  const rightImportedAt = importTimestamp(right.importedAt)
+  if (leftImportedAt !== rightImportedAt) return rightImportedAt > leftImportedAt ? 1 : -1
+  return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id)
+}
+function importTimestamp(value) {
+  if (typeof value !== 'string') return Number.NEGATIVE_INFINITY
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY
+}
 function embeddedLoreEntries(character) { return Array.isArray(character.characterBook?.entries) ? character.characterBook.entries.length : 0 }
 function readJson(path) { return readFile(path, 'utf8').then(JSON.parse) }
 function assertId(id, kind) { if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/.test(id)) throw assetError('INVALID_REQUEST', `invalid ${kind} id`) }

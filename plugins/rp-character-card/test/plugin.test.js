@@ -223,6 +223,28 @@ test('creates a native card without an import file and keeps it revision-editabl
   }
 })
 
+test('lists imported character cards by import time with the newest first', async () => {
+  const libraryDir = await mkdtemp(join(tmpdir(), 'dsh-roleplay-card-import-order-'))
+  const ctx = new Context()
+  const cards = new RpCharacterCards(ctx, { libraryDir, maxInputBytes: 4096, maxTextCharacters: 4096 })
+  try {
+    const older = await cards.import(new TextEncoder().encode(JSON.stringify({ name: 'A 旧角色' })), { path: 'older.json' })
+    const newer = await cards.import(new TextEncoder().encode(JSON.stringify({ name: 'Z 新角色' })), { path: 'newer.json' })
+    await setCardImportedAt(libraryDir, older.id, '2026-01-01T00:00:00.000Z')
+    await setCardImportedAt(libraryDir, newer.id, '2026-02-01T00:00:00.000Z')
+    await cards.update(older.id, { description: '后来编辑，但不改变导入顺序。' }, 1)
+
+    const firstPage = await cards.list({ limit: 1 })
+    const secondPage = await cards.list({ cursor: firstPage.nextCursor, limit: 1 })
+    assert.deepEqual(firstPage.items.map(item => item.id), [newer.id])
+    assert.equal(firstPage.items[0].importedAt, '2026-02-01T00:00:00.000Z')
+    assert.deepEqual(secondPage.items.map(item => item.id), [older.id])
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(libraryDir, { recursive: true, force: true })
+  }
+})
+
 test('browser export downloads the latest saved native card as a re-importable V3 PNG', async () => {
   const libraryDir = await mkdtemp(join(tmpdir(), 'dsh-roleplay-native-card-export-'))
   const ctx = new Context()
@@ -401,6 +423,12 @@ function characterCardBytes(value) {
     chunk('tEXt', text),
     chunk('IEND', Buffer.alloc(0)),
   ])
+}
+
+async function setCardImportedAt(libraryDir, id, importedAt) {
+  const path = join(libraryDir, id, 'manifest.json')
+  const manifest = JSON.parse(await readFile(path, 'utf8'))
+  await writeFile(path, `${JSON.stringify({ ...manifest, importedAt }, null, 2)}\n`)
 }
 
 function chunk(type, data) {
