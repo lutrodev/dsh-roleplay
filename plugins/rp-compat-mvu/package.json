@@ -20,7 +20,7 @@
     "README.md"
   ],
   "scripts": {
-    "check": "node --check src/index.js && node --check src/convert.js && node --check src/initial-value.js && node --check src/lore-adapter.js && node --check src/materialize.js && node --check src/mvu-control.js && node --check src/mvu-type.js && node --check src/native-state.js && node --check src/opening-command-parser.js && node --check src/opening-operations.js && node --check src/semantic-rules.js && node --check src/state-template.js",
+    "check": "node --check src/index.js && node --check src/convert.js && node --check src/initial-value.js && node --check src/lore-adapter.js && node --check src/materialize.js && node --check src/mvu-control.js && node --check src/mvu-type.js && node --check src/native-state.js && node --check src/opening-command-parser.js && node --check src/opening-operations.js && node --check src/semantic-path.js && node --check src/semantic-rules.js && node --check src/state-template.js",
     "test": "node --test",
     "verify": "pnpm run check && pnpm test"
   },

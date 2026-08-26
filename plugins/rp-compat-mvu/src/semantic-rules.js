@@ -1,19 +1,26 @@
-import { parseDocument } from 'yaml'
+import { isAlias, isMap, isScalar, isSeq, parseDocument } from 'yaml'
 import {
   applyMvuDeclaredSchema,
   matchesMvuDeclaredType,
   parseMvuDeclaredType,
 } from './mvu-type.js'
 import { hasMvuLegacyOperationSyntax, hasMvuLegacyOutputSyntax } from './mvu-control.js'
+import {
+  ensureMvuSemanticSchemaTargets,
+  renderMvuSemanticPattern,
+  resolveMvuSemanticRulePath,
+} from './semantic-path.js'
 
 const UPDATE_MARKER = /\[mvu_update\]/i
 const OUTPUT_MARKER = /变量输出格式/i
 const OUTPUT_DOCUMENT = /^\s*(?:#\s*)?变量输出格式\s*:/mu
 const SEMANTIC_RULE_DOCUMENT = /^\s*(?:#\s*)?变量更新规则\s*:/mu
-const PLACEHOLDER = /^\$\{[^:{}]+:\s*([^{}]+)\}$/u
 const RULE_FIELDS = new Set(['type', 'range', 'check', 'format'])
 const OPERATION_FIELDS = new Set(['script', 'patch', 'patches', 'operation', 'operations', 'command', 'commands', 'output'])
 const UNSAFE_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
+const GLOBAL_RULE_KEYS = new Set(['核心规则', '全局规则', '通用规则'])
+const MAX_RULE_DOCUMENT_DEPTH = 64
+const MAX_RULE_DOCUMENT_NODES = 100_000
 
 /** True for an MVU lore entry that defines semantic rules or a legacy output protocol. */
 export function isMvuUpdateControlEntry(entry) {
@@ -65,8 +72,28 @@ export function convertMvuSemanticRules(documents, initialValue, sourceSchema) {
   let machineEnforceable = true
   for (const document of documents) {
     walkRuleTree(document.value, [], document.path, (segments, leaf, path) => {
-      for (const expanded of expandPath(segments, path, diagnostics)) {
-        leafByPath.set(toPointer(expanded), { segments: expanded, leaf, path })
+      const resolved = segments.length === 0
+        ? { ok: true, targets: [{ segments: [], group: true, pattern: [] }] }
+        : resolveMvuSemanticRulePath(segments, initialValue, sourceSchema)
+      if (!resolved.ok) {
+        diagnostics.push({
+          code: 'MVU_UPDATE_RULE_UNCONVERTED',
+          severity: 'error',
+          path,
+          message: resolved.message,
+        })
+        return
+      }
+      for (const target of resolved.targets) {
+        const key = toPointer(target.segments)
+        const candidate = {
+          ...target,
+          leaf,
+          path,
+          wildcardCount: target.pattern.filter(segment => segment.kind !== 'literal').length,
+        }
+        const previous = leafByPath.get(key)
+        if (previous === undefined || candidate.wildcardCount <= previous.wildcardCount) leafByPath.set(key, candidate)
       }
     }, diagnostics)
   }
@@ -76,22 +103,44 @@ export function convertMvuSemanticRules(documents, initialValue, sourceSchema) {
   for (const [declaredTarget, entry] of leafByPath) {
     let segments = entry.segments
     let target = declaredTarget
-    let node = ensureSchemaPath(schema, segments)
+    let nodes = ensureMvuSemanticSchemaTargets(schema, entry)
     let current = valueAt(initialValue, segments)
-    if (!current.found) diagnostics.push({
+    if (nodes.length === 0) {
+      unsupported = true
+      diagnostics.push({
+        code: 'MVU_UPDATE_RULE_UNCONVERTED',
+        severity: 'error',
+        path: entry.path,
+        message: `MVU 语义规则目标 ${target || '<root>'} 与已初始化的容器类型不兼容。`,
+      })
+      continue
+    }
+    const concrete = entry.group
+      ? (entry.concreteSegments ?? []).map(candidate => valueAt(initialValue, candidate)).filter(candidate => candidate.found)
+      : [current].filter(candidate => candidate.found)
+    if (!entry.group && !current.found) diagnostics.push({
       code: 'MVU_RULE_TARGET_NOT_INITIALIZED',
       severity: 'warning',
       path: entry.path,
       message: `MVU 语义规则目标 ${target} 没有初始值；已保留为可选变量，请检查初始化路径是否一致。`,
     })
+    if (entry.group) {
+      machineEnforceable = false
+      diagnostics.push({
+        code: 'MVU_RULE_GROUP_NORMALIZED',
+        severity: 'info',
+        path: entry.path,
+        message: `MVU 分组路径 ${renderMvuSemanticPattern(entry.pattern)} 已关联到原生变量组 ${target || '<root>'}；子变量写入由 Schema 校验。`,
+      })
+    }
     if (entry.leaf.type !== undefined) {
       const declared = parseMvuDeclaredType(entry.leaf.type)
-      const redirected = declared === undefined ? undefined : redirectSingleChildTarget(declared, current, segments)
+      const redirected = entry.group || declared === undefined ? undefined : redirectSingleChildTarget(declared, current, segments)
       if (redirected !== undefined) {
         segments = redirected.segments
         target = toPointer(segments)
         current = redirected.current
-        node = ensureSchemaPath(schema, segments)
+        nodes = ensureMvuSemanticSchemaTargets(schema, { ...entry, group: false, segments })
         diagnostics.push({
           code: 'MVU_RULE_TARGET_NORMALIZED',
           severity: 'info',
@@ -99,7 +148,12 @@ export function convertMvuSemanticRules(documents, initialValue, sourceSchema) {
           message: `MVU 规则 ${declaredTarget} 的声明类型与其唯一子变量一致；已将语义规则关联到 ${target}。`,
         })
       }
-      if (declared === undefined || (current.found && !matchesMvuDeclaredType(declared, current.value))) {
+      const typeValues = entry.group
+        ? concrete
+        : [current].filter(candidate => candidate.found)
+      const mismatched = declared !== undefined
+        && typeValues.some(candidate => !matchesMvuDeclaredType(declared, candidate.value))
+      if (declared === undefined || mismatched) {
         unsupported = true
         diagnostics.push({
           code: 'MVU_RULE_TYPE_UNCONVERTED',
@@ -109,11 +163,10 @@ export function convertMvuSemanticRules(documents, initialValue, sourceSchema) {
             ? `不支持 MVU 变量类型“${String(entry.leaf.type)}”。`
             : `MVU 声明类型 ${declared.type} 与初始值不一致。`,
         })
-      } else applyMvuDeclaredSchema(node, declared)
+      } else for (const node of nodes) applyMvuDeclaredSchema(node, declared)
     }
     if (entry.leaf.range !== undefined) {
       const range = parseRange(entry.leaf.range)
-      const type = node.type
       const description = normalizeRangeDescription(entry.leaf.range)
       if (description === undefined) {
         unsupported = true
@@ -123,11 +176,14 @@ export function convertMvuSemanticRules(documents, initialValue, sourceSchema) {
           path: `${entry.path}/range`,
           message: 'MVU range 必须是非空文本或两个有限数值。',
         })
-      } else if (range !== undefined && ['number', 'integer'].includes(type)) {
-        node.minimum = range.minimum
-        node.maximum = range.maximum
-        if (!isPlainNumericRange(entry.leaf.range)) appendSchemaDescription(node, `取值说明：${description}`)
-      } else appendSchemaDescription(node, `取值说明：${description}`)
+      } else for (const node of nodes) {
+        const types = Array.isArray(node.type) ? node.type : [node.type]
+        if (range !== undefined && types.some(type => ['number', 'integer'].includes(type))) {
+          node.minimum = range.minimum
+          node.maximum = range.maximum
+          if (!isPlainNumericRange(entry.leaf.range)) appendSchemaDescription(node, `取值说明：${description}`)
+        } else appendSchemaDescription(node, `取值说明：${description}`)
+      }
     }
     const checks = normalizeChecks(entry.leaf.check, `${entry.path}/check`, diagnostics)
     if (entry.leaf.check !== undefined && checks === undefined) {
@@ -139,20 +195,20 @@ export function convertMvuSemanticRules(documents, initialValue, sourceSchema) {
       unsupported = true
       continue
     }
-    if (format !== undefined && node.type === undefined) node.type = 'string'
+    if (format !== undefined) for (const node of nodes) if (node.type === undefined) node.type = 'string'
     const guidance = [
       ...(checks ?? []),
       ...(format === undefined ? [] : [`值格式：${format}`]),
     ]
     if (guidance.length === 0) continue
     ruleIndex += 1
-    const numericTarget = current.found
+    const numericTarget = !entry.group && current.found
       ? typeof current.value === 'number' && Number.isFinite(current.value)
-      : ['number', 'integer'].includes(node.type)
+      : !entry.group && nodes.some(node => (Array.isArray(node.type) ? node.type : [node.type]).some(type => ['number', 'integer'].includes(type)))
     const delta = numericTarget ? deriveDeltaRange(guidance) : undefined
     const cadence = guidance.some(isEveryTurnGuidance) ? 'every-turn' : 'when-applicable'
     const when = guidance.find(text => !isEveryTurnGuidance(text) && parseDeltaRange(text) === undefined) ?? guidance[0]
-    const condition = deriveCondition(guidance, segments, target)
+    const condition = entry.group ? undefined : deriveCondition(guidance, segments, target)
     if (current.found && (record(current.value) || Array.isArray(current.value))) machineEnforceable = false
     rules.push({
       id: `mvu-rule-${String(ruleIndex).padStart(3, '0')}`,
@@ -162,7 +218,10 @@ export function convertMvuSemanticRules(documents, initialValue, sourceSchema) {
       effect: delta === undefined
         ? { op: 'set' }
         : { op: 'increment', minimum: delta.minimum, maximum: delta.maximum },
-      guidance: guidance.filter(text => text !== when),
+      guidance: [
+        ...(entry.group ? [`适用 MVU 路径模式：${renderMvuSemanticPattern(entry.pattern)}`] : []),
+        ...guidance.filter(text => text !== when),
+      ],
       cadence,
     })
   }
@@ -180,6 +239,13 @@ function redirectSingleChildTarget(declared, current, segments) {
 }
 
 function walkRuleTree(node, segments, path, emit, diagnostics) {
+  if (Array.isArray(node)
+    && GLOBAL_RULE_KEYS.has(segments.at(-1))
+    && node.length > 0
+    && node.every(item => typeof item === 'string' && item.trim().length > 0)) {
+    emit([], { check: node }, path)
+    return
+  }
   if (!record(node)) {
     diagnostics.push({ code: 'MVU_UPDATE_RULE_UNCONVERTED', severity: 'error', path, message: 'MVU 更新规则节点必须是对象。' })
     return
@@ -188,18 +254,25 @@ function walkRuleTree(node, segments, path, emit, diagnostics) {
   const ruleKeys = keys.filter(key => RULE_FIELDS.has(key))
   const operationKeys = keys.filter(key => OPERATION_FIELDS.has(key))
   if (ruleKeys.length > 0) {
-    const unknown = keys.find(key => !RULE_FIELDS.has(key) && !OPERATION_FIELDS.has(key))
-    if (unknown !== undefined || segments.length === 0) {
+    if (segments.length === 0) {
       diagnostics.push({
         code: 'MVU_UPDATE_RULE_UNCONVERTED',
         severity: 'error',
         path,
-        message: unknown === undefined ? 'MVU 更新规则缺少变量路径。' : `MVU 更新规则包含未知字段“${unknown}”。`,
+        message: 'MVU 更新规则缺少变量路径。',
       })
       return
     }
     if (operationKeys.length > 0) diagnostics.push(operationLogicDiagnostic(path, operationKeys))
     emit(segments, Object.fromEntries(Object.entries(node).filter(([key]) => RULE_FIELDS.has(key))), path)
+    for (const [key, child] of Object.entries(node)) {
+      if (RULE_FIELDS.has(key) || OPERATION_FIELDS.has(key)) continue
+      if (UNSAFE_KEYS.has(key)) {
+        diagnostics.push({ code: 'MVU_UPDATE_RULE_UNCONVERTED', severity: 'error', path, message: `MVU 更新规则包含不安全字段“${key}”。` })
+        continue
+      }
+      walkRuleTree(child, [...segments, key], `${path}/${escapePointer(key)}`, emit, diagnostics)
+    }
     return
   }
   if (operationKeys.length > 0) {
@@ -216,43 +289,6 @@ function walkRuleTree(node, segments, path, emit, diagnostics) {
     }
     walkRuleTree(child, [...segments, key], `${path}/${escapePointer(key)}`, emit, diagnostics)
   }
-}
-
-function expandPath(segments, path, diagnostics) {
-  let paths = [[]]
-  for (const segment of segments) {
-    const placeholder = PLACEHOLDER.exec(segment)
-    if (placeholder === null) {
-      if (segment.includes('${')) {
-        diagnostics.push({ code: 'MVU_UPDATE_RULE_UNCONVERTED', severity: 'error', path, message: `无法安全展开 MVU 路径“${segment}”。` })
-        return []
-      }
-      paths = paths.map(parts => [...parts, segment])
-      continue
-    }
-    const alternatives = placeholder[1].split('|').map(value => value.trim()).filter(Boolean)
-    if (alternatives.length === 0 || alternatives.some(value => UNSAFE_KEYS.has(value))) {
-      diagnostics.push({ code: 'MVU_UPDATE_RULE_UNCONVERTED', severity: 'error', path, message: `MVU 路径占位符“${segment}”没有安全候选值。` })
-      return []
-    }
-    paths = paths.flatMap(parts => alternatives.map(value => [...parts, value]))
-  }
-  return paths
-}
-
-function ensureSchemaPath(schema, segments) {
-  let current = schema
-  for (const segment of segments) {
-    if (current.type !== 'object') {
-      current.type = 'object'
-      current.properties = {}
-      current.additionalProperties = false
-    }
-    if (!record(current.properties)) current.properties = {}
-    if (!record(current.properties[segment])) current.properties[segment] = {}
-    current = current.properties[segment]
-  }
-  return current
 }
 
 function deriveCondition(checks, segments, target) {
@@ -385,7 +421,7 @@ function extractSemanticRuleDocument(content) {
 
 function parseRuleDocument(content) {
   const source = normalizeSemanticRuleHeading(String(content).replace(UPDATE_MARKER, ''))
-  const text = normalizeSemanticCheckBlocks(normalizeSemanticScalarFields(quotePlaceholderKeys(source))).trim()
+  const text = normalizeSemanticGlobalRuleLists(normalizeSemanticCheckBlocks(normalizeSemanticScalarFields(quotePlaceholderKeys(source)))).trim()
   if (text.length === 0) return { ok: false, message: '规则内容为空。' }
   try {
     const document = parseDocument(text, {
@@ -393,16 +429,82 @@ function parseRuleDocument(content) {
       merge: false,
       prettyErrors: false,
       strict: true,
-      uniqueKeys: true,
+      uniqueKeys: false,
     })
     if (document.errors.length > 0) throw document.errors[0]
-    const parsed = document.toJS({ maxAliasCount: 100, mapAsMap: false })
+    const parsed = convertRuleYamlNode(document.contents, '$', 0, { nodes: 0 })
     if (!record(parsed)) return { ok: false, message: '规则根节点必须是对象。' }
     const value = record(parsed['变量更新规则']) ? parsed['变量更新规则'] : parsed
     return record(value) ? { ok: true, value } : { ok: false, message: '“变量更新规则”必须是对象。' }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : String(error) }
   }
+}
+
+function normalizeSemanticGlobalRuleLists(value) {
+  const lines = value.split('\n')
+  for (let index = 0; index < lines.length; index += 1) {
+    const heading = /^(\s*)(核心规则|全局规则|通用规则):\s*$/u.exec(lines[index])
+    if (heading === null) continue
+    const baseIndent = indentation(heading[1])
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      const line = lines[cursor]
+      if (line.trim().length === 0) continue
+      const lineIndent = indentation(/^\s*/u.exec(line)[0])
+      if (lineIndent <= baseIndent) break
+      const item = /^(\s*)-\s*(.*?)\s*$/u.exec(line)
+      if (item !== null && item[2].length > 0) lines[cursor] = `${item[1]}- ${JSON.stringify(unquoteSemanticText(item[2]))}`
+    }
+  }
+  return lines.join('\n')
+}
+
+function convertRuleYamlNode(node, path, depth, state) {
+  state.nodes += 1
+  if (state.nodes > MAX_RULE_DOCUMENT_NODES) throw new Error(`MVU 规则超过 ${MAX_RULE_DOCUMENT_NODES} 个节点。`)
+  if (depth > MAX_RULE_DOCUMENT_DEPTH) throw new Error(`MVU 规则超过 ${MAX_RULE_DOCUMENT_DEPTH} 层。`)
+  if (node === null || node === undefined) return null
+  if (isAlias(node)) throw new Error('MVU 规则不支持 YAML 锚点或别名。')
+  if (node.tag !== undefined) throw new Error(`MVU 规则不支持 YAML 标签“${node.tag}”。`)
+  if (isScalar(node)) return normalizeRuleScalar(node.value, path)
+  if (isSeq(node)) return node.items.map((item, index) => convertRuleYamlNode(item, `${path}[${index}]`, depth + 1, state))
+  if (!isMap(node)) throw new Error(`MVU 规则节点 ${path} 不是声明式值。`)
+  const output = {}
+  for (const pair of node.items) {
+    if (!isScalar(pair.key) || typeof pair.key.value !== 'string' || pair.key.value.length === 0) {
+      throw new Error(`MVU 规则字段 ${path} 必须是非空文本。`)
+    }
+    const key = pair.key.value
+    if (UNSAFE_KEYS.has(key)) throw new Error(`MVU 规则包含不安全字段“${key}”。`)
+    const childPath = `${path}/${escapePointer(key)}`
+    const value = convertRuleYamlNode(pair.value, childPath, depth + 1, state)
+    output[key] = Object.hasOwn(output, key)
+      ? mergeDuplicateRuleValue(output[key], value, childPath)
+      : value
+  }
+  return output
+}
+
+function mergeDuplicateRuleValue(left, right, path) {
+  if (record(left) && record(right)) {
+    const output = structuredClone(left)
+    for (const [key, value] of Object.entries(right)) {
+      const childPath = `${path}/${escapePointer(key)}`
+      output[key] = Object.hasOwn(output, key)
+        ? mergeDuplicateRuleValue(output[key], value, childPath)
+        : structuredClone(value)
+    }
+    return output
+  }
+  if (Array.isArray(left) && Array.isArray(right)) return [...structuredClone(left), ...structuredClone(right)]
+  if (Object.is(left, right)) return structuredClone(left)
+  throw new Error(`MVU 规则重复字段 ${path} 的定义不一致。`)
+}
+
+function normalizeRuleScalar(value, path) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new Error(`MVU 规则字段 ${path} 不是 JSON 兼容的标量。`)
 }
 
 function normalizeSemanticRuleHeading(value) {
@@ -495,7 +597,14 @@ function isEveryTurnGuidance(value) {
 }
 
 function quotePlaceholderKeys(value) {
-  return value.replace(/^(\s*)(\$\{[^}\r\n]+\}):(\s*)/gmu, (_whole, indent, key, spacing) => `${indent}${JSON.stringify(key)}:${spacing}`)
+  return value.split('\n').map(line => {
+    if (!line.includes('${')) return line
+    const match = /^(\s*)(.*\$\{[^}\r\n]+\}.*):(\s*)$/u.exec(line)
+    if (match === null) return line
+    const key = match[2].trim()
+    if (/^-\s/u.test(key) || /^(?:type|range|check|format|script|patch(?:es)?|operation(?:s)?|command(?:s)?|output)\s*:/u.test(key)) return line
+    return `${match[1]}${JSON.stringify(key)}:${match[3]}`
+  }).join('\n')
 }
 
 function indentation(value) {
@@ -505,14 +614,20 @@ function indentation(value) {
 function valueAt(value, segments) {
   let current = value
   for (const segment of segments) {
-    if (!record(current) || !Object.prototype.hasOwnProperty.call(current, segment)) return { found: false }
-    current = current[segment]
+    if (Array.isArray(current) && /^(?:0|[1-9]\d*)$/u.test(segment)) {
+      const index = Number(segment)
+      if (index >= current.length) return { found: false }
+      current = current[index]
+    } else {
+      if (!record(current) || !Object.prototype.hasOwnProperty.call(current, segment)) return { found: false }
+      current = current[segment]
+    }
   }
   return { found: true, value: current }
 }
 
 function toPointer(segments) {
-  return `/${segments.map(escapePointer).join('/')}`
+  return segments.length === 0 ? '' : `/${segments.map(escapePointer).join('/')}`
 }
 
 function escapePointer(value) {

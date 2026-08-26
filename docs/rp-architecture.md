@@ -276,6 +276,8 @@ Session 配置和一个 turn 的关键事件顺序：
 | `stat_data` / `[InitVar]` | 适配时将角色卡、绑定世界书与所选开场合并为原生 `story` bootstrap；安全解析 JSON、YAML、常见缺逗号/尾逗号的社区 JSON，并将 `$meta.required`、`$meta.extensible` 转成 Schema；多角色保留在值路径中 | 完整覆盖声明式数据，资产实体不保存转换结果；失败时保留禁用分区与诊断 |
 | 默认、备用或自定义 greeting 的初始变量 | 按 `scene.openingSource` 与 `openingIndex` 只适配当前开场的 `<initvar>`，以及当前 MVU Zod 的字面量 `set/add/insert/delete/move` 命令；`assign/remove/unset` 分别归一为 `insert/delete/delete` | 固定基础 Schema 后逐条校验并整组原子应用；未选开场不污染 State，任一失败不会留下半初始化结果 |
 | ValueWithDescription | 递归拆分为纯 JSON 值与对应 Schema `description`；仅在兼容模板运行时临时重建只读 pair 视图 | 数据语义覆盖，不污染原生 State |
+| MVU / MVU Zod 语义路径 | 点号、括号、有限 `A \| B` 与 `${名称: A \| B}` 展开为精确 JSON Pointer；封闭对象中的 `*` / `${名称}` 展开为逐项规则，开放动态分组只生成 Schema 与模型指导 | 具体规则覆盖通配规则；动态分组令 namespace 使用 `schema-only`，原生 State 始终只接收精确路径 |
+| MVU Zod 类型与 YAML 习惯 | 转换安全的对象、字面量并集、可选字段、数组、索引签名、`Record<string, T>` 和 `null` 占位；递归合并不冲突的重复 YAML 分组 | 无法判定的伪类型或冲突声明失败关闭并保留诊断 |
 | 变量读写、插入、删除 | 原生 `state.update` 的 `set/increment/append/remove` + namespace revision CAS | 权威状态覆盖 |
 | 世界书按变量显示/激活 | 原生世界书 v3 使用安全 `stateCondition`；MVU 插件继续编译只读 `getvar`、条件、输出和字面量 `getwi` | 覆盖声明式安全子集；不执行状态写入或动态脚本 |
 | `stat_data` / `display_data` | 只作为 MVU 模板运行时对当前 `story` 值与 Schema 描述的临时别名 | 语义归并，不建立第二状态 |

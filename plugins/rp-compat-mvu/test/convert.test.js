@@ -14,7 +14,9 @@ import { decodeMvuInitialValue } from '../src/initial-value.js'
 import { createMvuLoreActivation } from '../src/lore-adapter.js'
 import { materializeMvuProfile } from '../src/materialize.js'
 import { createMvuCompatibilityView, isMvuControlEntry, materializeNativeMvuState, splitMvuValue } from '../src/native-state.js'
+import { parseMvuDeclaredType } from '../src/mvu-type.js'
 import { apply as applyMvuPlugin } from '../src/index.js'
+import { applyStateChanges } from 'dsh-roleplay-rp-state/update'
 
 test('sanitizes visible card text without adding compatibility fields or changing embedded lore', () => {
   const sourcePayload = {
@@ -133,6 +135,179 @@ test('discovers semantic rules by content and repairs common MVU YAML formatting
   assert.equal(state.diagnostics.setup.some(item => item.severity === 'error'), false)
   assert.equal(isMvuControlEntry(semanticEntry), true)
   assert.equal(isMvuControlEntry({ name: '变量更新指令集', content: '<UpdateVariable><JSONPatch>[]</JSONPatch></UpdateVariable>' }), true)
+})
+
+test('normalizes dotted MVU paths and expands a closed wildcard into exact native rules', () => {
+  const initialValue = {
+    世界: { 日期: '8月15日', 具体时间: '10:00', 当前地点: '大门前' },
+    莎夏: {
+      脸部特写: '神情自然',
+      衣着状态: '穿着外套',
+      身材概述: '固定特征',
+    },
+  }
+  const story = materializeNativeMvuState({
+    initialValue,
+    source: { data: { character_book: { entries: [{
+      comment: '[mvu_update]变量更新规则',
+      content: [
+        '变量更新规则:',
+        '  世界.具体时间:',
+        '    check: 剧情经过后更新时间',
+        '  莎夏.*:',
+        '    check: 根据本轮可见事实更新',
+        '  莎夏.身材概述:',
+        '    check: 固定特征不得随意修改',
+      ].join('\n'),
+    }] } } },
+  }).namespaces[0]
+  assert.equal(story.definition.updateMode, 'rules-required')
+  assert.deepEqual(story.definition.rules.map(rule => rule.target), [
+    '/世界/具体时间',
+    '/莎夏/脸部特写',
+    '/莎夏/衣着状态',
+    '/莎夏/身材概述',
+  ])
+  assert.equal(story.definition.rules[1].id, 'mvu-rule-002')
+  assert.match(story.definition.rules.at(-1).when, /固定特征/)
+  assert.equal(Object.hasOwn(story.definition.schema.properties, '莎夏.*'), false)
+  assert.equal(Object.hasOwn(story.definition.schema.properties, '世界.具体时间'), false)
+
+  const snapshot = {
+    revision: 1,
+    initialValue: structuredClone(story.initialValue),
+    value: structuredClone(story.initialValue),
+    definition: story.definition,
+    diagnostics: story.diagnostics,
+  }
+  const applied = applyStateChanges({
+    state: { revision: 1, namespaces: { story: snapshot } },
+    namespace: 'story',
+    snapshot,
+    changes: [{
+      op: 'set',
+      path: '/莎夏/脸部特写',
+      value: '视线转向门内',
+      ruleId: 'mvu-rule-002',
+      reason: '本轮明确描写了视线移动',
+    }],
+  })
+  assert.equal(applied.result.value['莎夏']['脸部特写'], '视线转向门内')
+})
+
+test('supports MVU Zod path groups, duplicate YAML sections and nullable placeholders safely', () => {
+  const story = materializeNativeMvuState({
+    initialValue: {
+      主角: {
+        能力: { 力量: null, 敏捷: 2 },
+        生命值: { 当前值: null, 最大值: null },
+        魔力值: { 当前值: 5, 最大值: 10 },
+        职业: {},
+        技能列表: {},
+      },
+    },
+    source: { data: { character_book: { entries: [{
+      comment: '[mvu_update]变量更新规则',
+      content: [
+        '变量更新规则:',
+        '  核心规则:',
+        '    - `description` 只记录客观效果。',
+        '  主角:',
+        '    能力.${七维}:',
+        '      type: number',
+        '      check: 对应历练完成时更新',
+        '    生命值 | 魔力值:',
+        '      type: |-',
+        '        { 当前值: number; 最大值: number; }',
+        '      check: 当前值不得超过最大值',
+        '    职业.${职业名}:',
+        '      type: |-',
+        '        { 当前等级: number; 当前经验: number; }',
+        '      check: 获得经验时更新',
+        '  主角:',
+        '    技能列表.${技能名}:',
+        '      type: |-',
+        "        { type: '主动' | '被动'; tags: string[]; flags: Record<string, true>; }",
+        '      check: 学会新技能时完整录入',
+      ].join('\n'),
+    }] } } },
+  }).namespaces[0]
+  assert.equal(story.definition.updateMode, 'schema-only')
+  assert.equal(story.diagnostics.setup.some(item => item.severity === 'error'), false)
+  assert.deepEqual(story.definition.rules.map(rule => rule.target), [
+    '',
+    '/主角/能力/力量',
+    '/主角/能力/敏捷',
+    '/主角/生命值',
+    '/主角/魔力值',
+    '/主角/职业',
+    '/主角/技能列表',
+  ])
+  assert.deepEqual(story.definition.schema.properties['主角'].properties['能力'].properties['力量'].type, ['number', 'null'])
+  assert.deepEqual(story.definition.schema.properties['主角'].properties['生命值'].properties['当前值'].type, ['number', 'null'])
+  assert.equal(story.definition.schema.properties['主角'].properties['职业'].additionalProperties.type, 'object')
+  const skill = story.definition.schema.properties['主角'].properties['技能列表'].additionalProperties
+  assert.equal(skill.properties.tags.type, 'array')
+  assert.equal(skill.properties.tags.items.type, 'string')
+  assert.deepEqual(skill.properties.flags.additionalProperties, { type: 'boolean', const: true })
+})
+
+test('keeps bracket paths and array wildcards schema-only without inventing pointer wildcards', () => {
+  const story = materializeNativeMvuState({
+    initialValue: {
+      '事件.记录': {
+        条目: [{ 状态: '进行中' }, { 状态: '已结束' }],
+      },
+    },
+    source: { data: { character_book: { entries: [{
+      comment: '[mvu_update]变量更新规则',
+      content: [
+        '变量更新规则:',
+        '  \'["事件.记录"].条目.*.状态\':',
+        '    type: string',
+        '    check: 条目状态发生变化时更新',
+      ].join('\n'),
+    }] } } },
+  }).namespaces[0]
+  assert.equal(story.definition.updateMode, 'schema-only')
+  assert.deepEqual(story.definition.rules.map(rule => rule.target), ['/事件.记录/条目'])
+  assert.match(story.definition.rules[0].guidance[0], /\["事件\.记录"\]\.条目\.\*\.状态/u)
+  assert.equal(story.definition.schema.properties['事件.记录'].properties['条目'].items.properties['状态'].type, 'string')
+})
+
+test('parses safe TypeScript-style MVU Zod collection declarations', () => {
+  assert.deepEqual(parseMvuDeclaredType('Array<{ emotion: string; intensity: "高" | "低"; }>'), {
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        emotion: { type: 'string' },
+        intensity: { type: 'string', enum: ['高', '低'] },
+      },
+      required: ['emotion', 'intensity'],
+      additionalProperties: false,
+    },
+  })
+  assert.deepEqual(parseMvuDeclaredType('{ 姓名, 职业: string; 标签: Record<string, true>; 技能: string[]; }'), {
+    type: 'object',
+    properties: {
+      姓名: { type: 'string' },
+      职业: { type: 'string' },
+      标签: { type: 'object', additionalProperties: { type: 'boolean', const: true } },
+      技能: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['姓名', '职业', '标签', '技能'],
+    additionalProperties: false,
+  })
+  assert.deepEqual(parseMvuDeclaredType('{ 名称：string；标签：Record<string， string[]>； }'), {
+    type: 'object',
+    properties: {
+      名称: { type: 'string' },
+      标签: { type: 'object', additionalProperties: { type: 'array', items: { type: 'string' } } },
+    },
+    required: ['名称', '标签'],
+    additionalProperties: false,
+  })
 })
 
 test('extracts an indented semantic rule section without treating every mvu_update entry as one', () => {
