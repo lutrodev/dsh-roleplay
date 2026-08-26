@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
-import { RpCharacterCards } from 'dsh-roleplay-rp-character-card'
+import { parseCharacterCard, RpCharacterCards } from 'dsh-roleplay-rp-character-card'
 import { RpLoreBooks, apply, dispatchBrowser, inject } from '../src/index.js'
 
 test('imports, rejects duplicates, searches, pages and reads lorebook details', async () => {
@@ -258,9 +258,63 @@ test('materializes embedded card lore, preserves its relationship, and supports 
     await books.delete(lore.id)
     assert.deepEqual(await cards.detail(imported.id), characterBeforeLoreDelete)
     assert.equal((await books.list({ limit: 100 })).total, 0)
+    const exportedWithoutDeletedLore = await cards.exportV3Png(imported.id, { modificationDate: 1234567890 })
+    assert.deepEqual(exportedWithoutDeletedLore.lorebooks, [])
+    assert.equal(parseCharacterCard(exportedWithoutDeletedLore.bytes, { maxTextCharacters: 4096 }).sourcePayload.data.character_book, undefined)
 
     await cards.delete(imported.id)
     await assert.rejects(cards.detail(imported.id), error => error.code === 'ASSET_NOT_FOUND')
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(cardRoot, { recursive: true, force: true })
+    await rm(loreRoot, { recursive: true, force: true })
+  }
+})
+
+test('character export embeds the latest associated lorebook revision in CCv3 format', async () => {
+  const cardRoot = await mkdtemp(join(tmpdir(), 'rp-card-v3-export-'))
+  const loreRoot = await mkdtemp(join(tmpdir(), 'rp-lore-v3-export-'))
+  const ctx = new Context()
+  const cards = new RpCharacterCards(ctx, { libraryDir: cardRoot, maxInputBytes: 8192, maxTextCharacters: 8192 })
+  const books = new RpLoreBooks(ctx, { libraryDir: loreRoot, maxInputBytes: 8192, maxTokens: 128, maxEntries: 16, maxRecursiveDepth: 2 })
+  await new Promise(resolve => setImmediate(resolve))
+  try {
+    const imported = await cards.import(new TextEncoder().encode(JSON.stringify({
+      spec: 'chara_card_v2',
+      spec_version: '2.0',
+      data: {
+        name: '港湾守望者',
+        description: '旧角色设定。',
+        system_prompt: '隔离后不可导出',
+        character_book: {
+          name: '旧港世界',
+          scan_depth: 2,
+          recursive_scanning: false,
+          entries: [{ id: 1, keys: ['潮门'], content: '潮门每天开启一次。', position: 0, insertion_order: 3 }],
+        },
+      },
+    })), { path: 'harbor.json' })
+    await cards.update(imported.id, { name: '新港守望者', description: '保存后的角色设定。' }, 1)
+    const cardDetail = await cards.detail(imported.id)
+    const lore = await books.detail(cardDetail.linkedLorebookIds[0])
+    const entries = lore.entries.map(entry => ({ ...entry, content: '潮门每天开启两次。' }))
+    await books.update(lore.id, { name: '新港世界', entries }, 1)
+
+    const exported = await cards.exportV3Png(imported.id, { modificationDate: 1234567890 })
+    assert.deepEqual(exported.lorebooks, [{ id: lore.id, name: '新港世界', entries: 1 }])
+    assert.equal(exported.lorebookEntries, 1)
+    const parsed = parseCharacterCard(exported.bytes, { maxTextCharacters: 8192 })
+    assert.equal(parsed.format, 'character_card_v3')
+    assert.equal(parsed.character.name, '新港守望者')
+    assert.equal(parsed.character.description, '保存后的角色设定。')
+    assert.equal(parsed.sourcePayload.data.modification_date, 1234567890)
+    assert.equal(parsed.sourcePayload.data.system_prompt, undefined)
+    assert.equal(parsed.sourcePayload.data.character_book.name, '新港世界')
+    assert.equal(parsed.sourcePayload.data.character_book.scan_depth, 2)
+    assert.equal(parsed.sourcePayload.data.character_book.recursive_scanning, false)
+    assert.equal(parsed.sourcePayload.data.character_book.entries[0].content, '潮门每天开启两次。')
+    assert.equal(parsed.sourcePayload.data.character_book.entries[0].use_regex, false)
+    assert.equal(parsed.sourcePayload.data.character_book.entries[0].position, 'before_char')
   } finally {
     await ctx.fiber.dispose()
     await rm(cardRoot, { recursive: true, force: true })

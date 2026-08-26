@@ -7,8 +7,10 @@ import { deflateSync } from 'node:zlib'
 import {
   assertPngPath,
   CharacterCardImportError,
+  encodeCharacterCardV3Png,
   parseCharacterCard,
   parseCharacterCardFile,
+  serializeCharacterCardV3,
 } from '../src/character-card.js'
 import { persistCharacterCard } from '../src/library.js'
 
@@ -91,6 +93,75 @@ test('imports uncompressed V3 iTXt and normalizes empty tag-only openings', () =
   assert.equal(parsed.sourcePayload.data.assets.length, 1)
 })
 
+test('prefers the official ccv3 PNG payload over a legacy chara backfill', () => {
+  const png = buildPng([
+    characterTextChunk('chara', { spec: 'chara_card_v2', spec_version: '2.0', data: { name: 'Legacy copy' } }),
+    characterTextChunk('ccv3', { spec: 'chara_card_v3', spec_version: '3.0', data: { name: 'Current V3' } }),
+  ])
+  const parsed = parseCharacterCard(png, { maxTextCharacters: 150000 })
+  assert.equal(parsed.format, 'character_card_v3')
+  assert.equal(parsed.character.name, 'Current V3')
+})
+
+test('serializes current edits and an associated lorebook into a valid CCv3 PNG', () => {
+  const characterBook = {
+    name: '更新后的世界',
+    extensions: {},
+    entries: [{ keys: ['潮门'], content: '潮门现在每天开启两次。', extensions: {}, enabled: true, insertion_order: 1, use_regex: false, constant: false }],
+  }
+  const payload = serializeCharacterCardV3({
+    name: '改名后的守望者',
+    description: '更新后的角色设定。',
+    personality: '沉着',
+    scenario: '新的港口',
+    firstMessage: '潮声响起。',
+    alternateGreetings: ['晨雾散开。'],
+    messageExample: '守望者：潮门已开。',
+    creatorNotes: '已修改',
+    creator: '作者',
+    characterVersion: '2.1',
+    tags: ['港口'],
+    nickname: '守望者',
+    groupOnlyGreetings: ['诸位，晚上好。'],
+    extensions: { safe: true },
+  }, {
+    sourcePayload: { spec: 'chara_card_v3', data: { source: ['https://example.com/card'], system_prompt: 'must not return' } },
+    characterBook,
+    modificationDate: 1234567890,
+    maxTextCharacters: 150000,
+  })
+  assert.equal(payload.spec, 'chara_card_v3')
+  assert.equal(payload.spec_version, '3.0')
+  assert.equal(payload.data.name, '改名后的守望者')
+  assert.equal(payload.data.system_prompt, '')
+  assert.equal(payload.data.post_history_instructions, '')
+  assert.equal(payload.data.modification_date, 1234567890)
+  assert.deepEqual(payload.data.character_book, characterBook)
+  assert.deepEqual(payload.data.source, ['https://example.com/card'])
+
+  const png = encodeCharacterCardV3Png(payload)
+  assert.deepEqual(textKeywords(png), ['ccv3'])
+  assertValidChunkChecksums(png)
+  const reparsed = parseCharacterCard(png, { maxTextCharacters: 150000 })
+  assert.equal(reparsed.format, 'character_card_v3')
+  assert.equal(reparsed.character.name, '改名后的守望者')
+  assert.equal(reparsed.character.firstMessage, '潮声响起。')
+  assert.equal(reparsed.sourcePayload.data.character_book.entries[0].content, '潮门现在每天开启两次。')
+  assert.deepEqual(chunkTypes(reparsed.avatarBytes), ['IHDR', 'IDAT', 'IEND'])
+})
+
+test('applies the export text limit to the complete V3 payload at the exact boundary', () => {
+  const character = { name: '边界角色', description: '完整导出内容', tags: [], alternateGreetings: [], groupOnlyGreetings: [] }
+  const options = { modificationDate: 1234567890 }
+  const complete = serializeCharacterCardV3(character, options)
+  const exactLimit = textCharacters(complete)
+  assert.deepEqual(serializeCharacterCardV3(character, { ...options, maxTextCharacters: exactLimit }), complete)
+  assert.throws(
+    () => serializeCharacterCardV3(character, { ...options, maxTextCharacters: exactLimit - 1 }),
+    error => error instanceof CharacterCardImportError && error.code === 'CARD_TEXT_LIMIT_EXCEEDED',
+  )
+})
+
 test('imports V1 field aliases', () => {
   const parsed = parseCharacterCard(pngCharacterCard({
     char_name: 'Legacy',
@@ -171,6 +242,11 @@ function pngCharacterCard(value, textType = 'tEXt', addPrivateMetadata = false) 
   return buildPng([pngChunk(textType, text), ...extra])
 }
 
+function characterTextChunk(keyword, value) {
+  const payload = Buffer.from(JSON.stringify(value), 'utf8').toString('base64')
+  return pngChunk('tEXt', Buffer.from(`${keyword}\0${payload}`, 'latin1'))
+}
+
 function buildPng(extraChunks) {
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
   const ihdr = Buffer.alloc(13)
@@ -212,6 +288,37 @@ function chunkTypes(bytes) {
   return types
 }
 
+function textKeywords(bytes) {
+  const view = Buffer.from(bytes)
+  const keywords = []
+  let offset = 8
+  while (offset + 12 <= view.length) {
+    const length = view.readUInt32BE(offset)
+    const type = view.toString('ascii', offset + 4, offset + 8)
+    if (type === 'tEXt') {
+      const data = view.subarray(offset + 8, offset + 8 + length)
+      const separator = data.indexOf(0)
+      if (separator >= 0) keywords.push(data.toString('latin1', 0, separator))
+    }
+    offset += 12 + length
+    if (type === 'IEND') break
+  }
+  return keywords
+}
+
+function assertValidChunkChecksums(bytes) {
+  const view = Buffer.from(bytes)
+  let offset = 8
+  while (offset + 12 <= view.length) {
+    const length = view.readUInt32BE(offset)
+    const expected = view.readUInt32BE(offset + 8 + length)
+    assert.equal(expected, crc32(view.subarray(offset + 4, offset + 8 + length)))
+    const type = view.toString('ascii', offset + 4, offset + 8)
+    offset += 12 + length
+    if (type === 'IEND') break
+  }
+}
+
 function crc32(bytes) {
   let crc = 0xffffffff
   for (const byte of bytes) {
@@ -221,4 +328,11 @@ function crc32(bytes) {
     }
   }
   return (crc ^ 0xffffffff) >>> 0
+}
+
+function textCharacters(value) {
+  if (typeof value === 'string') return [...value].length
+  if (Array.isArray(value)) return value.reduce((total, item) => total + textCharacters(item), 0)
+  if (value && typeof value === 'object') return Object.values(value).reduce((total, item) => total + textCharacters(item), 0)
+  return 0
 }

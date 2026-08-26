@@ -146,9 +146,13 @@ function CharacterDetail({ detail, connection, onChanged, onDeleted }) {
   const [deletePreview, setDeletePreview] = useState({ status: 'idle', sessions: [], lorebooks: [], sessionScanComplete: true })
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(null)
+  const [exportNotice, setExportNotice] = useState(null)
   useEffect(() => {
     setEditing(false); setConfirmingDelete(false); setDeleteLinkedLorebooks(true)
     setDeletePreview({ status: 'idle', sessions: [], lorebooks: [], sessionScanComplete: true }); setActionError(null)
+    setExporting(false); setExportError(null); setExportNotice(null)
   }, [detail?.id])
   useEffect(() => {
     if (!confirmingDelete || detail === null) return
@@ -175,6 +179,17 @@ function CharacterDetail({ detail, connection, onChanged, onDeleted }) {
       onDeleted()
     } catch (reason) { setActionError(reason) } finally { setSaving(false) }
   }
+  const exportCard = async () => {
+    setExporting(true); setExportError(null); setExportNotice(null); setConfirmingDelete(false)
+    try {
+      const value = await rpc(connection, 'export', { id: detail.id })
+      downloadExport(value)
+      const lorebookCount = Array.isArray(value.lorebooks) ? value.lorebooks.length : 0
+      setExportNotice(lorebookCount > 0
+        ? `Character Card V3 PNG 已开始下载，包含 ${lorebookCount} 本关联世界书、${value.lorebookEntries} 条设定。`
+        : 'Character Card V3 PNG 已开始下载。')
+    } catch (reason) { setExportError(reason) } finally { setExporting(false) }
+  }
   if (editing) return h(CharacterEditForm, {
     detail,
     connection,
@@ -186,8 +201,14 @@ function CharacterDetail({ detail, connection, onChanged, onDeleted }) {
   return h('article', { className: css.detail },
     h('header', null,
       h('div', null, h('h3', null, detail.name), h('p', null, characterFormatLabel(detail.format))),
-      h('div', { className: css.headerActions }, h('span', { className: css.badge }, linkedLorebookLabel(detail.lorebookEntries)), h('button', { type: 'button', onClick: () => { setEditing(true); setConfirmingDelete(false); setActionError(null) } }, '编辑'), h('button', { type: 'button', className: css.dangerText, onClick: () => { setConfirmingDelete(true); setDeleteLinkedLorebooks(true); setActionError(null) } }, '删除'))),
+      h('div', { className: css.headerActions },
+        h('span', { className: css.badge }, linkedLorebookLabel(detail.lorebookEntries)),
+        h('button', { type: 'button', disabled: exporting || saving, 'aria-label': '导出 Character Card V3 PNG', onClick: () => void exportCard() }, exporting ? '导出中…' : '导出'),
+        h('button', { type: 'button', disabled: exporting || saving, onClick: () => { setEditing(true); setConfirmingDelete(false); setActionError(null); setExportError(null); setExportNotice(null) } }, '编辑'),
+        h('button', { type: 'button', disabled: exporting || saving, className: css.dangerText, onClick: () => { setConfirmingDelete(true); setDeleteLinkedLorebooks(true); setActionError(null); setExportError(null); setExportNotice(null) } }, '删除'))),
     actionError ? h('div', { className: css.error, role: 'alert' }, characterActionErrorMessage(actionError)) : null,
+    exportError ? h('div', { className: css.error, role: 'alert' }, characterExportErrorMessage(exportError)) : null,
+    exportNotice ? h('div', { className: css.notice, role: 'status' }, exportNotice) : null,
     confirmingDelete ? h('div', { className: css.deleteConfirm, role: 'alertdialog', 'aria-label': `删除 ${detail.name}` },
       h('div', { className: css.deleteSummary },
         h('strong', null, '确认删除这张角色卡？'),
@@ -319,6 +340,15 @@ function characterActionErrorMessage(reason) {
   return '暂时无法更新角色卡，请稍后再试。'
 }
 
+function characterExportErrorMessage(reason) {
+  const code = reason?.code
+  if (code === 'ASSET_SERVICE_UNAVAILABLE') return '关联世界书暂时不可用，未生成文件。请确认世界书功能已启用后重试。'
+  if (code === 'ASSET_NOT_FOUND') return '这张角色卡已不存在，未生成文件。请返回列表后刷新。'
+  if (code === 'ASSET_CORRUPT') return '暂时无法读取角色卡或关联世界书，未生成文件。请检查资料后重试。'
+  if (code === 'LIMIT_EXCEEDED') return '角色卡与关联世界书内容过大，未生成文件。'
+  return '暂时无法导出角色卡，未生成文件。请稍后再试。'
+}
+
 function characterFormatLabel() { return '角色卡' }
 function linkedLorebookLabel(entries) { return entries > 0 ? `关联世界书 · ${entries} 条设定` : '未关联世界书' }
 
@@ -352,3 +382,28 @@ function useModalScrollLock(open) {
 async function rpc(connection, endpoint, payload) { return domainValue(await connection.rpc.call('/rp-character-cards', endpoint, payload)) }
 async function assetRpc(connection, endpoint, payload) { return domainValue(await connection.rpc.call('/rp-assets', endpoint, payload)) }
 function bytesToBase64(bytes) { let binary = ''; for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000)); return btoa(binary) }
+function downloadExport(value) {
+  if (value?.mimeType !== 'image/png' || typeof value.fileName !== 'string' || !value.fileName.toLocaleLowerCase().endsWith('.png')
+    || value.fileName.includes('/') || value.fileName.includes('\\') || typeof value.base64 !== 'string'
+    || value.base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value.base64)) {
+    throw Object.assign(new Error('export response is invalid'), { code: 'INVALID_EXPORT' })
+  }
+  const binary = atob(value.base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  const url = URL.createObjectURL(new Blob([bytes], { type: value.mimeType }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = value.fileName
+  anchor.hidden = true
+  document.body.append(anchor)
+  try {
+    anchor.click()
+  } catch (error) {
+    URL.revokeObjectURL(url)
+    throw error
+  } finally {
+    anchor.remove()
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}

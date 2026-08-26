@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto'
-import { inflateSync } from 'node:zlib'
+import { deflateSync, inflateSync } from 'node:zlib'
 
 const PNG_SIGNATURE = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 const PNG_SIGNATURE_LENGTH = PNG_SIGNATURE.length
 const PNG_CHUNK_OVERHEAD = 12
 const PRIVATE_METADATA_CHUNKS = new Set(['tEXt', 'iTXt', 'zTXt', 'eXIf'])
-const CHARACTER_KEYWORD = 'chara'
+const CHARACTER_KEYWORDS = ['ccv3', 'chara']
+const CHARACTER_V3_KEYWORD = CHARACTER_KEYWORDS[0]
 const EMPTY_TAG_TOKEN = /<\s*(\/?)\s*([A-Za-z][\w:.-]*)\s*(\/?)\s*>/g
 
 /** Error raised for an invalid or unsupported external character card. */
@@ -108,6 +109,107 @@ export function parseCharacterCardFile(bytes, path, limits) {
 }
 
 /**
+ * Serialize the current editable character entity as a safe Character Card V3 object.
+ * Preserved community fields remain available, while quarantined executable prompts
+ * are deliberately exported as empty required fields.
+ *
+ * @param {Record<string, unknown>} character Current normalized character entity.
+ * @param {{
+ *   sourcePayload?: Record<string, unknown>,
+ *   characterBook?: Record<string, unknown>,
+ *   modificationDate?: number,
+ *   maxTextCharacters?: number,
+ * }} [options] Export inputs.
+ */
+export function serializeCharacterCardV3(character, options = {}) {
+  if (!isRecord(character)) throw new TypeError('character must be an object')
+  if (typeof character.name !== 'string' || character.name.trim().length === 0) {
+    throw new CharacterCardImportError('INVALID_CHARACTER_DATA', 'Character name is required for export.')
+  }
+  const sourcePayload = isRecord(options.sourcePayload) ? options.sourcePayload : {}
+  const sourceData = isRecord(sourcePayload.data) ? sourcePayload.data : {}
+  const modificationDate = options.modificationDate ?? Math.floor(Date.now() / 1000)
+  if (!Number.isSafeInteger(modificationDate) || modificationDate < 0) {
+    throw new TypeError('modificationDate must be a non-negative integer')
+  }
+
+  const data = {
+    ...sourceData,
+    name: character.name,
+    description: exportText(character.description),
+    tags: exportStrings(character.tags),
+    creator: exportText(character.creator),
+    character_version: exportText(character.characterVersion) || '1.0',
+    mes_example: exportText(character.messageExample),
+    extensions: isRecord(character.extensions)
+      ? character.extensions
+      : isRecord(sourceData.extensions) ? sourceData.extensions : {},
+    system_prompt: '',
+    post_history_instructions: '',
+    first_mes: exportText(character.firstMessage),
+    alternate_greetings: exportStrings(character.alternateGreetings),
+    personality: exportText(character.personality),
+    scenario: exportText(character.scenario),
+    creator_notes: exportText(character.creatorNotes),
+    group_only_greetings: exportStrings(character.groupOnlyGreetings),
+    modification_date: modificationDate,
+  }
+
+  if (typeof character.nickname === 'string' && character.nickname.length > 0) data.nickname = character.nickname
+  else delete data.nickname
+  if (isRecord(options.characterBook)) data.character_book = options.characterBook
+  else delete data.character_book
+  if (data.assets !== undefined && !Array.isArray(data.assets)) delete data.assets
+  if (data.source !== undefined && (!Array.isArray(data.source) || data.source.some(value => typeof value !== 'string'))) delete data.source
+  if (data.creator_notes_multilingual !== undefined
+    && (!isRecord(data.creator_notes_multilingual) || Object.values(data.creator_notes_multilingual).some(value => typeof value !== 'string'))) {
+    delete data.creator_notes_multilingual
+  }
+  if (data.creation_date !== undefined && (!Number.isSafeInteger(data.creation_date) || data.creation_date < 0)) delete data.creation_date
+
+  const payload = { spec: 'chara_card_v3', spec_version: '3.0', data }
+  if (options.maxTextCharacters !== undefined) {
+    assertPositiveInteger('maxTextCharacters', options.maxTextCharacters)
+    const textCharacters = countTextCharacters(payload)
+    if (textCharacters > options.maxTextCharacters) {
+      throw new CharacterCardImportError(
+        'CARD_TEXT_LIMIT_EXCEEDED',
+        `Exported character card contains ${textCharacters} text characters; maximum is ${options.maxTextCharacters}.`,
+      )
+    }
+  }
+  return payload
+}
+
+/**
+ * Embed one Character Card V3 object into a clean PNG `ccv3` tEXt chunk.
+ * A transparent one-pixel PNG is used when the character has no avatar.
+ *
+ * @param {Record<string, unknown>} payload Character Card V3 object.
+ * @param {Uint8Array | undefined} avatarBytes Sanitized avatar PNG bytes.
+ */
+export function encodeCharacterCardV3Png(payload, avatarBytes) {
+  if (!isRecord(payload) || payload.spec !== 'chara_card_v3' || payload.spec_version !== '3.0' || !isRecord(payload.data)) {
+    throw new TypeError('payload must be a Character Card V3 object')
+  }
+  if (avatarBytes !== undefined && !(avatarBytes instanceof Uint8Array)) throw new TypeError('avatarBytes must be a Uint8Array')
+  const png = avatarBytes ?? transparentPng()
+  const chunks = readPngChunks(png)
+  const json = JSON.stringify(payload)
+  const encoded = Buffer.from(json, 'utf8').toString('base64')
+  const characterChunk = pngChunk('tEXt', Buffer.from(`${CHARACTER_V3_KEYWORD}\0${encoded}`, 'latin1'))
+  const retained = [png.subarray(0, PNG_SIGNATURE_LENGTH)]
+  for (const chunk of chunks) {
+    if (chunk.type === 'IEND') {
+      retained.push(characterChunk, png.subarray(chunk.start, chunk.end))
+      break
+    }
+    if (!PRIVATE_METADATA_CHUNKS.has(chunk.type)) retained.push(png.subarray(chunk.start, chunk.end))
+  }
+  return concatenateBytes(retained)
+}
+
+/**
  * Reject non-PNG names before reading or parsing bytes.
  *
  * @param {string} path Model/plugin supplied path.
@@ -134,7 +236,7 @@ export function assertCardPath(path) {
 
 /** @param {Uint8Array} bytes */
 function readPngChunks(bytes) {
-  if (bytes.byteLength < 100) {
+  if (bytes.byteLength < PNG_SIGNATURE_LENGTH + PNG_CHUNK_OVERHEAD) {
     throw new CharacterCardImportError(
       'INVALID_PNG',
       'The file is too small to be a valid character card PNG.',
@@ -177,39 +279,37 @@ function readPngChunks(bytes) {
  * @param {ReturnType<typeof readPngChunks>} chunks
  */
 function extractCharacterPayload(bytes, chunks) {
-  for (const chunk of chunks) {
-    if (chunk.type !== 'tEXt' && chunk.type !== 'iTXt' && chunk.type !== 'zTXt') continue
-    const data = bytes.subarray(chunk.dataStart, chunk.dataEnd)
-    const payload = chunk.type === 'tEXt'
-      ? extractTextPayload(data)
-      : chunk.type === 'iTXt'
-        ? extractInternationalTextPayload(data)
-        : extractCompressedTextPayload(data)
-    if (payload !== undefined) return decodeCharacterPayload(payload)
+  for (const keyword of CHARACTER_KEYWORDS) {
+    for (const chunk of chunks) {
+      if (chunk.type !== 'tEXt' && chunk.type !== 'iTXt' && chunk.type !== 'zTXt') continue
+      const data = bytes.subarray(chunk.dataStart, chunk.dataEnd)
+      const payload = chunk.type === 'tEXt'
+        ? extractTextPayload(data, keyword)
+        : chunk.type === 'iTXt'
+          ? extractInternationalTextPayload(data, keyword)
+          : extractCompressedTextPayload(data, keyword)
+      if (payload !== undefined) return decodeCharacterPayload(payload)
+    }
   }
   throw new CharacterCardImportError(
     'CHARACTER_DATA_NOT_FOUND',
-    'No SillyTavern `chara` payload was found in the PNG.',
+    'No Character Card `ccv3` or `chara` payload was found in the PNG.',
   )
 }
 
-/** @param {Uint8Array} data */
-function extractTextPayload(data) {
+/** @param {Uint8Array} data @param {string} keyword */
+function extractTextPayload(data, keyword) {
   const separator = data.indexOf(0)
-  if (separator === -1) {
-    throw new CharacterCardImportError('INVALID_PNG_TEXT', 'The tEXt chunk has no keyword separator.')
-  }
-  if (decodeLatin1(data.subarray(0, separator)) !== CHARACTER_KEYWORD) return undefined
+  if (separator === -1) return undefined
+  if (decodeLatin1(data.subarray(0, separator)) !== keyword) return undefined
   return decodeLatin1(data.subarray(separator + 1))
 }
 
-/** @param {Uint8Array} data */
-function extractInternationalTextPayload(data) {
+/** @param {Uint8Array} data @param {string} keyword */
+function extractInternationalTextPayload(data, keyword) {
   const keywordEnd = data.indexOf(0)
-  if (keywordEnd === -1) {
-    throw new CharacterCardImportError('INVALID_PNG_TEXT', 'The iTXt chunk has no keyword separator.')
-  }
-  if (decodeLatin1(data.subarray(0, keywordEnd)) !== CHARACTER_KEYWORD) return undefined
+  if (keywordEnd === -1) return undefined
+  if (decodeLatin1(data.subarray(0, keywordEnd)) !== keyword) return undefined
   if (keywordEnd + 2 >= data.byteLength) {
     throw new CharacterCardImportError('INVALID_PNG_TEXT', 'The iTXt character data is incomplete.')
   }
@@ -227,13 +327,12 @@ function extractInternationalTextPayload(data) {
   return compressionFlag === 1 ? inflatePayload(text, 'iTXt') : decodeLatin1(text)
 }
 
-/** @param {Uint8Array} data */
-function extractCompressedTextPayload(data) {
+/** @param {Uint8Array} data @param {string} keyword */
+function extractCompressedTextPayload(data, keyword) {
   const separator = data.indexOf(0)
-  if (separator === -1 || separator + 1 >= data.byteLength) {
-    throw new CharacterCardImportError('INVALID_PNG_TEXT', 'The zTXt chunk is incomplete.')
-  }
-  if (decodeLatin1(data.subarray(0, separator)) !== CHARACTER_KEYWORD) return undefined
+  if (separator === -1) return undefined
+  if (decodeLatin1(data.subarray(0, separator)) !== keyword) return undefined
+  if (separator + 1 >= data.byteLength) throw new CharacterCardImportError('INVALID_PNG_TEXT', 'The zTXt chunk is incomplete.')
   if (data[separator + 1] !== 0) throw new CharacterCardImportError('INVALID_PNG_TEXT', 'Unsupported zTXt compression method.')
   return inflatePayload(data.subarray(separator + 2), 'zTXt')
 }
@@ -455,6 +554,57 @@ function stripPrivateMetadata(bytes, chunks) {
   }
   return output
 }
+
+function transparentPng() {
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(1, 0)
+  header.writeUInt32BE(1, 4)
+  header[8] = 8
+  header[9] = 6
+  return concatenateBytes([
+    PNG_SIGNATURE,
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', deflateSync(Buffer.from([0, 0, 0, 0, 0]))),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
+/** @param {string} type @param {Uint8Array} data */
+function pngChunk(type, data) {
+  if (!/^[A-Za-z]{4}$/.test(type)) throw new TypeError('PNG chunk type must contain four ASCII letters')
+  const output = Buffer.alloc(PNG_CHUNK_OVERHEAD + data.byteLength)
+  output.writeUInt32BE(data.byteLength, 0)
+  output.write(type, 4, 4, 'ascii')
+  output.set(data, 8)
+  const checksumInput = output.subarray(4, 8 + data.byteLength)
+  output.writeUInt32BE(crc32(checksumInput), 8 + data.byteLength)
+  return output
+}
+
+/** @param {Uint8Array} bytes */
+function crc32(bytes) {
+  let value = 0xffffffff
+  for (const byte of bytes) {
+    value ^= byte
+    for (let bit = 0; bit < 8; bit += 1) value = (value >>> 1) ^ (value & 1 ? 0xedb88320 : 0)
+  }
+  return (value ^ 0xffffffff) >>> 0
+}
+
+/** @param {Uint8Array[]} parts */
+function concatenateBytes(parts) {
+  const length = parts.reduce((total, part) => total + part.byteLength, 0)
+  const output = new Uint8Array(length)
+  let offset = 0
+  for (const part of parts) {
+    output.set(part, offset)
+    offset += part.byteLength
+  }
+  return output
+}
+
+function exportText(value) { return typeof value === 'string' ? value : '' }
+function exportStrings(value) { return Array.isArray(value) ? value.filter(item => typeof item === 'string') : [] }
 
 /** @param {Uint8Array} bytes @param {number} offset */
 function readUint32(bytes, offset) {

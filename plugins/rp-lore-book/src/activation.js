@@ -46,6 +46,48 @@ export function normalizeLoreBook(input, fallbackId = 'embedded') {
   }
 }
 
+/** Serialize one normalized lorebook into the Character Card V3 Lorebook shape. */
+export function serializeLoreBookV3(book) {
+  if (!record(book) || !Array.isArray(book.entries)) throw new Error('normalized lorebook must contain an entries array')
+  const entries = book.entries.map((entry, index) => {
+    if (!record(entry) || typeof entry.content !== 'string') throw new Error(`normalized lorebook entry ${index} is invalid`)
+    const secondaryKeys = strings(entry.secondaryKeys)
+    const extensions = {
+      ...(typeof entry.level === 'string' ? { level: entry.level } : {}),
+      ...(Number.isSafeInteger(entry.position) ? { position: entry.position } : {}),
+      ...(Number.isSafeInteger(entry.depth) ? { depth: entry.depth } : {}),
+      ...(entry.recursive === false ? { prevent_recursion: true } : {}),
+      ...(typeof entry.semanticKey === 'string' && entry.semanticKey.length > 0 ? { semantic_key: entry.semanticKey } : {}),
+      ...(typeof entry.stateCondition === 'string' && entry.stateCondition.length > 0 ? { state_condition: entry.stateCondition } : {}),
+      ...(typeof entry.probability === 'number' && entry.probability < 1
+        ? { use_probability: true, probability: Math.round(Math.max(0, entry.probability) * 100) }
+        : {}),
+    }
+    return {
+      keys: strings(entry.keys),
+      content: entry.content,
+      extensions,
+      enabled: entry.enabled !== false,
+      insertion_order: Number.isSafeInteger(entry.order) ? entry.order : index,
+      case_sensitive: entry.caseSensitive === true,
+      use_regex: false,
+      constant: entry.constant === true,
+      ...(typeof entry.name === 'string' && entry.name.length > 0 ? { name: entry.name } : {}),
+      ...(entry.id === undefined ? {} : { id: String(entry.id) }),
+      selective: secondaryKeys.length > 0,
+      ...(secondaryKeys.length === 0 ? {} : { secondary_keys: secondaryKeys }),
+      position: entry.level === LORE_LEVELS.worldDescription ? 'before_char' : 'after_char',
+    }
+  })
+  return {
+    ...(typeof book.name === 'string' && book.name.length > 0 ? { name: book.name } : {}),
+    ...(Number.isSafeInteger(book.scanDepth) && book.scanDepth >= 0 ? { scan_depth: book.scanDepth } : {}),
+    ...(typeof book.recursiveScanning === 'boolean' ? { recursive_scanning: book.recursiveScanning } : {}),
+    extensions: {},
+    entries,
+  }
+}
+
 /** Deterministically activate one or more normalized lorebooks. */
 export function activateLore({ books, corpus, bookCorpora, runId, maxDepth, maxEntries, maxTokens, adapters = [] }) {
   const renderDiagnostics = []

@@ -2,7 +2,12 @@ import { Service } from '@deepseek-ai/cordis'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, resolve } from 'node:path'
-import { CharacterCardImportError, parseCharacterCardFile } from './character-card.js'
+import {
+  CharacterCardImportError,
+  encodeCharacterCardV3Png,
+  parseCharacterCardFile,
+  serializeCharacterCardV3,
+} from './character-card.js'
 import { persistCharacterCard } from './library.js'
 
 /** Character library and import-transform registry. */
@@ -65,7 +70,9 @@ export class RpCharacterCards extends Service {
 
   /** The lore-book plugin owns materializing embedded books and its lifecycle. */
   registerEmbeddedLoreManager(manager) {
-    if (typeof manager?.materialize !== 'function' || typeof manager?.rollback !== 'function') throw new Error('embedded lore manager requires materialize and rollback')
+    if (typeof manager?.materialize !== 'function' || typeof manager?.rollback !== 'function' || typeof manager?.exportV3 !== 'function') {
+      throw new Error('embedded lore manager requires materialize, rollback, and exportV3')
+    }
     if (this.embeddedLoreManager !== undefined) throw new Error('an embedded lore manager is already registered')
     this.embeddedLoreManager = manager
     return () => { if (this.embeddedLoreManager === manager) this.embeddedLoreManager = undefined }
@@ -179,6 +186,53 @@ export class RpCharacterCards extends Service {
     } catch (error) {
       if (error?.code === 'ENOENT') throw assetError('ASSET_NOT_FOUND', `Character card ${id} does not exist.`, error)
       throw assetError('ASSET_CORRUPT', `Character card source ${id} cannot be read.`, error)
+    }
+  }
+
+  /** Export the latest card and its current associated lorebooks as Character Card V3 PNG. */
+  async exportV3Png(id, options = {}) {
+    assertId(id, 'character')
+    const [character, sourcePayload] = await Promise.all([this.get(id), this.getSource(id)])
+    const recordedRelationships = Array.isArray(character.embeddedLorebooks)
+    const linkedLorebookIds = recordedRelationships
+      ? character.embeddedLorebooks.filter(relation => relation?.status !== 'deleted' && typeof relation?.id === 'string').map(relation => relation.id)
+      : []
+
+    let loreExport
+    if (this.embeddedLoreManager !== undefined) {
+      loreExport = await this.embeddedLoreManager.exportV3({ characterId: id, linkedLorebookIds })
+    } else if (linkedLorebookIds.length > 0) {
+      throw assetError('ASSET_SERVICE_UNAVAILABLE', 'Associated lorebooks are not available for character export.')
+    }
+    const legacyCharacterBook = !recordedRelationships && isRecord(character.characterBook) ? character.characterBook : undefined
+    const characterBook = loreExport?.characterBook ?? legacyCharacterBook
+
+    let avatarBytes
+    try {
+      avatarBytes = await this.avatar(id)
+    } catch (error) {
+      if (error?.code !== 'ASSET_NOT_FOUND') throw error
+    }
+    const payload = serializeCharacterCardV3(character, {
+      sourcePayload,
+      ...(characterBook === undefined ? {} : { characterBook }),
+      modificationDate: options.modificationDate,
+      maxTextCharacters: this.maxTextCharacters,
+    })
+    const bytes = encodeCharacterCardV3Png(payload, avatarBytes)
+    const fallbackLorebooks = characterBook === undefined ? [] : [{
+      name: typeof characterBook.name === 'string' && characterBook.name.trim() ? characterBook.name.trim() : '关联世界书',
+      entries: Array.isArray(characterBook.entries) ? characterBook.entries.length : 0,
+    }]
+    const lorebooks = Array.isArray(loreExport?.lorebooks) ? loreExport.lorebooks : fallbackLorebooks
+    return {
+      bytes,
+      fileName: exportFileName(character.name),
+      mimeType: 'image/png',
+      format: 'character_card_v3',
+      specVersion: '3.0',
+      lorebooks,
+      lorebookEntries: lorebooks.reduce((total, book) => total + (Number.isSafeInteger(book.entries) ? book.entries : 0), 0),
     }
   }
 
@@ -409,6 +463,15 @@ function embeddedLoreEntries(character) { return Array.isArray(character.charact
 function readJson(path) { return readFile(path, 'utf8').then(JSON.parse) }
 function assertId(id, kind) { if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/.test(id)) throw assetError('INVALID_REQUEST', `invalid ${kind} id`) }
 function assetError(code, message, cause) { const error = new Error(message, { cause }); error.code = code; return error }
+function isRecord(value) { return typeof value === 'object' && value !== null && !Array.isArray(value) }
+function exportFileName(name) {
+  const clean = [...String(name ?? '')
+    .normalize('NFC')
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]/g, '_')
+    .replace(/[. ]+$/g, '')
+    .trim()].slice(0, 96).join('')
+  return `${clean || '角色卡'}.png`
+}
 
 const libraryMutations = new Map()
 

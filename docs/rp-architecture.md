@@ -213,7 +213,7 @@ flowchart LR
 | `rp-feature-manager` | RP 组合唯一用户入口、启用状态、硬依赖闭包、Host Loader 生命周期和 RP/DSH 版本契约；不下载、移除代码或删除资料 | Settings `roleplay-features`、`ctx.rpFeatures`、loopback `/rp-features`、Loader `disabled` 更新 |
 | `rp-core` | `RpRun`、Session Slot Context Build、固定 Writer 与隔离任务子 Agent、上下文预算、文本转换、按执行模式提交校验、统一消息操作 metadata 与助手实体生命周期 | `ctx.rpRuntime` 注册表、`rp_write_turn`、`rp_run_subagent`、`rpMessageAction` helper |
 | `rp-subagent-manager` | 全局 Writer 模型策略与独立任务子代理目录；持久化调用契约与启用状态，Host 管理界面和 preset 运行快照共享一个原子目录但 service realm 隔离 | `ctx.rpSubagentManager`、loopback `/rp-subagents`、侧栏“子代理”、`registerSubagentProfileProvider()` |
-| `rp-character-card` | V1/V2/V3 社区信息包、PNG/JSON 导入、隔离提示词、浏览器列表、详情与唯一角色卡编辑器 | `ctx.rpCharacterCards`、loopback `/rp-character-cards`、侧栏入口、`rpAssetEditors`、导入 transformer、`rp.card` source |
+| `rp-character-card` | V1/V2/V3 社区信息包、PNG/JSON 导入、V3 PNG 导出、隔离提示词、浏览器列表、详情与唯一角色卡编辑器；导出读取当前角色实体与最新关联世界书，使用官方 `ccv3` PNG 数据块且不恢复隔离提示 | `ctx.rpCharacterCards`、loopback `/rp-character-cards`、侧栏入口、`rpAssetEditors`、导入 transformer、`rp.card` source |
 | `rp-lore-book` | 世界书资产、三槽位导入分类、浏览器列表、详情、唯一整本编辑器与确定性激活算法 | `ctx.rpLoreBooks`、loopback `/rp-lore-books`、侧栏入口、`rpAssetEditors`、`rp.lore.world-description` / `rp.lore.character-descriptions` / `rp.lore.important-rules` sources |
 | `rp-persona` | 可复用用户人设资产、头像净化、浏览器快捷新建/列表/默认选择、唯一人设编辑器、会话 live 引用上下文 | `ctx.rpPersonas`、loopback `/rp-personas`、侧栏入口、`rpAssetEditors`、`rp.persona` source |
 | `rp-macro` | 按 Run 冻结当前角色卡与人设名称，展开新输入、上下文与模型输出中的 `char`／`user` 身份宏；资料源码和已结算消息编辑保持不变 | `registerTextTransformer()`、`transformText()`、浏览器安全 `./syntax` |

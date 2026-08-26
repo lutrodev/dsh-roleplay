@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
-import { RpCharacterCards, apply, dispatchBrowser, inject } from '../src/index.js'
+import { parseCharacterCard, RpCharacterCards, apply, dispatchBrowser, inject } from '../src/index.js'
 
 test('registers import_character_card and reads bytes through the Harness filesystem service', async () => {
   const libraryDir = await mkdtemp(join(tmpdir(), 'dsh-roleplay-tool-'))
@@ -101,6 +101,40 @@ test('mounts the browser RPC when connection becomes available after the plugin'
   await ctx.fiber.dispose()
 })
 
+test('browser RPC admits export through the registered endpoint whitelist', async () => {
+  const libraryDir = await mkdtemp(join(tmpdir(), 'dsh-roleplay-card-export-rpc-'))
+  const ctx = new Context()
+  let handler
+  ctx.provide('connection', { rpc: { handle(path, next, options) {
+    assert.equal(path, '/rp-character-cards')
+    assert.deepEqual(options, { authority: 'loopback' })
+    handler = next
+    return () => {}
+  } } })
+
+  try {
+    apply(ctx, {
+      libraryDir,
+      maxInputBytes: 4096,
+      maxTextCharacters: 4096,
+      registerTool: false,
+      exposeBrowser: true,
+    })
+    await new Promise(resolve => setImmediate(resolve))
+    const created = (await ctx.rpCharacterCards.create({ name: 'RPC 导出角色', description: '经过完整浏览器 RPC 路径。' })).created
+    const response = await handler('export', { id: created.id })
+
+    assert.equal(response.ok, true)
+    assert.equal(response.value.ok, true)
+    assert.equal(response.value.value.format, 'character_card_v3')
+    assert.equal(response.value.value.mimeType, 'image/png')
+    assert.equal(parseCharacterCard(Buffer.from(response.value.value.base64, 'base64'), { maxTextCharacters: 4096 }).character.name, 'RPC 导出角色')
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(libraryDir, { recursive: true, force: true })
+  }
+})
+
 test('registers the card context source when the runtime becomes available later', async () => {
   const ctx = new Context()
   const sources = []
@@ -183,6 +217,36 @@ test('creates a native card without an import file and keeps it revision-editabl
     const updated = await cards.update(result.detail.id, { personality: '冷静而敏锐。' }, 1)
     assert.equal(updated.revision, 2)
     assert.equal(updated.character.personality, '冷静而敏锐。')
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(libraryDir, { recursive: true, force: true })
+  }
+})
+
+test('browser export downloads the latest saved native card as a re-importable V3 PNG', async () => {
+  const libraryDir = await mkdtemp(join(tmpdir(), 'dsh-roleplay-native-card-export-'))
+  const ctx = new Context()
+  const cards = new RpCharacterCards(ctx, { libraryDir, maxInputBytes: 4096, maxTextCharacters: 4096 })
+  try {
+    const created = (await cards.create({ name: '初始角色', description: '旧设定。' })).created
+    await cards.update(created.id, {
+      name: '修改/后的:角色',
+      description: '保存后的新设定。',
+      firstMessage: '新的开场。',
+      tags: ['已修改'],
+    }, 1)
+    const exported = await dispatchBrowser(cards, 'export', { id: created.id })
+    assert.equal(exported.mimeType, 'image/png')
+    assert.equal(exported.format, 'character_card_v3')
+    assert.equal(exported.specVersion, '3.0')
+    assert.equal(exported.fileName, '修改_后的_角色.png')
+    assert.deepEqual(exported.lorebooks, [])
+    assert.equal(exported.lorebookEntries, 0)
+    const parsed = parseCharacterCard(Buffer.from(exported.base64, 'base64'), { maxTextCharacters: 4096 })
+    assert.equal(parsed.character.name, '修改/后的:角色')
+    assert.equal(parsed.character.description, '保存后的新设定。')
+    assert.equal(parsed.character.firstMessage, '新的开场。')
+    assert.deepEqual(parsed.character.tags, ['已修改'])
   } finally {
     await ctx.fiber.dispose()
     await rm(libraryDir, { recursive: true, force: true })

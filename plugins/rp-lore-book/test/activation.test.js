@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { activateLore, classifyLoreEntry, groupActivatedLore, LORE_SLOT_DEFINITIONS, normalizeLoreBook } from '../src/activation.js'
+import { activateLore, classifyLoreEntry, groupActivatedLore, LORE_SLOT_DEFINITIONS, normalizeLoreBook, serializeLoreBookV3 } from '../src/activation.js'
 
 test('classifies imported entries into the three semantic lore slots', () => {
   assert.equal(LORE_SLOT_DEFINITIONS[1].label, '扮演指导')
@@ -37,6 +37,42 @@ test('keeps every imported entry and contains no format-specific extraction', ()
   assert.equal(Object.hasOwn(book, 'nativeState'), false)
   const result = activateLore({ books: [book], corpus: '', runId: 'literal', maxDepth: 0, maxEntries: 10, maxTokens: 100 })
   assert.equal(result.entries[0].content, '<% format_specific() %>')
+})
+
+test('serializes normalized entries into the required CCv3 lorebook fields', () => {
+  const book = normalizeLoreBook({
+    name: '可携带世界书',
+    scan_depth: 3,
+    recursive_scanning: false,
+    entries: [{
+      id: 'gate', name: '潮门', keys: ['潮门'], secondary_keys: ['夜晚'], selective: true,
+      content: '潮门只在夜晚开启。', position: 4, depth: 1, insertion_order: 7,
+      probability: 50, state_condition: 'story.open === true', prevent_recursion: true,
+    }],
+  })
+  const exported = serializeLoreBookV3(book)
+  assert.equal(exported.name, '可携带世界书')
+  assert.equal(exported.scan_depth, 3)
+  assert.equal(exported.recursive_scanning, false)
+  assert.deepEqual(exported.extensions, {})
+  assert.deepEqual(exported.entries[0], {
+    keys: ['潮门'],
+    content: '潮门只在夜晚开启。',
+    extensions: {
+      level: 'importantRules', position: 4, depth: 1, prevent_recursion: true,
+      state_condition: 'story.open === true', use_probability: true, probability: 50,
+    },
+    enabled: true,
+    insertion_order: 1007,
+    case_sensitive: false,
+    use_regex: false,
+    constant: false,
+    name: '潮门',
+    id: 'gate',
+    selective: true,
+    secondary_keys: ['夜晚'],
+    position: 'after_char',
+  })
 })
 
 test('activates constant, keyword and recursive entries deterministically', () => {

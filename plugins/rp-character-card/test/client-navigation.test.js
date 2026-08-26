@@ -79,6 +79,21 @@ test('角色卡详情展示完整字段并以可排序草稿编辑备用开场',
   assert.match(styles, /\.quarantine summary \{[^}]*font:11px\/18px/)
 })
 
+test('角色卡详情可将已保存内容和关联世界书导出为 V3 PNG', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
+  assert.match(client, /rpc\(connection, 'export', \{ id: detail\.id \}\)/)
+  assert.match(client, /'aria-label': '导出 Character Card V3 PNG'/)
+  assert.match(client, /exporting \? '导出中…' : '导出'/)
+  assert.match(client, /包含 \$\{lorebookCount\} 本关联世界书、\$\{value\.lorebookEntries\} 条设定/)
+  assert.match(client, /new Blob\(\[bytes\], \{ type: value\.mimeType \}\)/)
+  assert.match(client, /anchor\.download = value\.fileName/)
+  assert.match(client, /role: 'status'/)
+  assert.match(client, /关联世界书暂时不可用，未生成文件/)
+  assert.match(client, /暂时无法读取角色卡或关联世界书，未生成文件/)
+  assert.match(styles, /\.notice \{[^}]*state-success-primary/)
+})
+
 test('角色卡详情只列出关联世界书名称', () => {
   assert.deepEqual(relatedLorebookNames({
     embeddedLorebooks: [

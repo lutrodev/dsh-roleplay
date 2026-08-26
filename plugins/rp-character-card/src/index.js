@@ -88,7 +88,7 @@ function registerImportTool(ctx, cards, config) {
   }))
 }
 
-const BROWSER_ENDPOINTS = new Set(['list', 'get', 'avatar', 'import', 'create', 'update'])
+const BROWSER_ENDPOINTS = new Set(['list', 'get', 'avatar', 'import', 'export', 'create', 'update'])
 
 /** Register the loopback browser API owned by the character-card plugin. */
 function registerBrowserLibrary(ctx, cards) {
@@ -120,6 +120,18 @@ export async function dispatchBrowser(cards, endpoint, payload, signal) {
       const file = decodeUpload(input, cards.maxInputBytes)
       const imported = await cards.import(file.bytes, { path: file.name, signal })
       return { imported, detail: await cards.detail(imported.id) }
+    }
+    case 'export': {
+      const exported = await cards.exportV3Png(requiredId(input.id))
+      return {
+        fileName: exported.fileName,
+        mimeType: exported.mimeType,
+        format: exported.format,
+        specVersion: exported.specVersion,
+        lorebooks: exported.lorebooks,
+        lorebookEntries: exported.lorebookEntries,
+        base64: Buffer.from(exported.bytes).toString('base64'),
+      }
     }
     case 'create': return cards.create(object(input.character))
     case 'update': return cards.update(requiredId(input.id), editablePatch(input.patch), optionalRevision(input.expectedRevision))
@@ -154,7 +166,7 @@ function codeFor(error) {
   if (error?.code === 'DUPLICATE_CARD') return 'DUPLICATE_ASSET'
   if (error?.code === 'CARD_TEXT_LIMIT_EXCEEDED') return 'LIMIT_EXCEEDED'
   if (['UNSUPPORTED_FORMAT', 'INVALID_PATH'].includes(error?.code)) return 'UNSUPPORTED_FORMAT'
-  if (['INVALID_REQUEST', 'LIMIT_EXCEEDED', 'DUPLICATE_ASSET', 'ASSET_CORRUPT', 'ASSET_NOT_FOUND', 'REVISION_CONFLICT'].includes(error?.code)) return error.code
+  if (['INVALID_REQUEST', 'LIMIT_EXCEEDED', 'DUPLICATE_ASSET', 'ASSET_CORRUPT', 'ASSET_NOT_FOUND', 'ASSET_SERVICE_UNAVAILABLE', 'REVISION_CONFLICT'].includes(error?.code)) return error.code
   if (typeof error?.code === 'string' && (error.code.startsWith('INVALID_') || error.code.endsWith('_NOT_FOUND'))) return 'ASSET_CORRUPT'
   return 'ASSET_CORRUPT'
 }

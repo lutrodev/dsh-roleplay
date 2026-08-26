@@ -4,9 +4,9 @@ import { basename, resolve } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { activateLore, groupActivatedLore, LORE_SLOT_DEFINITIONS, normalizeLoreBook } from './activation.js'
+import { activateLore, groupActivatedLore, LORE_SLOT_DEFINITIONS, normalizeLoreBook, serializeLoreBookV3 } from './activation.js'
 
-export { activateLore, classifyLoreEntry, groupActivatedLore, LORE_LEVELS, LORE_SLOT_DEFINITIONS, normalizeLoreBook } from './activation.js'
+export { activateLore, classifyLoreEntry, groupActivatedLore, LORE_LEVELS, LORE_SLOT_DEFINITIONS, normalizeLoreBook, serializeLoreBookV3 } from './activation.js'
 export const name = 'rp-lore-book'
 export const inject = []
 export const Config = Schema.object({
@@ -30,6 +30,7 @@ export class RpLoreBooks extends Service {
     ctx.inject(['rpCharacterCards'], cardsCtx => cardsCtx.effect(() => cardsCtx.rpCharacterCards.registerEmbeddedLoreManager({
       materialize: input => this.materializeEmbedded(input),
       rollback: id => this.delete(id),
+      exportV3: input => this.exportEmbeddedV3(input),
     }), 'rp-lore-book: embedded character lore manager'))
     // Asset browsing can exist without a runtime. Waiting for the service keeps
     // preset startup order from silently dropping the lore context source.
@@ -262,6 +263,33 @@ export class RpLoreBooks extends Service {
     }
     await this.writeBook(book)
     return summary(book)
+  }
+
+  /** Resolve every live lorebook associated with a card and serialize it for CCv3 export. */
+  async exportEmbeddedV3({ characterId, linkedLorebookIds = [] }) {
+    assertCharacterId(characterId)
+    if (!Array.isArray(linkedLorebookIds) || linkedLorebookIds.some(id => typeof id !== 'string' || !/^[0-9a-f-]{36}$/.test(id))) {
+      throw coded('INVALID_REQUEST', 'linked lorebook ids must be an array of asset ids')
+    }
+    const ids = new Set(linkedLorebookIds)
+    const reverseLinks = await this.listDeletionCandidates(characterId)
+    reverseLinks.sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
+    for (const relation of reverseLinks) ids.add(relation.id)
+
+    const books = []
+    for (const id of ids) {
+      try {
+        books.push(await this.get(id))
+      } catch (error) {
+        if (error?.code !== 'ASSET_NOT_FOUND') throw error
+      }
+    }
+    if (books.length === 0) return undefined
+    const serialized = books.map(serializeLoreBookV3)
+    return {
+      characterBook: mergeSerializedLoreBooks(serialized, books),
+      lorebooks: books.map(book => ({ id: book.id, name: book.name, entries: book.entries.length })),
+    }
   }
 
   async get(id) {
@@ -578,6 +606,27 @@ function messageText(messages, scanDepth) {
     : messages.filter(message => ['user', 'assistant'].includes(message?.role)).slice(-(scanDepth + 1))
   return selected.flatMap(message => Array.isArray(message?.content) ? message.content : [])
     .filter(part => part?.type === 'text' && typeof part.text === 'string').map(part => part.text).join('\n')
+}
+function mergeSerializedLoreBooks(serialized, books) {
+  if (serialized.length === 1) return serialized[0]
+  const scanDepths = serialized.map(book => book.scan_depth).filter(value => Number.isSafeInteger(value) && value >= 0)
+  const recursion = serialized.map(book => book.recursive_scanning).filter(value => typeof value === 'boolean')
+  return {
+    name: books.map(book => book.name).join(' + '),
+    ...(scanDepths.length === 0 ? {} : { scan_depth: Math.max(...scanDepths) }),
+    ...(recursion.length === 0 ? {} : { recursive_scanning: recursion.every(Boolean) }),
+    extensions: {
+      dsh_roleplay: {
+        merged_lorebooks: books.map(book => ({ id: book.id, name: book.name })),
+      },
+    },
+    entries: serialized.flatMap((book, bookIndex) => book.entries.map((entry, entryIndex) => ({
+      ...entry,
+      id: `${books[bookIndex].id}:${entry.id ?? entryIndex}`,
+      insertion_order: bookIndex * 1000000 + entry.insertion_order,
+      extensions: { ...entry.extensions, dsh_roleplay_source_book: books[bookIndex].name },
+    }))),
+  }
 }
 function summary(book) { return { id: book.id, name: book.name, revision: book.revision, hash: book.sourceHash, entries: book.entries.length, slots: slotCounts(book.entries), status: 'ready', sourceCharacterId: book.sourceCharacterId ?? null, sourceCharacterName: book.sourceCharacterName ?? null, embedded: book.embedded === true } }
 function removalSummary(id, raw) {
