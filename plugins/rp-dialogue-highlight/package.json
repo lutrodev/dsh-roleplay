@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-dialogue-highlight",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Roleplay dialogue text highlighting during streaming and finalized assistant output",
   "license": "MIT",
   "private": true,
