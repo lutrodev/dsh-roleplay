@@ -12,7 +12,10 @@
 .search input { width:100%; border:0; outline:0; background:transparent; color:var(--dsw-alias-label-primary); font:13px/20px var(--dsw-font-family); }
 .importButton { position:relative; display:flex; align-items:center; min-height:36px; overflow:hidden; padding:0 13px; border-radius:10px; background:var(--dsw-alias-button-primary-fill); color:var(--dsw-alias-label-primary-foreground); cursor:pointer; font:12px/20px var(--dsw-font-family); }
 .importButton:focus-within { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }
+.importButton[aria-disabled="true"] { cursor:wait; }
+.importContent { display:inline-flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap; }
 .fileInput { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+.fileInput:disabled { cursor:wait; }
 .error { margin:10px 16px 0; padding:8px 10px; border-radius:9px; background:var(--dsw-alias-state-error-tertiary); color:var(--dsw-alias-state-error-primary); font-size:12px; }
 .notice { margin:10px 16px 0; padding:8px 10px; border-radius:9px; background:color-mix(in srgb,var(--dsw-alias-state-success-primary) 9%,transparent); color:var(--dsw-alias-state-success-primary); font-size:12px; }
 .view { flex:1; min-height:0; overflow:hidden; }

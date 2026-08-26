@@ -3,7 +3,7 @@ import { AnimatePresence, Reorder, useDragControls } from 'motion/react'
 import { IconBrowseOutline16, IconChevronLeftOutline14, IconEditOutline16, IconEllipsisOutline16, IconPlusOutline16, IconSearchOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { domainValue } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
-import { ContentTransition, DirtyBar, Inspector, RpMotionProvider } from 'dsh-roleplay-rp-ui'
+import { ContentTransition, DirtyBar, Inspector, LoadingSpinner, RpMotionProvider } from 'dsh-roleplay-rp-ui'
 
 export const inject = ['slots', 'connection', 'rpAssetEditors']
 const h = React.createElement
@@ -36,6 +36,7 @@ function LoreLibrary({ open, onClose, connection }) {
   const [error, setError] = useState(null)
   const [refresh, setRefresh] = useState(0)
   const [detailDirty, setDetailDirty] = useState(false)
+  const [importing, setImporting] = useState(false)
   useModalScrollLock(open)
   useEffect(() => {
     if (!open) { setSelected(null); setDetail(null); setError(null); setDetailDirty(false) }
@@ -57,13 +58,19 @@ function LoreLibrary({ open, onClose, connection }) {
     return () => { live = false }
   }, [connection, open, selected])
   const importFiles = async files => {
+    if (importing || files.length === 0) return
+    setImporting(true)
     setError(null)
-    for (const file of files) {
-      try {
+    let lastImportedId = null
+    try {
+      for (const file of files) {
         if (file.size > 2 * 1024 * 1024) throw Object.assign(new Error('文件超过 2 MiB'), { code: 'LIMIT_EXCEEDED' })
         const value = await rpc(connection, 'import', { name: file.name, mimeType: 'application/json', base64: bytesToBase64(new Uint8Array(await file.arrayBuffer())) })
-        setSelected(value.imported.id); setRefresh(value => value + 1)
-      } catch (reason) { setError(reason); break }
+        lastImportedId = value.imported.id; setRefresh(value => value + 1)
+      }
+    } catch (reason) { setError(reason) } finally {
+      setImporting(false)
+      if (lastImportedId !== null) setSelected(lastImportedId)
     }
   }
   const guardedClose = () => { if (!detailDirty || window.confirm('修改还没有保存，要放弃这些修改吗？')) onClose() }
@@ -72,8 +79,8 @@ function LoreLibrary({ open, onClose, connection }) {
     setDetailDirty(false); setSelected(null); setDetail(null); setError(null)
   }
   return h(Modal, { open, onClose: guardedClose, title: '世界书', closeLabel: '关闭世界书', className: css.dialog, contentClassName: css.content },
-    h('div', { className: css.shell },
-      selected === null ? h('div', { className: css.toolbar }, h('label', { className: css.search }, h(IconSearchOutline16, { size: 15 }), h('span', { className: css.srOnly }, '搜索世界书'), h('input', { value: query, onChange: event => setQuery(event.target.value), placeholder: '搜索世界书' })), h('label', { className: css.importButton }, h('span', { 'aria-hidden': true }, '导入 JSON'), h('input', { className: css.fileInput, type: 'file', multiple: true, accept: '.json,application/json', 'aria-label': '导入世界书 JSON', onChange: event => { void importFiles(event.target.files ?? []); event.target.value = '' } }))) : h(DetailNavigation, { label: '返回世界书列表', onBack: back }),
+    h('div', { className: css.shell, 'aria-busy': importing },
+      selected === null ? h('div', { className: css.toolbar }, h('label', { className: css.search }, h(IconSearchOutline16, { size: 15 }), h('span', { className: css.srOnly }, '搜索世界书'), h('input', { value: query, onChange: event => setQuery(event.target.value), placeholder: '搜索世界书' })), h('label', { className: css.importButton, 'aria-disabled': importing, 'aria-busy': importing }, h('span', { className: css.importContent, 'aria-hidden': true }, importing ? h(LoadingSpinner, { size: 13 }) : null, importing ? '导入中…' : '导入 JSON'), h('span', { className: css.srOnly, role: 'status', 'aria-live': 'polite' }, importing ? '正在导入世界书，请稍候。' : ''), h('input', { className: css.fileInput, type: 'file', multiple: true, disabled: importing, accept: '.json,application/json', 'aria-label': '导入世界书 JSON', onChange: event => { const files = [...(event.target.files ?? [])]; event.target.value = ''; void importFiles(files) } }))) : h(DetailNavigation, { label: '返回世界书列表', onBack: back }),
       error ? h('div', { className: css.error, role: 'alert' }, loreBookErrorMessage(error)) : null,
       h('div', { className: css.view }, h(ContentTransition, { viewKey: selected ?? 'list', className: css.viewTransition }, selected === null ? h(LoreList, { items, status, onSelect: setSelected }) : h(LoreDetail, { detail, connection, onDirtyChange: setDetailDirty,
         onChanged: value => { setDetail(value); setRefresh(current => current + 1) },

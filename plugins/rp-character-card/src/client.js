@@ -3,7 +3,7 @@ import { AnimatePresence, Reorder, m } from 'motion/react'
 import { IconChevronLeftOutline14, IconSearchOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { domainValue, normalizedMime, relatedLorebookNames } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
-import { ContentTransition, DirtyBar, IconCharacterCardOutline16, RpMotionProvider } from 'dsh-roleplay-rp-ui'
+import { ContentTransition, DirtyBar, IconCharacterCardOutline16, LoadingSpinner, RpMotionProvider } from 'dsh-roleplay-rp-ui'
 
 export const inject = ['slots', 'connection', 'rpAssetEditors']
 const h = React.createElement
@@ -33,6 +33,7 @@ function CharacterLibrary({ open, onClose, connection }) {
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState(null)
   const [refresh, setRefresh] = useState(0)
+  const [importing, setImporting] = useState(false)
   useModalScrollLock(open)
 
   useEffect(() => {
@@ -61,22 +62,26 @@ function CharacterLibrary({ open, onClose, connection }) {
   }, [connection, open, selected])
 
   const importFiles = async files => {
+    if (importing || files.length === 0) return
+    setImporting(true)
     setError(null)
-    for (const file of files) {
-      try {
+    try {
+      for (const file of files) {
         if (file.size > 8 * 1024 * 1024) throw Object.assign(new Error('文件超过 8 MiB'), { code: 'LIMIT_EXCEEDED' })
         await rpc(connection, 'import', { name: file.name, mimeType: normalizedMime(file), base64: bytesToBase64(new Uint8Array(await file.arrayBuffer())) })
         setRefresh(value => value + 1)
-      } catch (reason) { setError(reason); break }
-    }
+      }
+    } catch (reason) { setError(reason) } finally { setImporting(false) }
   }
 
   return h(Modal, { open, onClose, title: '角色卡', closeLabel: '关闭角色卡', className: css.dialog, contentClassName: css.content },
-    h('div', { className: css.shell },
+    h('div', { className: css.shell, 'aria-busy': importing },
       selected === null ? h('div', { className: css.toolbar },
         h('label', { className: css.search }, h(IconSearchOutline16, { size: 15 }), h('span', { className: css.srOnly }, '搜索角色卡'), h('input', { value: query, onChange: event => setQuery(event.target.value), placeholder: '搜索角色卡' })),
-        h('label', { className: css.importButton }, h('span', { 'aria-hidden': true }, '导入 PNG / JSON'),
-          h('input', { className: css.fileInput, type: 'file', multiple: true, accept: '.png,.json,image/png,application/json', 'aria-label': '导入角色卡 PNG 或 JSON', onChange: event => { void importFiles(event.target.files ?? []); event.target.value = '' } }))) : h(DetailNavigation, { label: '返回角色卡列表', onBack: () => { setSelected(null); setDetail(null); setError(null) } }),
+        h('label', { className: css.importButton, 'aria-disabled': importing, 'aria-busy': importing },
+          h('span', { className: css.importContent, 'aria-hidden': true }, importing ? h(LoadingSpinner, { size: 13 }) : null, importing ? '导入中…' : '导入 PNG / JSON'),
+          h('span', { className: css.srOnly, role: 'status', 'aria-live': 'polite' }, importing ? '正在导入角色卡，请稍候。' : ''),
+          h('input', { className: css.fileInput, type: 'file', multiple: true, disabled: importing, accept: '.png,.json,image/png,application/json', 'aria-label': '导入角色卡 PNG 或 JSON', onChange: event => { const files = [...(event.target.files ?? [])]; event.target.value = ''; void importFiles(files) } }))) : h(DetailNavigation, { label: '返回角色卡列表', onBack: () => { setSelected(null); setDetail(null); setError(null) } }),
       error ? h('div', { className: css.error, role: 'alert' }, characterActionErrorMessage(error)) : null,
       h('div', { className: css.view }, h(ContentTransition, { viewKey: selected ?? 'list', className: css.viewTransition },
         selected === null ? h(CharacterList, { items, status, onSelect: setSelected, connection }) : h(CharacterDetail, { detail, connection,

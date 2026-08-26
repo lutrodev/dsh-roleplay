@@ -68,7 +68,10 @@
   font:600 12px/20px var(--dsw-font-family);
 }
 .importButton:focus-within { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }
+.importButton[aria-disabled="true"] { cursor:wait; }
+.importContent { display:inline-flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap; }
 .fileInput { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+.fileInput:disabled { cursor:wait; }
 
 .error { margin:10px 18px 0; padding:9px 11px; border-radius:9px; background:var(--dsw-alias-state-error-tertiary); color:var(--dsw-alias-state-error-primary); font-size:12px; line-height:18px; }
 .state { display:flex; min-height:180px; align-items:center; justify-content:center; padding:24px; color:var(--dsw-alias-label-tertiary); text-align:center; font-size:12px; }

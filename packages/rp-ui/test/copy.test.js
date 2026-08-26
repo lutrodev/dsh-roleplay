@@ -17,6 +17,14 @@ test('角色卡使用独立的资料卡图标语义', async () => {
   assert.match(source, /h\('circle'.*cx: 5\.1.*cy: 5\.7/)
 })
 
+test('共享加载指示使用 Motion 并尊重减少动态效果偏好', async () => {
+  const source = await readFile(new URL('../src/index.js', import.meta.url), 'utf8')
+  assert.match(source, /function LoadingSpinner/)
+  assert.match(source, /const reduced = useReducedMotion\(\)/)
+  assert.match(source, /animate: reduced \? undefined : \{ rotate: 360 \}/)
+  assert.match(source, /\.rpui-loadingSpinner\{[^}]*border-top-color:transparent/)
+})
+
 test('工作台页签保持图标与文字分栏并压缩纵向占用', async () => {
   const source = await readFile(new URL('../src/index.js', import.meta.url), 'utf8')
   assert.match(source, /function WorkbenchTabs\([^)]*\) \{\n  ensureWorkbenchStyles\(\)/)

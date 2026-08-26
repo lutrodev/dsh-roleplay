@@ -29,6 +29,18 @@ test('世界书导入由覆盖按钮区域的原生文件输入直接打开', as
   assert.match(styles, /\.importButton:focus-within/)
 })
 
+test('世界书选择文件后持续展示导入状态并阻止重复选择', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
+  assert.match(client, /const \[importing, setImporting\] = useState\(false\)/)
+  assert.match(client, /setImporting\(true\)[\s\S]*await rpc\(connection, 'import'[\s\S]*setImporting\(false\)/)
+  assert.match(client, /importing \? h\(LoadingSpinner, \{ size: 13 \}\) : null/)
+  assert.match(client, /importing \? '导入中…' : '导入 JSON'/)
+  assert.match(client, /disabled: importing/)
+  assert.match(client, /'aria-live': 'polite'/)
+  assert.match(styles, /\.importButton\[aria-disabled="true"\][^}]*cursor:wait/)
+})
+
 test('世界书操作只展示用户能理解的结果和影响', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
   assert.match(client, /世界书修改尚未保存/)
