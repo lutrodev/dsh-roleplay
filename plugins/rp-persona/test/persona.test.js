@@ -38,7 +38,7 @@ test('creates personas and makes the first one default', async () => {
   }
 })
 
-test('seeds one neutral default persona and does not duplicate it', async () => {
+test('seeds one guided placeholder persona and does not duplicate it', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-persona-seed-'))
   const firstCtx = new Context()
   const secondCtx = new Context()
@@ -46,7 +46,8 @@ test('seeds one neutral default persona and does not duplicate it', async () => 
   const second = new RpPersonas(secondCtx, configFor(root))
   try {
     const seeded = await first.ensureDefault()
-    assert.equal(seeded.name, DEFAULT_PERSONA.name)
+    assert.equal(DEFAULT_PERSONA.name, '用户角色')
+    assert.equal(seeded.name, '用户角色')
     assert.equal(seeded.description, DEFAULT_PERSONA.description)
     assert.equal(seeded.isDefault, true)
     assert.equal((await second.ensureDefault()).id, seeded.id)
@@ -54,6 +55,23 @@ test('seeds one neutral default persona and does not duplicate it', async () => 
   } finally {
     await firstCtx.fiber.dispose()
     await secondCtx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('keeps an existing persona named 我 unchanged when ensuring the default', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-persona-existing-'))
+  const ctx = new Context()
+  const personas = new RpPersonas(ctx, configFor(root))
+  try {
+    const created = await personas.create({ name: '我', description: '用户主动设置的人设。' })
+    const existing = await personas.ensureDefault()
+    assert.equal(existing.id, created.id)
+    assert.equal(existing.name, '我')
+    assert.equal(existing.description, '用户主动设置的人设。')
+    assert.equal(existing.revision, 1)
+  } finally {
+    await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })
   }
 })

@@ -21,7 +21,7 @@ const PREFERENCES_FILE = '.preferences.json'
 const PERSONA_FILE = 'persona.json'
 const AVATAR_FILE = 'avatar.webp'
 export const DEFAULT_PERSONA = Object.freeze({
-  name: '我',
+  name: '用户角色',
   description: '由用户在当前对话中逐步定义的参与者；未说明的身份、经历与外观保持开放。',
   personality: '',
   scenario: '',
