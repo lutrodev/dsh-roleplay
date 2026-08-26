@@ -190,7 +190,7 @@ test('browser RPC registration is disposed with the plugin fiber', async () => {
   const ctx = new Context()
   let handler
   let disposed = false
-  ctx.provide('connection', { rpc: { handle(path, next, options) { assert.equal(path, '/rp-personas'); assert.deepEqual(options, { authority: 'loopback' }); handler = next; return () => { disposed = true } } } })
+  ctx.provide('connection', { rpc: { handle(path, next, options) { assert.equal(path, '/rp-personas'); assert.deepEqual(options, { authority: 'trusted-host' }); handler = next; return () => { disposed = true } } } })
   try {
     await apply(ctx, configFor(root))
     const response = await handler('list', { limit: 10 })

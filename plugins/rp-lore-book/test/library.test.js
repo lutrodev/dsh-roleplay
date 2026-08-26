@@ -393,7 +393,7 @@ test('mounts the browser RPC when connection becomes available after the plugin'
   } } })
   await new Promise(resolve => setImmediate(resolve))
 
-  assert.deepEqual(mounted, [{ path: '/rp-lore-books', options: { authority: 'loopback' } }])
+  assert.deepEqual(mounted, [{ path: '/rp-lore-books', options: { authority: 'trusted-host' } }])
   await ctx.fiber.dispose()
 })
 

@@ -559,7 +559,7 @@ function registerBrowserLibrary(ctx, books) {
     if (!BROWSER_ENDPOINTS.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown lore-book endpoint: ${endpoint}`))
     try { return transportSuccess(success(await dispatchBrowser(books, endpoint, payload))) }
     catch (error) { return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error))) }
-  }, { authority: 'loopback' })
+  }, { authority: 'trusted-host' })
   ctx.effect(() => dispose, 'rp-lore-book: /rp-lore-books RPC')
 }
 

@@ -90,7 +90,7 @@ function registerImportTool(ctx, cards, config) {
 
 const BROWSER_ENDPOINTS = new Set(['list', 'get', 'avatar', 'import', 'export', 'create', 'update'])
 
-/** Register the loopback browser API owned by the character-card plugin. */
+/** Register the browser API behind the active DSH trusted-host boundary. */
 function registerBrowserLibrary(ctx, cards) {
   const connection = ctx.get('connection')
   if (connection === undefined) throw new Error('rp-character-card: injected connection is unavailable')
@@ -101,7 +101,7 @@ function registerBrowserLibrary(ctx, cards) {
     } catch (error) {
       return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error)))
     }
-  }, { authority: 'loopback' })
+  }, { authority: 'trusted-host' })
   ctx.effect(() => dispose, 'rp-character-card: /rp-character-cards RPC')
 }
 

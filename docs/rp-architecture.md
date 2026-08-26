@@ -210,22 +210,22 @@ flowchart LR
 
 | 插件 | 权威职责 | 主要扩展面 |
 |---|---|---|
-| `rp-feature-manager` | RP 组合唯一用户入口、启用状态、硬依赖闭包、Host Loader 生命周期和 RP/DSH 版本契约；不下载、移除代码或删除资料 | Settings `roleplay-features`、`ctx.rpFeatures`、loopback `/rp-features`、Loader `disabled` 更新 |
+| `rp-feature-manager` | RP 组合唯一用户入口、启用状态、硬依赖闭包、Host Loader 生命周期和 RP/DSH 版本契约；不下载、移除代码或删除资料 | Settings `roleplay-features`、`ctx.rpFeatures`、trusted-host `/rp-features`、Loader `disabled` 更新 |
 | `rp-core` | `RpRun`、Session Slot Context Build、固定 Writer 与隔离任务子 Agent、上下文预算、文本转换、按执行模式提交校验、统一消息操作 metadata 与助手实体生命周期 | `ctx.rpRuntime` 注册表、`rp_write_turn`、`rp_run_subagent`、`rpMessageAction` helper |
-| `rp-subagent-manager` | 全局 Writer 模型策略与独立任务子代理目录；持久化调用契约与启用状态，Host 管理界面和 preset 运行快照共享一个原子目录但 service realm 隔离 | `ctx.rpSubagentManager`、loopback `/rp-subagents`、侧栏“子代理”、`registerSubagentProfileProvider()` |
-| `rp-character-card` | V1/V2/V3 社区信息包、PNG/JSON 导入、V3 PNG 导出、隔离提示词、浏览器列表、详情与唯一角色卡编辑器；导出读取当前角色实体与最新关联世界书，使用官方 `ccv3` PNG 数据块且不恢复隔离提示 | `ctx.rpCharacterCards`、loopback `/rp-character-cards`、侧栏入口、`rpAssetEditors`、导入 transformer、`rp.card` source |
-| `rp-lore-book` | 世界书资产、三槽位导入分类、浏览器列表、详情、唯一整本编辑器与确定性激活算法 | `ctx.rpLoreBooks`、loopback `/rp-lore-books`、侧栏入口、`rpAssetEditors`、`rp.lore.world-description` / `rp.lore.character-descriptions` / `rp.lore.important-rules` sources |
-| `rp-persona` | 可复用用户人设资产、头像净化、浏览器快捷新建/列表/默认选择、唯一人设编辑器、会话 live 引用上下文 | `ctx.rpPersonas`、loopback `/rp-personas`、侧栏入口、`rpAssetEditors`、`rp.persona` source |
+| `rp-subagent-manager` | 全局 Writer 模型策略与独立任务子代理目录；持久化调用契约与启用状态，Host 管理界面和 preset 运行快照共享一个原子目录但 service realm 隔离 | `ctx.rpSubagentManager`、trusted-host `/rp-subagents`、侧栏“子代理”、`registerSubagentProfileProvider()` |
+| `rp-character-card` | V1/V2/V3 社区信息包、PNG/JSON 导入、V3 PNG 导出、隔离提示词、浏览器列表、详情与唯一角色卡编辑器；导出读取当前角色实体与最新关联世界书，使用官方 `ccv3` PNG 数据块且不恢复隔离提示 | `ctx.rpCharacterCards`、trusted-host `/rp-character-cards`、侧栏入口、`rpAssetEditors`、导入 transformer、`rp.card` source |
+| `rp-lore-book` | 世界书资产、三槽位导入分类、浏览器列表、详情、唯一整本编辑器与确定性激活算法 | `ctx.rpLoreBooks`、trusted-host `/rp-lore-books`、侧栏入口、`rpAssetEditors`、`rp.lore.world-description` / `rp.lore.character-descriptions` / `rp.lore.important-rules` sources |
+| `rp-persona` | 可复用用户人设资产、头像净化、浏览器快捷新建/列表/默认选择、唯一人设编辑器、会话 live 引用上下文 | `ctx.rpPersonas`、trusted-host `/rp-personas`、侧栏入口、`rpAssetEditors`、`rp.persona` source |
 | `rp-macro` | 按 Run 冻结当前角色卡与人设名称，展开新输入、上下文与模型输出中的 `char`／`user` 身份宏；资料源码和已结算消息编辑保持不变 | `registerTextTransformer()`、`transformText()`、浏览器安全 `./syntax` |
-| `rp-preset` | 可复用创作预设、有序栏位、唯一预设编辑器、会话 live 引用上下文，以及 SillyTavern 预设语义迁移指导 | `ctx.rpPresets`、loopback `/rp-presets`、侧栏入口、`rpAssetEditors`、动态 `rp.preset:<field-id>` sources、`rp-guide-preset`、`rp-guide-preset-sillytavern` |
-| `rp-writing-style` | 可复用文风资产、唯一文风编辑器、会话有序多选与 live 引用上下文 | `ctx.rpWritingStyles`、loopback `/rp-writing-styles`、侧栏入口、`rpAssetEditors`、动态 `rp.writing-style:<asset-id>` sources |
+| `rp-preset` | 可复用创作预设、有序栏位、唯一预设编辑器、会话 live 引用上下文，以及 SillyTavern 预设语义迁移指导 | `ctx.rpPresets`、trusted-host `/rp-presets`、侧栏入口、`rpAssetEditors`、动态 `rp.preset:<field-id>` sources、`rp-guide-preset`、`rp-guide-preset-sillytavern` |
+| `rp-writing-style` | 可复用文风资产、唯一文风编辑器、会话有序多选与 live 引用上下文 | `ctx.rpWritingStyles`、trusted-host `/rp-writing-styles`、侧栏入口、`rpAssetEditors`、动态 `rp.writing-style:<asset-id>` sources |
 | `rp-asset-tools` | 五类共享资料的统一模型薄适配，不建立存储 | `rp_asset_read` 的 `list/get`；Agent-only `rp_asset` 的 `create/update/bind`、运行中绑定与上下文刷新 |
 | `rp-state` | Session-owned `rp.state` v2、受限 Schema、语义规则与操作、安全条件、配置命令、世界书激活门和按需 Skill | `ctx.rpState`、`state.update`、`rp_state_read`、Agent-only `rp_state`、`rp-state-configure`、`rp/state` 与只读 `rp/state/activity` 投影、`rp-guide-state` |
 | `rp-compat-mvu` | 无实体的 MVU 社区适配；内聚角色卡源、开场、世界书初始化与只读模板语义 | character import transformer、Host/preset session materializer、lore activation adapter、开场/角色卡控制块文本转换 |
 
-| `rp-library` | 资产入口编排、会话绑定、Roleplay 引导、唯一资料编辑器能力注册表、故事上下文工作台、只读 State Wiki，以及活动运行边界；不持有五类资料字段 schema | loopback `/rp-assets`、`rpAssetEditors`、Sidebar、Composer dock、`rp-run-marker` Conversation Node |
+| `rp-library` | 资产入口编排、会话绑定、Roleplay 引导、唯一资料编辑器能力注册表、故事上下文工作台、只读 State Wiki，以及活动运行边界；不持有五类资料字段 schema | trusted-host `/rp-assets`、`rpAssetEditors`、Sidebar、Composer dock、`rp-run-marker` Conversation Node |
 | `rp-message-avatar` | 用户消息、开场与普通助手回复的统一头像展示 | 三类自定义 Conversation Nodes、公开 `conversation.chat.node` renderer、局部 Portal、角色卡与人设浏览器 RPC |
-| `rp-message-actions` | Roleplay 消息复制、行内编辑、后缀删除、同会话重新生成、保存并重新生成、分支、回复指标及失败恢复 | loopback `/rp-message-actions`、`rpMessageAction`、原生 surface replacement、自定义 Conversation Nodes、`conversation.chat.node` / `commandview` / `turnTail`、局部 Portal |
+| `rp-message-actions` | Roleplay 消息复制、行内编辑、后缀删除、同会话重新生成、保存并重新生成、分支、回复指标及失败恢复 | trusted-host `/rp-message-actions`、`rpMessageAction`、原生 surface replacement、自定义 Conversation Nodes、`conversation.chat.node` / `commandview` / `turnTail`、局部 Portal |
 | `rp-dialogue-highlight` | Roleplay 助手正文的成对引号橙色高亮，不改写消息事实或占用可见操作 | 公开 `conversation.chat.assistant-actions` 隐藏锚点；优先使用 CSS Custom Highlight API，缺失或不可用时使用脱离 React 消息树的无障碍隐藏镜像层 |
 | `rp-standard` | 内部受管理 `roleplay` preset 提供者，按 `rpFeatures` 选择运行时行与指导 Skill | Harness preset roster、私有 isolate realm |
 

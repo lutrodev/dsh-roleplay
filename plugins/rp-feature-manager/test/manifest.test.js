@@ -44,6 +44,27 @@ test('all Roleplay packages stay on the declared suite version', async () => {
   }
 })
 
+test('every Roleplay browser RPC follows the DSH trusted-host boundary', async () => {
+  for (const entry of await readdir(pluginsDirectory, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    let source
+    try {
+      source = await readFile(resolve(pluginsDirectory, entry.name, 'src/index.js'), 'utf8')
+    } catch (error) {
+      if (error?.code === 'ENOENT') continue
+      throw error
+    }
+    const handles = source.match(/\.rpc\.handle\(/g)?.length ?? 0
+    if (handles === 0) continue
+    assert.doesNotMatch(source, /authority:\s*['"]loopback['"]/, `${entry.name} must not add a private loopback gate`)
+    assert.equal(
+      source.match(/authority:\s*['"]trusted-host['"]/g)?.length ?? 0,
+      handles,
+      `${entry.name} must delegate every browser RPC boundary to DSH`,
+    )
+  }
+})
+
 test('settings UI presents activation instead of package acquisition', async () => {
   const client = await readFile(resolve(pluginDirectory, 'src/client.js'), 'utf8')
   assert.match(client, /启用只控制是否加载/)

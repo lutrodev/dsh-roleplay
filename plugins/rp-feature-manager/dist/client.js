@@ -7110,8 +7110,21 @@ get: (_target, key) => {
 		async function promptPreview(connection) {
 			return roleplayFeatureRequest(connection, "prompts", "代理提示词预览读取失败");
 		}
-		async function roleplayFeatureRequest(connection, endpoint, fallbackMessage) {
-			const response = await connection.rpc.call("/rp-features", endpoint, {});
+		async function setRoleplaySetting(connection, field, value, expectedRevision) {
+			return roleplayFeatureRequest(connection, "settings/set", "Roleplay 设置保存失败", {
+				field,
+				value,
+				expectedRevision
+			});
+		}
+		async function unsetRoleplaySetting(connection, field, expectedRevision) {
+			return roleplayFeatureRequest(connection, "settings/unset", "Roleplay 设置重置失败", {
+				field,
+				expectedRevision
+			});
+		}
+		async function roleplayFeatureRequest(connection, endpoint, fallbackMessage, payload = {}) {
+			const response = await connection.rpc.call("/rp-features", endpoint, payload);
 			const domain = response?.ok === true && response.value?.ok !== void 0 ? response.value : response;
 			if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? fallbackMessage), { code: domain?.error?.code });
 			return domain.value;
@@ -7550,7 +7563,8 @@ get: (_target, key) => {
 			const enabled = (0, react.useMemo)(() => new Set(enabledFeatures), [enabledFeatures]);
 			const selectedSkills = (0, react.useMemo)(() => new Set(enabledSkills), [enabledSkills]);
 			const compatible = status.phase === "ready" && status.value.compatible === true;
-			const canWrite = settings.status === "ready" && settings.writable && compatible && pending === null;
+			const settingsRevision = status.phase === "ready" ? status.value.settings?.revision : null;
+			const canWrite = status.phase === "ready" && status.value.settings?.writable === true && Number.isSafeInteger(settingsRevision) && compatible && pending === null;
 			const toggleFeature = async (feature) => {
 				if (!canWrite) return;
 				const nextEnabled = !enabled.has(feature.id);
@@ -7558,10 +7572,7 @@ get: (_target, key) => {
 				setPending(`feature:${feature.id}`);
 				setNotice("");
 				try {
-					await scope.set("enabledFeatures", plan.enabledFeatures);
-					const saved = scope.getSnapshot().value?.enabledFeatures;
-					if (!sameSelection(saved, plan.enabledFeatures)) throw new Error("Roleplay feature selection was not persisted");
-					const nextStatus = await featureStatus(connection);
+					const nextStatus = await setRoleplaySetting(connection, "enabledFeatures", plan.enabledFeatures, settingsRevision);
 					if (!sameSelection(nextStatus.enabledFeatures, plan.enabledFeatures)) throw new Error("Roleplay feature selection was not applied");
 					setStatus({
 						phase: "ready",
@@ -7582,10 +7593,7 @@ get: (_target, key) => {
 				setPending(`skill:${skill.id}`);
 				setNotice("");
 				try {
-					await scope.set("enabledSkills", nextSkills);
-					const saved = scope.getSnapshot().value?.enabledSkills;
-					if (!sameSelection(saved, nextSkills)) throw new Error("Roleplay Skill selection was not persisted");
-					const nextStatus = await featureStatus(connection);
+					const nextStatus = await setRoleplaySetting(connection, "enabledSkills", nextSkills, settingsRevision);
 					if (!sameSelection(nextStatus.enabledSkills, nextSkills)) throw new Error("Roleplay Skill selection was not applied");
 					setStatus({
 						phase: "ready",
@@ -7605,8 +7613,11 @@ get: (_target, key) => {
 				setPending("harness-identity");
 				setNotice("");
 				try {
-					if (reset) await scope.unset("harnessIdentity");
-					else await scope.set("harnessIdentity", normalized);
+					const nextStatus = reset ? await unsetRoleplaySetting(connection, "harnessIdentity", settingsRevision) : await setRoleplaySetting(connection, "harnessIdentity", normalized, settingsRevision);
+					setStatus({
+						phase: "ready",
+						value: nextStatus
+					});
 					const nextPreview = await promptPreview(connection);
 					if (reset) {
 						if (nextPreview.harnessIdentity?.customized !== false) throw new Error("Roleplay identity reset was not applied");
@@ -7624,11 +7635,11 @@ get: (_target, key) => {
 					setPending(null);
 				}
 			};
-			if (status.phase === "loading" || settings.status === "loading") return h("div", {
+			if (status.phase === "loading") return h("div", {
 				className: css.state,
 				role: "status"
 			}, t("loading"));
-			if (status.phase === "error" || settings.status !== "ready") return h("div", { className: css.failure }, h("p", { role: "alert" }, t("loadError")), h("button", {
+			if (status.phase === "error") return h("div", { className: css.failure }, h("p", { role: "alert" }, t("loadError")), h("button", {
 				type: "button",
 				onClick: () => setRequest((value) => value + 1)
 			}, t("retry")));

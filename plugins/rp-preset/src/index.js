@@ -341,7 +341,7 @@ function registerBrowser(ctx, presets) {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown preset endpoint: ${endpoint}`))
     try { return transportSuccess(success(await dispatchBrowser(presets, endpoint, payload))) }
     catch (error) { return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error))) }
-  }, { authority: 'loopback' })
+  }, { authority: 'trusted-host' })
   ctx.effect(() => dispose, 'rp-preset: /rp-presets RPC')
 }
 

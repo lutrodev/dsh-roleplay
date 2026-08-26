@@ -32,7 +32,7 @@ export function apply(ctx, config) {
     } catch (error) {
       return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error)))
     }
-  }, { authority: 'loopback' })
+  }, { authority: 'trusted-host' })
   ctx.effect(() => dispose, 'rp-library: /rp-assets RPC')
 }
 

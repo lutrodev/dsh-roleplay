@@ -91,7 +91,7 @@ const copy = {
 
 function t(key) { return copy[key] ?? key }
 
-function statusView(enabledFeatures, enabledSkills) {
+function statusView(enabledFeatures, enabledSkills, revision = 0) {
   return {
     roleplay: { version: '0.1.0' },
     dsh: { version: '0.1.1-rc.2', compatible: true },
@@ -99,6 +99,7 @@ function statusView(enabledFeatures, enabledSkills) {
     problems: [],
     enabledFeatures: [...enabledFeatures],
     enabledSkills: [...enabledSkills],
+    settings: { writable: true, revision },
     core: [{ label: '回复运行时', packageVersion: '0.1.0', versionCompatible: true }],
     features: FEATURE_CATALOG.map(item => ({
       ...item,
@@ -122,11 +123,15 @@ function statusView(enabledFeatures, enabledSkills) {
   }
 }
 
-function harness(enabledFeatures = ['lore-book'], enabledSkills = ['rp-guide-lorebook', 'rp-guide-state']) {
+function harness(
+  enabledFeatures = ['lore-book'],
+  enabledSkills = ['rp-guide-lorebook', 'rp-guide-state'],
+  { remote = false } = {},
+) {
   let status = statusView(enabledFeatures, enabledSkills)
   let snapshot = {
-    status: 'ready',
-    writable: true,
+    status: remote ? 'unavailable' : 'ready',
+    writable: !remote,
     revision: 0,
     value: { enabledFeatures: [...enabledFeatures], enabledSkills: [...enabledSkills], harnessIdentity: '' },
   }
@@ -144,7 +149,7 @@ function harness(enabledFeatures = ['lore-book'], enabledSkills = ['rp-guide-lor
         revision: snapshot.revision + 1,
         value: { ...snapshot.value, [field]: stored },
       }
-      status = statusView(snapshot.value.enabledFeatures, snapshot.value.enabledSkills)
+      status = statusView(snapshot.value.enabledFeatures, snapshot.value.enabledSkills, snapshot.revision)
       for (const listener of listeners) listener()
     }),
     unset: vi.fn(async field => {
@@ -158,15 +163,33 @@ function harness(enabledFeatures = ['lore-book'], enabledSkills = ['rp-guide-lor
   }
   const connection = {
     rpc: {
-      call: vi.fn(async (_path, endpoint) => ({
-        ok: true,
-        value: {
+      call: vi.fn(async (_path, endpoint, payload) => {
+        if (endpoint === 'settings/set') {
+          const stored = Array.isArray(payload.value) ? [...payload.value] : payload.value
+          snapshot = {
+            ...snapshot,
+            revision: snapshot.revision + 1,
+            value: { ...snapshot.value, [payload.field]: stored },
+          }
+          status = statusView(snapshot.value.enabledFeatures, snapshot.value.enabledSkills, snapshot.revision)
+        } else if (endpoint === 'settings/unset') {
+          snapshot = {
+            ...snapshot,
+            revision: snapshot.revision + 1,
+            value: { ...snapshot.value, [payload.field]: payload.field === 'harnessIdentity' ? '' : undefined },
+          }
+          status = statusView(snapshot.value.enabledFeatures, snapshot.value.enabledSkills, snapshot.revision)
+        }
+        return {
           ok: true,
-          value: structuredClone(endpoint === 'prompts'
-            ? promptView(snapshot.value.enabledFeatures, snapshot.value.harnessIdentity)
-            : status),
-        },
-      })),
+          value: {
+            ok: true,
+            value: structuredClone(endpoint === 'prompts'
+              ? promptView(snapshot.value.enabledFeatures, snapshot.value.harnessIdentity)
+              : status),
+          },
+        }
+      }),
     },
   }
   return { scope, connection }
@@ -236,8 +259,28 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     expect(screen.getByText('等待插件启用')).toBeTruthy()
 
     fireEvent.click(loreSwitch)
-    await waitFor(() => expect(scope.set).toHaveBeenCalledWith('enabledSkills', ['rp-guide-state']))
+    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-features', 'settings/set', {
+      field: 'enabledSkills',
+      value: ['rp-guide-state'],
+      expectedRevision: 0,
+    }))
     expect(await screen.findByText('已停用世界书指南。')).toBeTruthy()
+  })
+
+  it('非回环页面不依赖全局 settings scope，仍通过 Roleplay RPC 保存', async () => {
+    const { scope, connection } = harness(undefined, undefined, { remote: true })
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+
+    const loreSwitch = await screen.findByRole('switch', { name: '停用世界书' })
+    expect(loreSwitch.disabled).toBe(false)
+    fireEvent.click(loreSwitch)
+
+    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-features', 'settings/set', {
+      field: 'enabledFeatures',
+      value: [],
+      expectedRevision: 0,
+    }))
+    expect(scope.set).not.toHaveBeenCalled()
   })
 
   it('在系统提示词页签展示 Chat、Agent、Writer 与自定义子代理的真实拼接来源，且各层默认收起', async () => {
@@ -281,14 +324,21 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     fireEvent.change(field, { target: { value: 'You are the shared Roleplay identity.' } })
     fireEvent.click(screen.getByRole('button', { name: '保存统一身份' }))
 
-    await waitFor(() => expect(scope.set).toHaveBeenCalledWith('harnessIdentity', 'You are the shared Roleplay identity.'))
+    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-features', 'settings/set', {
+      field: 'harnessIdentity',
+      value: 'You are the shared Roleplay identity.',
+      expectedRevision: 0,
+    }))
     expect(await screen.findByText('已更新 Roleplay 统一身份；下一次模型请求开始使用。')).toBeTruthy()
     expect(screen.getAllByText('You are the shared Roleplay identity.').length).toBeGreaterThan(1)
     expect(screen.getByText('已自定义')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '编辑统一身份' }))
     fireEvent.click(screen.getByRole('button', { name: '恢复 Harness 默认值' }))
-    await waitFor(() => expect(scope.unset).toHaveBeenCalledWith('harnessIdentity'))
+    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-features', 'settings/unset', {
+      field: 'harnessIdentity',
+      expectedRevision: 1,
+    }))
     expect(await screen.findByText('已恢复 Harness 默认身份。')).toBeTruthy()
     expect(screen.getByText('使用 Harness 默认值')).toBeTruthy()
   })

@@ -196,7 +196,7 @@ test('host coordinator activates without optional asset providers', async () => 
   ctx.provide('workspaceRegistry', {})
   try {
     await ctx.plugin(Library, {})
-    assert.deepEqual(route, { path: '/rp-assets', options: { authority: 'loopback' } })
+    assert.deepEqual(route, { path: '/rp-assets', options: { authority: 'trusted-host' } })
     assert.ok(ctx.get('rpSessionBootstrap'))
   } finally {
     await ctx.fiber.dispose()

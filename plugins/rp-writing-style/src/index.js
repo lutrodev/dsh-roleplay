@@ -294,7 +294,7 @@ function registerBrowser(ctx, styles) {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown writing style endpoint: ${endpoint}`))
     try { return transportSuccess(success(await dispatchBrowser(styles, endpoint, payload))) }
     catch (error) { return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error))) }
-  }, { authority: 'loopback' })
+  }, { authority: 'trusted-host' })
   ctx.effect(() => dispose, 'rp-writing-style: /rp-writing-styles RPC')
 }
 

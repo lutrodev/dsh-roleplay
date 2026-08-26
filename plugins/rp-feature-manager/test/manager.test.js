@@ -67,6 +67,7 @@ test('manager reconciles independently selectable Host entries from one validate
     assert.equal(entries[1].options.disabled, false)
     assert.equal(entries[2].options.disabled, false)
     assert.equal(manager.status().compatible, true)
+    assert.deepEqual(manager.status().settings, { writable: false, revision: null })
     assert.deepEqual(manager.guidanceSkills().map(item => item.skillName), ['rp-guide-lorebook'])
     assert.equal(manager.status().core.some(item => item.label === '会话变量'), false)
     assert.equal(manager.status().features.find(item => item.id === 'state').active, false)
@@ -91,6 +92,67 @@ test('manager publishes its enabled selection through the shared settings namesp
       harnessIdentity: '',
     })
     assert.equal(namespace?.applies, 'live')
+    assert.deepEqual(ctx.get('rpFeatures').status().settings, { writable: true, revision: 0 })
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('browser API follows the DSH trusted-host boundary and persists Roleplay settings remotely', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  ctx.provide('loader', { entries: () => [], async await() {} })
+  let handler
+  let route
+  ctx.provide('connection', {
+    rpc: {
+      handle(path, next, options) {
+        handler = next
+        route = { path, options }
+        return () => {}
+      },
+    },
+  })
+  try {
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(ManagerPlugin, {
+      enabledFeatures: ['lore-book'],
+      enabledSkills: ['rp-guide-lorebook'],
+    })
+    await ctx.get('rpFeatures').settled()
+    assert.deepEqual(route, { path: '/rp-features', options: { authority: 'trusted-host' } })
+
+    const initial = await handler('status', {})
+    assert.deepEqual(initial.value.value.settings, { writable: true, revision: 0 })
+
+    const updated = await handler('settings/set', {
+      field: 'enabledFeatures', value: ['state'], expectedRevision: 0,
+    })
+    assert.equal(updated.value.ok, true)
+    assert.deepEqual(updated.value.value.enabledFeatures, ['state'])
+    assert.deepEqual(updated.value.value.settings, { writable: true, revision: 1 })
+    assert.deepEqual(ctx.settings.get('roleplay-features').enabledFeatures, ['state'])
+
+    const identity = await handler('settings/set', {
+      field: 'harnessIdentity', value: 'Remote Roleplay identity.', expectedRevision: 1,
+    })
+    assert.equal(identity.value.value.settings.revision, 2)
+    assert.equal(ctx.get('rpFeatures').harnessIdentity(), 'Remote Roleplay identity.')
+
+    const reset = await handler('settings/unset', {
+      field: 'harnessIdentity', expectedRevision: 2,
+    })
+    assert.equal(reset.value.value.settings.revision, 3)
+    assert.equal(ctx.get('rpFeatures').harnessIdentity(), DEFAULT_IDENTITY)
+
+    const stale = await handler('settings/set', {
+      field: 'enabledSkills', value: [], expectedRevision: 0,
+    })
+    assert.deepEqual(stale.value, {
+      ok: false,
+      error: { code: 'ROLEPLAY_SETTINGS_UPDATE_FAILED', message: 'Roleplay 设置没有保存，请稍后重试。' },
+    })
+    assert.deepEqual(ctx.settings.get('roleplay-features').enabledSkills, ['rp-guide-lorebook'])
   } finally {
     await ctx.fiber.dispose()
   }

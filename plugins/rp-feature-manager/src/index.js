@@ -19,6 +19,7 @@ import {
   hasEnabledAssetProvider,
 } from './catalog.js'
 import {
+  assertFeatureSelection,
   assertSkillSelection,
   migrateLegacyFeatureSelection,
   normalizeFeatureSelection,
@@ -33,6 +34,7 @@ export * from './version.js'
 const require = createRequire(import.meta.url)
 const FEATURE_IDS = FEATURE_CATALOG.map(item => item.id)
 const RP_PACKAGE_RANGE = ROLEPLAY_SUITE_VERSION
+const ROLEPLAY_SETTINGS_NAMESPACE = settingsNamespace(SETTINGS_NAMESPACE)
 const HARNESS_PROMPT_SECTIONS = new Map([
   ['harness:identity', { id: 'harness-identity', order: -100, source: 'dsh-system-prompt' }],
   ['harness:source', { id: 'harness-source', order: -99, source: 'dsh-app-boot' }],
@@ -67,7 +69,7 @@ export class RpFeatureManager extends Service {
     this.migrationTail = Promise.resolve()
     this.environment = inspectEnvironment()
 
-    installSettingsSection(ctx, settingsNamespace(SETTINGS_NAMESPACE), Config, config, {
+    installSettingsSection(ctx, ROLEPLAY_SETTINGS_NAMESPACE, Config, config, {
       setSource: source => { this.source = source },
       validate: value => {
         migrateLegacyFeatureSelection(value.enabledFeatures)
@@ -140,6 +142,7 @@ export class RpFeatureManager extends Service {
       problems: this.environment.problems,
       enabledFeatures: [...this.enabled],
       enabledSkills: [...this.enabledSkills],
+      settings: this.settingsStatus(),
       core: this.environment.core,
       features: FEATURE_CATALOG.map(item => ({
         id: item.id,
@@ -187,6 +190,44 @@ export class RpFeatureManager extends Service {
       writerRoute: subagentProfile?.writer,
       taskSubagents: subagentProfile?.subagents ?? [],
     })
+  }
+
+  /** Persist one Roleplay-owned setting through the Host settings provider. */
+  async setSetting(payload) {
+    const { field, value, expectedRevision } = parseSettingWrite(payload)
+    const settings = this.requireWritableSettings()
+    await settings.update(ROLEPLAY_SETTINGS_NAMESPACE, { [field]: value }, expectedRevision)
+    this.refresh()
+    await this.settled()
+    return this.status()
+  }
+
+  /** Remove one Roleplay-owned override so it inherits its composed default. */
+  async unsetSetting(payload) {
+    const { field, expectedRevision } = parseSettingReset(payload)
+    const settings = this.requireWritableSettings()
+    await settings.mutate(ROLEPLAY_SETTINGS_NAMESPACE, [{ op: 'unset', path: [field] }], expectedRevision)
+    this.refresh()
+    await this.settled()
+    return this.status()
+  }
+
+  settingsStatus() {
+    const settings = this.ctx.get('settings')
+    const descriptor = settings?.describe().find(item => item.ns === SETTINGS_NAMESPACE)
+    return {
+      writable: settings?.writable === true && descriptor !== undefined,
+      revision: descriptor?.revision ?? null,
+    }
+  }
+
+  requireWritableSettings() {
+    const settings = this.ctx.get('settings')
+    const registered = settings?.describe().some(item => item.ns === SETTINGS_NAMESPACE) === true
+    if (settings?.writable !== true || !registered) {
+      throw new Error('rp-feature-manager: Roleplay settings are not writable')
+    }
+    return settings
   }
 
   refresh() {
@@ -271,23 +312,28 @@ export async function apply(ctx, config) {
 }
 
 function registerBrowserApi(ctx, manager) {
-  const dispose = ctx.connection.rpc.handle('/rp-features', async endpoint => {
+  const dispose = ctx.connection.rpc.handle('/rp-features', async (endpoint, payload) => {
     try {
       await manager.settled()
       if (endpoint === 'status') return transportSuccess(success(manager.status()))
       if (endpoint === 'prompts') return transportSuccess(success(await manager.promptPreview()))
+      if (endpoint === 'settings/set') return transportSuccess(success(await manager.setSetting(payload)))
+      if (endpoint === 'settings/unset') return transportSuccess(success(await manager.unsetSetting(payload)))
       return transportSuccess(failure('INVALID_REQUEST', 'Unknown Roleplay feature endpoint.'))
     } catch {
+      if (endpoint === 'settings/set' || endpoint === 'settings/unset') {
+        return transportSuccess(failure('ROLEPLAY_SETTINGS_UPDATE_FAILED', 'Roleplay 设置没有保存，请稍后重试。'))
+      }
       return endpoint === 'prompts'
         ? transportSuccess(failure('PROMPT_PREVIEW_UNAVAILABLE', '暂时无法读取代理提示词预览。'))
         : transportSuccess(failure('ROLEPLAY_STATUS_UNAVAILABLE', '暂时无法读取 Roleplay 设置。'))
     }
-  }, { authority: 'loopback' })
+  }, { authority: 'trusted-host' })
   ctx.effect(() => dispose, 'rp-feature-manager: /rp-features RPC')
 }
 
 async function migratePersistedSelection(settings) {
-  const current = settings.get(settingsNamespace(SETTINGS_NAMESPACE))
+  const current = settings.get(ROLEPLAY_SETTINGS_NAMESPACE)
   if (current === undefined) return
   const migrated = migrateLegacyFeatureSelection(current.enabledFeatures)
   const skills = assertSkillSelection(current.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
@@ -295,7 +341,7 @@ async function migratePersistedSelection(settings) {
   const user = descriptor?.user
   const missingSkills = user !== undefined && !Object.hasOwn(user, 'enabledSkills')
   if (sameSelection(current.enabledFeatures, migrated) && !missingSkills) return
-  await settings.replace(settingsNamespace(SETTINGS_NAMESPACE), {
+  await settings.replace(ROLEPLAY_SETTINGS_NAMESPACE, {
     ...(user ?? {}),
     enabledFeatures: migrated,
     enabledSkills: skills,
@@ -379,4 +425,43 @@ function normalizeHarnessIdentityOverride(value) {
     throw new RangeError(`rp-feature-manager: harnessIdentity exceeds ${MAX_HARNESS_IDENTITY_CHARACTERS} characters`)
   }
   return normalized
+}
+
+function parseSettingWrite(payload) {
+  if (!isPlainObject(payload)) throw new TypeError('rp-feature-manager: setting write payload must be an object')
+  const field = payload.field
+  const expectedRevision = parseExpectedRevision(payload.expectedRevision)
+  if (field === 'enabledFeatures') {
+    return { field, value: assertFeatureSelection(payload.value), expectedRevision }
+  }
+  if (field === 'enabledSkills') {
+    return { field, value: assertSkillSelection(payload.value), expectedRevision }
+  }
+  if (field === 'harnessIdentity') {
+    const value = normalizeHarnessIdentityOverride(payload.value)
+    return { field, value: value ?? '', expectedRevision }
+  }
+  throw new TypeError(`rp-feature-manager: unknown Roleplay setting ${String(field)}`)
+}
+
+function parseSettingReset(payload) {
+  if (!isPlainObject(payload)) throw new TypeError('rp-feature-manager: setting reset payload must be an object')
+  const field = payload.field
+  if (field !== 'enabledFeatures' && field !== 'enabledSkills' && field !== 'harnessIdentity') {
+    throw new TypeError(`rp-feature-manager: unknown Roleplay setting ${String(field)}`)
+  }
+  return { field, expectedRevision: parseExpectedRevision(payload.expectedRevision) }
+}
+
+function parseExpectedRevision(value) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new TypeError('rp-feature-manager: expectedRevision must be a non-negative safe integer')
+  }
+  return value
+}
+
+function isPlainObject(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
 }

@@ -97,7 +97,7 @@ test('mounts the browser RPC when connection becomes available after the plugin'
   } } })
   await new Promise(resolve => setImmediate(resolve))
 
-  assert.deepEqual(mounted, [{ path: '/rp-character-cards', options: { authority: 'loopback' } }])
+  assert.deepEqual(mounted, [{ path: '/rp-character-cards', options: { authority: 'trusted-host' } }])
   await ctx.fiber.dispose()
 })
 
@@ -107,7 +107,7 @@ test('browser RPC admits export through the registered endpoint whitelist', asyn
   let handler
   ctx.provide('connection', { rpc: { handle(path, next, options) {
     assert.equal(path, '/rp-character-cards')
-    assert.deepEqual(options, { authority: 'loopback' })
+    assert.deepEqual(options, { authority: 'trusted-host' })
     handler = next
     return () => {}
   } } })

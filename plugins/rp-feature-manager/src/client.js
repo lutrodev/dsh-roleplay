@@ -17,8 +17,10 @@ import {
   planFeatureToggle,
   planSkillToggle,
   promptPreview,
+  setRoleplaySetting,
   skillToggleAnnouncement,
   toggleAnnouncement,
+  unsetRoleplaySetting,
 } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
@@ -280,7 +282,12 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
   const enabled = useMemo(() => new Set(enabledFeatures), [enabledFeatures])
   const selectedSkills = useMemo(() => new Set(enabledSkills), [enabledSkills])
   const compatible = status.phase === 'ready' && status.value.compatible === true
-  const canWrite = settings.status === 'ready' && settings.writable && compatible && pending === null
+  const settingsRevision = status.phase === 'ready' ? status.value.settings?.revision : null
+  const canWrite = status.phase === 'ready'
+    && status.value.settings?.writable === true
+    && Number.isSafeInteger(settingsRevision)
+    && compatible
+    && pending === null
 
   const toggleFeature = async feature => {
     if (!canWrite) return
@@ -289,10 +296,12 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
     setPending(`feature:${feature.id}`)
     setNotice('')
     try {
-      await scope.set('enabledFeatures', plan.enabledFeatures)
-      const saved = scope.getSnapshot().value?.enabledFeatures
-      if (!sameSelection(saved, plan.enabledFeatures)) throw new Error('Roleplay feature selection was not persisted')
-      const nextStatus = await featureStatus(connection)
+      const nextStatus = await setRoleplaySetting(
+        connection,
+        'enabledFeatures',
+        plan.enabledFeatures,
+        settingsRevision,
+      )
       if (!sameSelection(nextStatus.enabledFeatures, plan.enabledFeatures)) throw new Error('Roleplay feature selection was not applied')
       setStatus({ phase: 'ready', value: nextStatus })
       setNotice(toggleAnnouncement(feature, nextEnabled, plan.sideEffects))
@@ -311,10 +320,12 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
     setPending(`skill:${skill.id}`)
     setNotice('')
     try {
-      await scope.set('enabledSkills', nextSkills)
-      const saved = scope.getSnapshot().value?.enabledSkills
-      if (!sameSelection(saved, nextSkills)) throw new Error('Roleplay Skill selection was not persisted')
-      const nextStatus = await featureStatus(connection)
+      const nextStatus = await setRoleplaySetting(
+        connection,
+        'enabledSkills',
+        nextSkills,
+        settingsRevision,
+      )
       if (!sameSelection(nextStatus.enabledSkills, nextSkills)) throw new Error('Roleplay Skill selection was not applied')
       setStatus({ phase: 'ready', value: nextStatus })
       setNotice(skillToggleAnnouncement(skill, nextEnabled))
@@ -332,8 +343,10 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
     setPending('harness-identity')
     setNotice('')
     try {
-      if (reset) await scope.unset('harnessIdentity')
-      else await scope.set('harnessIdentity', normalized)
+      const nextStatus = reset
+        ? await unsetRoleplaySetting(connection, 'harnessIdentity', settingsRevision)
+        : await setRoleplaySetting(connection, 'harnessIdentity', normalized, settingsRevision)
+      setStatus({ phase: 'ready', value: nextStatus })
       const nextPreview = await promptPreview(connection)
       if (reset) {
         if (nextPreview.harnessIdentity?.customized !== false) throw new Error('Roleplay identity reset was not applied')
@@ -351,10 +364,10 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
     }
   }
 
-  if (status.phase === 'loading' || settings.status === 'loading') {
+  if (status.phase === 'loading') {
     return h('div', { className: css.state, role: 'status' }, t('loading'))
   }
-  if (status.phase === 'error' || settings.status !== 'ready') {
+  if (status.phase === 'error') {
     return h('div', { className: css.failure },
       h('p', { role: 'alert' }, t('loadError')),
       h('button', { type: 'button', onClick: () => setRequest(value => value + 1) }, t('retry')))

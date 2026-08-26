@@ -229,7 +229,7 @@ function registerBrowser(ctx, manager) {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown subagent endpoint: ${endpoint}`))
     try { return transportSuccess(success(await dispatchBrowser(manager, endpoint, payload, signal))) }
     catch (error) { return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error))) }
-  }, { authority: 'loopback' })
+  }, { authority: 'trusted-host' })
   ctx.effect(() => dispose, 'rp-subagent-manager: /rp-subagents RPC')
 }
 

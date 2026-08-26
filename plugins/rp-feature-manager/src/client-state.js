@@ -51,8 +51,23 @@ export async function promptPreview(connection) {
   return roleplayFeatureRequest(connection, 'prompts', '代理提示词预览读取失败')
 }
 
-async function roleplayFeatureRequest(connection, endpoint, fallbackMessage) {
-  const response = await connection.rpc.call('/rp-features', endpoint, {})
+export async function setRoleplaySetting(connection, field, value, expectedRevision) {
+  return roleplayFeatureRequest(connection, 'settings/set', 'Roleplay 设置保存失败', {
+    field,
+    value,
+    expectedRevision,
+  })
+}
+
+export async function unsetRoleplaySetting(connection, field, expectedRevision) {
+  return roleplayFeatureRequest(connection, 'settings/unset', 'Roleplay 设置重置失败', {
+    field,
+    expectedRevision,
+  })
+}
+
+async function roleplayFeatureRequest(connection, endpoint, fallbackMessage, payload = {}) {
+  const response = await connection.rpc.call('/rp-features', endpoint, payload)
   const domain = response?.ok === true && response.value?.ok !== undefined ? response.value : response
   if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? fallbackMessage), { code: domain?.error?.code })
   return domain.value
