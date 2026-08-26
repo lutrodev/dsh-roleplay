@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-subagent-manager",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Global fixed Writer and isolated task-subagent catalog for Roleplay",
   "license": "MIT",
   "private": true,

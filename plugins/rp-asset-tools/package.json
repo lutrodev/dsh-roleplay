@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-asset-tools",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Compact model-facing adapter for Roleplay shared assets",
   "license": "MIT",
   "private": true,
