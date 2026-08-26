@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-message-actions",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Roleplay message actions, inline editing, suffix deletion and same-session regeneration",
   "license": "MIT",
   "private": true,

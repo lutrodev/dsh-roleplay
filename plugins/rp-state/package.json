@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-state",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Schema-owned event-sourced state for roleplay agents",
   "license": "MIT",
   "private": true,

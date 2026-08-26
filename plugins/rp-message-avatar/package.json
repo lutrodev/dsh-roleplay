@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-message-avatar",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Roleplay user and canonical assistant message avatars",
   "license": "MIT",
   "private": true,

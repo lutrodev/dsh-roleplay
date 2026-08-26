@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-preset",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Reusable prompt preset library and browser UI for Roleplay",
   "license": "MIT",
   "private": true,
