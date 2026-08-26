@@ -100,6 +100,14 @@ export class RpRuntimeError extends HarnessError {
   }
 }
 
+/** Tool argument failure enriched by capability-owned, non-mutating corrections. */
+class RpCommitToolArgsError extends ToolArgsError {
+  constructor(violations, corrections) {
+    super(violations)
+    this.corrections = corrections
+  }
+}
+
 /** Roleplay orchestration service backed by the Harness Agent and Session APIs. */
 export class RpRuntime extends Service {
   /**
@@ -303,11 +311,14 @@ export class RpRuntime extends Service {
     return this.register(this.contextSources, normalized, 'context source')
   }
 
-  /** @param {{ kind: string, schema: object, validate(effect: object, context: object): unknown | Promise<unknown> }} definition */
+  /** @param {{ kind: string, schema: object, diagnoseArguments?(effect: object, context: { path: string }): string[], validate(effect: object, context: object): unknown | Promise<unknown> }} definition */
   registerEffectType(definition) {
     if (!isRecord(definition) || typeof definition.kind !== 'string' || definition.kind.length === 0
       || typeof definition.validate !== 'function' || !isRecord(definition.schema)) {
       throw new RpRuntimeError('RP_INVALID_REGISTRATION', 'effect type requires a non-empty kind, object schema, and validate function')
+    }
+    if (definition.diagnoseArguments !== undefined && typeof definition.diagnoseArguments !== 'function') {
+      throw new RpRuntimeError('RP_INVALID_REGISTRATION', `effect type "${definition.kind}" diagnoseArguments must be a function`)
     }
     const schema = jsonClone(definition.schema)
     assertObjectJsonSchema(schema)
@@ -336,6 +347,32 @@ export class RpRuntime extends Service {
   /** Return the live closed commit schema assembled from registered effect schemas. */
   commitParametersSchema() {
     return commitParametersSchema([...this.effectTypes.values()].map(definition => definition.schema))
+  }
+
+  /** Collect bounded capability-owned hints for otherwise opaque nested schema failures. */
+  commitArgumentCorrections(args) {
+    if (!isRecord(args) || !Array.isArray(args.effects)) return []
+    const corrections = new Set()
+    const limit = Math.min(args.effects.length, this.config.maxEffectsPerCommit)
+    for (let index = 0; index < limit; index += 1) {
+      const effect = args.effects[index]
+      if (!isRecord(effect) || typeof effect.kind !== 'string') continue
+      const diagnose = this.effectTypes.get(effect.kind)?.diagnoseArguments
+      if (typeof diagnose !== 'function') continue
+      let supplied
+      try {
+        supplied = diagnose(effect, { path: `effects[${index}]` })
+      } catch {
+        continue
+      }
+      if (!Array.isArray(supplied)) continue
+      for (const correction of supplied) {
+        if (typeof correction !== 'string' || correction.trim().length === 0) continue
+        corrections.add([...correction.trim()].slice(0, 1000).join(''))
+        if (corrections.size >= 32) return [...corrections]
+      }
+    }
+    return [...corrections]
   }
 
   /** Store one model-facing correction payload until the tool pipeline finalizes the failed call. */
@@ -1417,7 +1454,9 @@ export class RpRuntime extends Service {
     tool.execute = async (args, exec) => {
       try {
         const violations = validateJsonSchemaValue(runtime.commitParametersSchema(), args, '')
-        if (violations.length > 0) throw new ToolArgsError(violations)
+        if (violations.length > 0) {
+          throw new RpCommitToolArgsError(violations, runtime.commitArgumentCorrections(args))
+        }
         return await execute(args, exec)
       } catch (error) {
         runtime.recordCommitErrorFeedback(exec.agent, String(exec.callId ?? ''), error)
@@ -1693,11 +1732,17 @@ function commitParametersSchema(effectSchemas) {
 function commitErrorFeedback(error) {
   const message = error instanceof Error ? error.message : String(error)
   if (error instanceof ToolArgsError) {
+    const corrections = Array.isArray(error.corrections)
+      ? error.corrections.filter(item => typeof item === 'string' && item.length > 0)
+      : []
     return {
       category: 'invalid_arguments',
       code: error.code,
       retryable: true,
-      message: 'The commit arguments do not match the active tool schema. Correct only the reported fields and retry the commit.',
+      message: corrections.length === 0
+        ? 'The commit arguments do not match the active tool schema. Correct only the reported fields and retry the commit.'
+        : 'The commit arguments do not match the active tool schema. Apply every precise correction and remaining violation, preserve unrelated fields, and retry the commit.',
+      ...(corrections.length === 0 ? {} : { corrections }),
       violations: [...error.violations],
     }
   }

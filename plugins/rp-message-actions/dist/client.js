@@ -6697,6 +6697,7 @@ get: (_target, key) => {
 				failed: false,
 				deleted: false,
 				committed: false,
+				commitAttempted: false,
 				commitSeq: void 0,
 				finalAssistantSeq: void 0,
 				finalAssistantTarget: void 0,
@@ -6704,6 +6705,7 @@ get: (_target, key) => {
 				finalAssistantTime: void 0,
 				finalAssistantEdited: false,
 				finalAssistantInterrupted: false,
+				finalAssistantOwnsCommit: false,
 				hostOpeningSeq: void 0,
 				sharedAssetMutation: false,
 				endReasonKind: void 0,
@@ -6725,21 +6727,33 @@ get: (_target, key) => {
 				finalAssistantText: assistantMessageText(event.data?.message),
 				finalAssistantEdited: true
 			};
-			if (event.type === "assistant/message" && event.surfaceOp === "append" && event.data?.message?.source?.kind === "model" && assistantMessageText(event.data.message).trim().length > 0) return {
-				...state,
-				finalAssistantSeq: event.seq,
-				finalAssistantTarget: {
-					kind: "message",
-					role: "assistant",
-					messageId: event.data.message.id,
-					turn: event.data.turn,
-					step: event.data.step
-				},
-				finalAssistantText: assistantMessageText(event.data.message),
-				finalAssistantTime: event.time,
-				finalAssistantEdited: false,
-				finalAssistantInterrupted: event.data.interrupted === true
-			};
+			if (event.type === "assistant/message" && event.surfaceOp === "append" && event.data?.message?.source?.kind === "model") {
+				const text = assistantMessageText(event.data.message);
+				const ownsCommit = assistantCallsTool(event.data.message, "rp_commit_turn");
+				if (text.trim().length === 0) return ownsCommit ? {
+					...state,
+					commitAttempted: true,
+					finalAssistantOwnsCommit: Number.isSafeInteger(state.finalAssistantSeq) || state.finalAssistantOwnsCommit === true
+				} : state;
+				if (state.finalAssistantOwnsCommit === true && !ownsCommit) return state;
+				return {
+					...state,
+					commitAttempted: state.commitAttempted === true || ownsCommit,
+					finalAssistantSeq: event.seq,
+					finalAssistantTarget: {
+						kind: "message",
+						role: "assistant",
+						messageId: event.data.message.id,
+						turn: event.data.turn,
+						step: event.data.step
+					},
+					finalAssistantText: text,
+					finalAssistantTime: event.time,
+					finalAssistantEdited: false,
+					finalAssistantInterrupted: event.data.interrupted === true,
+					finalAssistantOwnsCommit: ownsCommit
+				};
+			}
 			if (event.type === "tool/result" && event.surfaceOp === "append" && event.data?.meta?.kind === "rp-agent/asset-mutation") return {
 				...state,
 				sharedAssetMutation: true
@@ -6747,13 +6761,15 @@ get: (_target, key) => {
 			if (event.type === "tool/result" && event.surfaceOp === "append" && event.data?.meta?.kind === "rp-agent/turn-commit") return {
 				...state,
 				committed: true,
+				commitAttempted: true,
 				commitSeq: event.seq,
 				failed: false,
-				finalAssistantSeq: event.data.meta.assistant?.seq ?? state.finalAssistantSeq
+				finalAssistantSeq: event.data.meta.assistant?.seq ?? state.finalAssistantSeq,
+				finalAssistantOwnsCommit: true
 			};
 			if (event.type === "turn/end") return {
 				...state,
-				failed: !state.committed && event.data.reason?.kind !== "completed",
+				failed: !state.committed && (state.commitAttempted === true || event.data.reason?.kind !== "completed"),
 				endReasonKind: event.data.reason?.kind,
 				endCancelKind: event.data.reason?.kind === "aborted" ? event.data.reason.reason?.kind : void 0,
 				seq: event.seq
@@ -6784,6 +6800,9 @@ get: (_target, key) => {
 		}
 		function assistantMessageText(message) {
 			return Array.isArray(message?.content) ? message.content.filter((part) => part?.type === "text" && typeof part.text === "string").map((part) => part.text).join("") : "";
+		}
+		function assistantCallsTool(message, name) {
+			return Array.isArray(message?.content) && message.content.some((part) => part?.type === "tool-call" && part.name === name);
 		}
 		//#endregion
 		//#region src/client-styles.generated.js
@@ -7171,6 +7190,7 @@ get: (_target, key) => {
 		function AssistantFloorEffects(props) {
 			if (!props.useSessions((state) => isRoleplaySession(state, props.sessionId))) return h(InactiveActionNodeMarker);
 			if (props.node.data.deleted === true) return h(DeletedAssistantTraceMarker, { target: props.node.data.target });
+			if (isFailedCanonicalAssistantAction(props.node)) return h(FailedCanonicalAssistantMarker);
 			if (!isCanonicalAssistantAction(props.node)) return h(InactiveActionNodeMarker);
 			return h(react.default.Fragment, null, h(AssistantEffectNodeMarker), h(SettledAssistantTraceEffect), props.node.data.edited === true ? h(EditedMessagePortal, {
 				surface: "assistant",
@@ -7195,6 +7215,13 @@ get: (_target, key) => {
 			const state = location.turn.data?.get?.("rp-floor-failed-assistant") ?? location.turn.data?.get?.("rp-message-failed-assistant");
 			return state?.failed !== true && Number.isSafeInteger(state?.finalAssistantSeq) && state.finalAssistantSeq === node.data?.seq;
 		}
+		/** Mark the exact readable reply selected for recovery from a failed commit. */
+		function isFailedCanonicalAssistantAction(node) {
+			const location = node?.location;
+			if (location?.kind !== "turn" && location?.kind !== "step" || location.turn.status !== "closed") return false;
+			const state = location.turn.data?.get?.("rp-floor-failed-assistant") ?? location.turn.data?.get?.("rp-message-failed-assistant");
+			return state?.failed === true && Number.isSafeInteger(state?.finalAssistantSeq) && state.finalAssistantSeq === node.data?.seq;
+		}
 		function InactiveActionNodeMarker() {
 			return h("span", {
 				className: css.inactiveActionNodeMarker,
@@ -7207,6 +7234,14 @@ get: (_target, key) => {
 				className: css.assistantEffectNodeMarker,
 				hidden: true,
 				"aria-hidden": true
+			});
+		}
+		function FailedCanonicalAssistantMarker() {
+			return h("span", {
+				className: css.assistantEffectNodeMarker,
+				hidden: true,
+				"aria-hidden": true,
+				"data-rp-message-actions-failed-canonical": ""
 			});
 		}
 		function AssistantMessageActions(props) {
@@ -7265,6 +7300,11 @@ get: (_target, key) => {
 			const recoveryMessage = (base, retryable) => {
 				if (detail?.sharedAssetMutation === true) return `${base}本次已修改共享资料，不能直接重新生成。`;
 				return detail?.canReroll === true ? retryable : `${base}你可以继续发送消息。`;
+			};
+			if (matched.state?.commitAttempted === true && matched.state?.committed !== true) return {
+				state: "error",
+				title: "回复未能完成保存",
+				message: recoveryMessage("正文已保留，但本次会话变量变化没有生效。", "正文已保留，但本次会话变量变化没有生效，可以重新生成这条回复。")
 			};
 			if (kind === "error") return {
 				state: "error",
@@ -7412,13 +7452,15 @@ get: (_target, key) => {
 		/** Collapse a closed failed turn while preserving its last readable partial. */
 		function failedAssistantTraceRows(host, endReasonKind) {
 			const hidden = [];
+			const selectedReply = failedCanonicalAssistantRow(host);
 			let keptReadablePartial = false;
 			for (let row = host?.previousElementSibling ?? null; row !== null; row = row.previousElementSibling) {
 				const kind = row.dataset?.chatFlowKind;
 				if (kind === "user" || kind === "steering") break;
 				if (kind === "turn-tail") continue;
 				if (endReasonKind === "max-tokens" && kind === "turn-max-tokens") continue;
-				if (kind === "assistant-step" && !keptReadablePartial && readableAssistantRow(row)) {
+				if (row === selectedReply) continue;
+				if (selectedReply === null && kind === "assistant-step" && !keptReadablePartial && readableAssistantRow(row)) {
 					keptReadablePartial = true;
 					continue;
 				}
@@ -7426,6 +7468,15 @@ get: (_target, key) => {
 				hidden.push(row);
 			}
 			return hidden;
+		}
+		function failedCanonicalAssistantRow(host) {
+			for (let row = host?.previousElementSibling ?? null; row !== null; row = row.previousElementSibling) {
+				const kind = row.dataset?.chatFlowKind;
+				if (kind === "user" || kind === "steering") break;
+				if (kind !== "rp-floor-assistant-actions") continue;
+				if (row.querySelector?.("[data-rp-message-actions-failed-canonical]") !== null) return messageRowForAction(row, "assistant");
+			}
+			return null;
 		}
 		function readableAssistantRow(row) {
 			const content = assistantMessageContent(row);
@@ -8210,6 +8261,7 @@ get: (_target, key) => {
 		exports.forkMessageBranch = forkMessageBranch;
 		exports.inject = inject;
 		exports.isCanonicalAssistantAction = isCanonicalAssistantAction;
+		exports.isFailedCanonicalAssistantAction = isFailedCanonicalAssistantAction;
 		exports.messageRowForAction = messageRowForAction;
 		exports.nativeAssistantBranchButton = nativeAssistantBranchButton;
 		exports.openingFloorNodeDefinition = openingFloorNodeDefinition;

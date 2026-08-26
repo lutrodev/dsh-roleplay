@@ -34,6 +34,7 @@ test('collects ordered context, validates effects and produces the sole commit m
   assert.deepEqual(Object.keys(writerTool.parameters.properties), ['action', 'brief'])
   assert.equal(writerTool.parameters.additionalProperties, false)
   assert.match(contractText, /narrative was already inserted and must not be repeated/i)
+  assert.match(contractText, /apply every correction exactly/i)
   assert.match(writerTool.description, /Review and revise the returned draft/i)
   assert.match(commitTool.description, /generated prose is already the complete visible narrative/i)
   assert.equal(runtimeContract.text({ agent: { session: { header: { origin: 'subagent' } } } }), '')
@@ -91,7 +92,22 @@ test('commit exposes registered effect schemas and returns structured correction
     schema: { type: 'object', properties: { kind: { type: 'string', const: 'open.effect' } }, required: ['kind'] },
     validate: effect => effect,
   }), /closed object/)
-  runtime.registerEffectType({ kind: 'test.effect', schema: testEffectSchema(), validate: effect => effect })
+  assert.throws(() => runtime.registerEffectType({
+    kind: 'bad.diagnostic', schema: testEffectSchema('bad.diagnostic'), diagnoseArguments: 'invalid', validate: effect => effect,
+  }), /diagnoseArguments must be a function/)
+  runtime.registerEffectType({
+    kind: 'test.effect',
+    schema: testEffectSchema(),
+    diagnoseArguments: (effect, { path }) => effect.target === 'bounded'
+      ? Array.from({ length: 40 }, (_value, index) => `${index}:${'x'.repeat(1100)}`)
+      : [`"${path}.value" is not accepted by test.effect; remove it.`],
+    validate: effect => effect,
+  })
+  const boundedCorrections = runtime.commitArgumentCorrections({
+    effects: [{ kind: 'test.effect', target: 'bounded', payload: {} }],
+  })
+  assert.equal(boundedCorrections.length, 32)
+  assert.equal([...boundedCorrections[0]].length, 1000)
 
   const commit = tools.get('rp_commit_turn')
   const agent = { session: { events: [] } }
@@ -113,6 +129,10 @@ test('commit exposes registered effect schemas and returns structured correction
   assert.equal(feedback.status, 'error')
   assert.equal(feedback.error.category, 'invalid_arguments')
   assert.equal(feedback.error.retryable, true)
+  assert.match(feedback.error.message, /precise correction/)
+  assert.deepEqual(feedback.error.corrections, [
+    '"effects[0].value" is not accepted by test.effect; remove it.',
+  ])
   assert.ok(feedback.error.violations.some(item => item.includes('effects[0].value')))
   assert.equal(commit.finalizeContent(exec, {
     isError: true,
@@ -1477,12 +1497,12 @@ test('inherit routes resolve from the first logged parent request before child e
   await ctx.fiber.dispose()
 })
 
-function testEffectSchema() {
+function testEffectSchema(kind = 'test.effect') {
   return {
     type: 'object',
     additionalProperties: false,
     properties: {
-      kind: { type: 'string', const: 'test.effect' },
+      kind: { type: 'string', const: kind },
       target: { type: 'string' },
       payload: { type: 'object', additionalProperties: true },
     },

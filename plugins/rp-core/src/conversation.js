@@ -103,12 +103,18 @@ export function roleplayTranscriptMessages(session) {
       && event.data?.source?.kind === 'user') userTurns.set(event.data.id, openTurn)
   }
   const finalAssistants = new Map()
+  const commitAssistants = new Map()
   for (const event of active) {
     if (event.type !== 'assistant/message'
       || event.data?.message?.source?.kind !== 'model'
       || endedTurns.get(event.data.turn) !== 'completed') continue
     finalAssistants.set(event.data.turn, event)
+    if (messageText(event.data.message).trim().length > 0
+      && assistantCallsTool(event.data.message, 'rp_commit_turn')) {
+      commitAssistants.set(event.data.turn, event)
+    }
   }
+  for (const [turn, commitAssistant] of commitAssistants) finalAssistants.set(turn, commitAssistant)
   const messages = []
   for (const event of active) {
     if (event.type === 'user/message'
@@ -205,6 +211,11 @@ function messageText(message) {
         .map(block => block.text)
         .join('\n')
     : ''
+}
+
+function assistantCallsTool(message, name) {
+  return Array.isArray(message?.content)
+    && message.content.some(block => block?.type === 'tool-call' && block.name === name)
 }
 
 function record(value) {

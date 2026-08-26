@@ -47,9 +47,30 @@ test('transcript keeps only settled users and the canonical closing model messag
   }, { surfaceOp: 'append' })
   session.append('turn/end', { turn: 5, reason: { kind: 'completed' } })
 
+  session.append('turn/start', { turn: 6 })
+  session.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: '提交失败轮输入' }], source: { kind: 'user' },
+  }), { surfaceOp: 'append' })
+  session.append('assistant/message', {
+    turn: 6,
+    step: 2,
+    message: createAssistantMessage({
+      content: [
+        { type: 'text', text: '提交时已经展示的完整正文' },
+        { type: 'tool-call', id: 'commit-invalid', name: 'rp_commit_turn', arguments: '{}' },
+      ],
+      source: { provider: 'mock', model: 'mock' },
+    }),
+  }, { surfaceOp: 'append' })
+  appendAssistant(session, 6, 3, '—')
+  session.append('turn/end', { turn: 6, reason: { kind: 'completed' } })
+
   assert.deepEqual(roleplayTranscriptMessages(session).flatMap(message => (
     message.content.filter(block => block.type === 'text').map(block => block.text)
-  )), ['开场白', '完成轮输入', '最终正文', '失败轮输入', '工具终止轮输入'])
+  )), [
+    '开场白', '完成轮输入', '最终正文', '失败轮输入', '工具终止轮输入',
+    '提交失败轮输入', '提交时已经展示的完整正文',
+  ])
 })
 
 function appendAssistant(session, turn, step, text) {

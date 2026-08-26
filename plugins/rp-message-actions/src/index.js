@@ -20,6 +20,7 @@ export const Config = Schema.object({
 
 const ENDPOINTS = new Set(['get', 'edit', 'delete', 'reroll'])
 const RP_ASSET_MUTATION_META_KIND = 'rp-agent/asset-mutation'
+const RP_COMMIT_TOOL = 'rp_commit_turn'
 
 export function apply(ctx, config) {
   validateConfig(config)
@@ -269,9 +270,14 @@ export function locateRoleplayTurn(session, turnNumber) {
     && event.surfaceOp === 'append'
     && event.data?.message?.source?.kind === 'model'
     && assistantText(event).trim().length > 0)
+  const commitReadableAssistant = events.findLast(event => event?.type === 'assistant/message'
+    && event.surfaceOp === 'append'
+    && event.data?.message?.source?.kind === 'model'
+    && assistantText(event).trim().length > 0
+    && assistantCallsTool(event, RP_COMMIT_TOOL))
   const assistant = committedAssistant?.type === 'assistant/message'
     ? committedAssistant
-    : finalReadableAssistant
+    : commitReadableAssistant ?? finalReadableAssistant
   return {
     start, end, events, users, user: users[0], claimedUsers,
     assistant, finalAssistant, commit,
@@ -711,6 +717,11 @@ function lastTurnStep(events) {
 
 function assistantText(event) {
   return messageText(event?.data?.message?.content)
+}
+
+function assistantCallsTool(event, name) {
+  return Array.isArray(event?.data?.message?.content)
+    && event.data.message.content.some(block => block?.type === 'tool-call' && block.name === name)
 }
 
 function messageText(content) {

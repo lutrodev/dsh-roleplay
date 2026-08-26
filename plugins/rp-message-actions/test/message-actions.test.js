@@ -349,6 +349,25 @@ test('an interrupted native assistant keeps message actions and rerolls in the s
   ])
 })
 
+test('a failed commit keeps its narrative actionable when a later placeholder closes the turn', async t => {
+  const harness = await createHarness(t, 'failed-commit-placeholder')
+  const failed = appendFailedCommitTurn(harness.session, 3, '继续剧情', '变量提交失败前生成的完整正文')
+  const turn = locateRoleplayTurn(harness.session, 3)
+  const target = assistantTarget(turn)
+
+  assert.equal(turn.assistant.seq, failed.assistant.seq)
+  assert.equal(turn.finalAssistant.seq, failed.placeholder.seq)
+  assert.equal(target.messageId, failed.assistant.data.message.id)
+  assert.equal((await get(harness, target)).content, '变量提交失败前生成的完整正文')
+
+  const result = await action(harness, 'reroll', target)
+  assert.equal(result.sameSession, true)
+  assert.deepEqual(harness.followups.map(message => message.content[0].text), ['继续剧情'])
+  assert.deepEqual(transcriptText(harness.session), [
+    '第一个选择', '第一层正文', '第二个选择', '第二层正文',
+  ])
+})
+
 test('shared asset writes disable reroll but remain durable after suffix deletion', async t => {
   const harness = await createHarness(t, 'asset')
   const asset = appendAssetTurn(harness.session, 3)
@@ -750,6 +769,47 @@ function appendInterruptedFailure(session, turn, userText, partialText) {
   session.append('step/end', { turn, step: 1 })
   session.append('turn/end', { turn, reason: { kind: 'aborted', reason: { kind: 'user' } } })
   return assistant
+}
+
+function appendFailedCommitTurn(session, turn, userText, narrative) {
+  session.append('turn/start', { turn })
+  session.append('step/start', { turn, step: 1 })
+  const user = session.append('user/message', {
+    role: 'user', id: `user-${turn}`,
+    content: [{ type: 'text', text: userText }], source: { kind: 'user' },
+  }, { surfaceOp: 'append' })
+  const callId = `rp-commit-invalid-${turn}`
+  const assistant = session.append('assistant/message', {
+    turn, step: 1,
+    message: createAssistantMessage({
+      content: [
+        { type: 'text', text: narrative },
+        { type: 'tool-call', id: callId, name: 'rp_commit_turn', arguments: '{}' },
+      ],
+      source: { provider: 'mock', model: 'mock' },
+    }),
+  }, { surfaceOp: 'append' })
+  const call = session.append('tool/call', {
+    turn, step: 1, callId, name: 'rp_commit_turn', arguments: '{}',
+  })
+  session.append('tool/result', {
+    turn, step: 1,
+    message: createToolResultMessage({
+      callId,
+      content: [{ type: 'text', text: '{"status":"error","error":{"code":"INVALID_ARGS"}}' }],
+      isError: true,
+    }),
+  }, { surfaceOp: 'append', sourceEventSeqs: [call.seq] })
+  const placeholder = session.append('assistant/message', {
+    turn, step: 1,
+    message: createAssistantMessage({
+      content: [{ type: 'text', text: '—' }],
+      source: { provider: 'mock', model: 'mock' },
+    }),
+  }, { surfaceOp: 'append' })
+  session.append('step/end', { turn, step: 1 })
+  session.append('turn/end', { turn, reason: { kind: 'completed' } })
+  return { user, assistant, placeholder }
 }
 
 function appendAssetTurn(session, turn) {

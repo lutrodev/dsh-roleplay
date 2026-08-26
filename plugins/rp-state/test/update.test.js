@@ -2,17 +2,23 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
 import { createNamespaceSnapshot } from '../src/definition.js'
-import { applyStateChanges, stateUpdateEffectSchema, stateUpdateOperationProtocol, StateUpdateError } from '../src/update.js'
+import {
+  applyStateChanges,
+  stateUpdateArgumentCorrections,
+  stateUpdateEffectSchema,
+  stateUpdateOperationProtocol,
+  StateUpdateError,
+} from '../src/update.js'
 
 test('publishes one strict schema and operation table for all State update paths', () => {
   const schema = stateUpdateEffectSchema()
   assert.equal(schema.additionalProperties, false)
   assert.deepEqual(schema.required, ['kind', 'namespace', 'expectedRevision', 'payload'])
   assert.deepEqual(stateUpdateOperationProtocol(), {
-    set: { required: ['op', 'path', 'value', 'reason'], optional: ['ruleId'] },
-    increment: { required: ['op', 'path', 'by', 'reason'], optional: ['ruleId'] },
-    append: { required: ['op', 'path', 'value', 'reason'], optional: ['ruleId'] },
-    remove: { required: ['op', 'path', 'reason'], optional: ['ruleId'], rootAllowed: false },
+    set: { required: ['op', 'path', 'value', 'reason'], optional: ['ruleId'], forbidden: ['by'] },
+    increment: { required: ['op', 'path', 'by', 'reason'], optional: ['ruleId'], forbidden: ['value'] },
+    append: { required: ['op', 'path', 'value', 'reason'], optional: ['ruleId'], forbidden: ['by'] },
+    remove: { required: ['op', 'path', 'reason'], optional: ['ruleId'], forbidden: ['value', 'by'], rootAllowed: false },
   })
   const effect = change => ({
     kind: 'state.update', namespace: 'story', expectedRevision: 1,
@@ -27,6 +33,31 @@ test('publishes one strict schema and operation table for all State update paths
   assert.ok(validateJsonSchemaValue(schema, effect({
     op: 'append', path: '/history', value: '新增记录',
   }), '').length > 0)
+})
+
+test('explains operation-specific nested schema failures without accepting them', () => {
+  const effect = {
+    kind: 'state.update', namespace: 'story', expectedRevision: 1,
+    payload: { changes: [
+      { op: 'set', path: '/time', value: '17:40', reason: '时间推进' },
+      { op: 'increment', path: '/score', value: 2, reason: '分数增加' },
+    ] },
+  }
+  assert.deepEqual(stateUpdateArgumentCorrections(effect, { path: 'effects[0]' }), [
+    '"effects[0].payload.changes[1]" uses op "increment": rename field "value" to "by" without changing its value.',
+  ])
+  assert.ok(validateJsonSchemaValue(stateUpdateEffectSchema(), effect, '').length > 0)
+  assert.deepEqual(stateUpdateArgumentCorrections({
+    ...effect,
+    payload: { changes: [{ op: 'remove', path: '/obsolete', value: true, reason: '' }] },
+  }, { path: 'effects[0]' }), [
+    '"effects[0].payload.changes[0].reason" must be a non-empty factual reason.',
+    '"effects[0].payload.changes[0]" does not allow "value" when op is "remove".',
+  ])
+  assert.match(stateUpdateArgumentCorrections({
+    ...effect,
+    payload: { changes: [{ op: '__proto__', path: '/score', reason: '非法操作名' }] },
+  }, { path: 'effects[0]' })[0], /must be exactly one of/)
 })
 
 test('applies set, increment, append, and remove atomically without mutating the source', () => {

@@ -4,10 +4,10 @@ import { cloneJson, normalizeJson, validateStateValue } from './schema.js'
 
 const CHANGE_BASE_FIELDS = Object.freeze(['op', 'path', 'reason', 'ruleId'])
 const OPERATION_SPECS = Object.freeze({
-  set: Object.freeze({ argument: 'value', description: 'Replace the value at one path. Use append instead when adding one item to an existing array.' }),
-  increment: Object.freeze({ argument: 'by', description: 'Add one finite numeric delta to the number at one path.' }),
-  append: Object.freeze({ argument: 'value', description: 'Append exactly one JSON item to an existing array without repeating its current contents.' }),
-  remove: Object.freeze({ description: 'Remove one existing non-root path.' }),
+  set: Object.freeze({ argument: 'value', forbidden: Object.freeze(['by']), description: 'Replace the value at one path. Pass the new value in "value"; never use "by". Use append instead when adding one item to an existing array.' }),
+  increment: Object.freeze({ argument: 'by', forbidden: Object.freeze(['value']), description: 'Add one finite numeric delta to the number at one path. Pass the delta in "by"; never use "value".' }),
+  append: Object.freeze({ argument: 'value', forbidden: Object.freeze(['by']), description: 'Append exactly one JSON item to an existing array without repeating its current contents. Pass that one item in "value"; never use "by".' }),
+  remove: Object.freeze({ forbidden: Object.freeze(['value', 'by']), description: 'Remove one existing non-root path. Do not pass "value" or "by".' }),
 })
 
 /** Return the strict model-facing schema for one atomic state.update effect. */
@@ -41,8 +41,60 @@ export function stateUpdateOperationProtocol() {
   return Object.fromEntries(Object.entries(OPERATION_SPECS).map(([operation, spec]) => [operation, {
     required: ['op', 'path', ...(spec.argument === undefined ? [] : [spec.argument]), 'reason'],
     optional: ['ruleId'],
+    forbidden: [...spec.forbidden],
     ...(operation === 'remove' ? { rootAllowed: false } : {}),
   }]))
+}
+
+/**
+ * Return concise model-facing corrections for a malformed raw state.update
+ * effect. The live JSON Schema remains authoritative; these messages explain
+ * nested oneOf failures without weakening any operation branch.
+ */
+export function stateUpdateArgumentCorrections(effect, context = {}) {
+  if (!object(effect) || !object(effect.payload) || !Array.isArray(effect.payload.changes)) return []
+  const effectPath = typeof context.path === 'string' && context.path.length > 0 ? context.path : 'effect'
+  const corrections = []
+  for (const [index, change] of effect.payload.changes.entries()) {
+    const path = `${effectPath}.payload.changes[${index}]`
+    if (!object(change)) {
+      corrections.push(`"${path}" must be an object matching one State operation.`)
+      continue
+    }
+    const spec = typeof change.op === 'string' && Object.hasOwn(OPERATION_SPECS, change.op)
+      ? OPERATION_SPECS[change.op]
+      : undefined
+    if (spec === undefined) {
+      corrections.push(`"${path}.op" must be exactly one of ${Object.keys(OPERATION_SPECS).map(value => `"${value}"`).join(', ')}.`)
+      continue
+    }
+    if (typeof change.path !== 'string') corrections.push(`"${path}.path" must be a JSON Pointer string.`)
+    if (typeof change.reason !== 'string' || change.reason.trim().length === 0) {
+      corrections.push(`"${path}.reason" must be a non-empty factual reason.`)
+    }
+    if (change.ruleId !== undefined && (typeof change.ruleId !== 'string' || change.ruleId.length === 0)) {
+      corrections.push(`"${path}.ruleId" must be a non-empty string when supplied.`)
+    }
+    if (spec.argument !== undefined && !Object.hasOwn(change, spec.argument)) {
+      const mistaken = spec.forbidden.find(field => Object.hasOwn(change, field))
+      corrections.push(mistaken === undefined
+        ? `"${path}.${spec.argument}" is required when op is "${change.op}".`
+        : `"${path}" uses op "${change.op}": rename field "${mistaken}" to "${spec.argument}" without changing its value.`)
+    }
+    if (spec.argument === 'by' && Object.hasOwn(change, 'by')
+      && (typeof change.by !== 'number' || !Number.isFinite(change.by))) {
+      corrections.push(`"${path}.by" must be a finite number.`)
+    }
+    const allowed = new Set([...CHANGE_BASE_FIELDS, ...(spec.argument === undefined ? [] : [spec.argument])])
+    const unsupported = Object.keys(change).filter(field => !allowed.has(field))
+    if (unsupported.length > 0 && !(spec.argument !== undefined
+      && !Object.hasOwn(change, spec.argument)
+      && unsupported.length === 1
+      && spec.forbidden.includes(unsupported[0]))) {
+      corrections.push(`"${path}" does not allow ${unsupported.map(field => `"${field}"`).join(', ')} when op is "${change.op}".`)
+    }
+  }
+  return corrections
 }
 
 /** Apply one complete semantic change list without mutating the source projection. */
@@ -228,4 +280,8 @@ function changeSchema(operation, spec) {
     properties,
     required: ['op', 'path', ...(spec.argument === undefined ? [] : [spec.argument]), 'reason'],
   }
+}
+
+function object(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }

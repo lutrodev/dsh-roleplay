@@ -15,7 +15,12 @@ import {
 } from './definition.js'
 import { parseJsonPointer, readJsonPointer } from './json-pointer.js'
 import { cloneJson, normalizeJson, validateStateValue } from './schema.js'
-import { applyStateChanges, stateUpdateEffectSchema, stateUpdateOperationProtocol } from './update.js'
+import {
+  applyStateChanges,
+  stateUpdateArgumentCorrections,
+  stateUpdateEffectSchema,
+  stateUpdateOperationProtocol,
+} from './update.js'
 import {
   applyStateCommandEvent,
   decodeStateCommandInput,
@@ -56,6 +61,7 @@ export class RpState extends Service {
     ctx.rpRuntime.registerEffectType({
       kind: 'state.update',
       schema: stateUpdateEffectSchema(),
+      diagnoseArguments: (effect, context) => stateUpdateArgumentCorrections(effect, context),
       validate: (effect, validation) => this.validateEffect(effect, validation),
     })
     ctx.rpRuntime.registerCommitDiagnosticProvider({ id: STATE_CONTEXT_SOURCE_ID, inspect: (artifact, context) => this.commitDiagnostics(artifact, context) })
@@ -273,6 +279,7 @@ export class RpState extends Service {
         },
         constraints: [
           'submit only paths that changed',
+          'increment uses by and never value; set and append use value and never by; remove uses neither field',
           'when adding to an array, append only the new item; never copy or set the complete current array',
           'one effect per namespace',
           'non-empty reason per change',

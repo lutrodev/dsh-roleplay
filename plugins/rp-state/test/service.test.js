@@ -62,7 +62,15 @@ test('registers State v2 context, semantic effect, diagnostics, and Chat-readabl
   assert.equal(Object.hasOwn(visible.namespaces[0], 'initialValue'), false)
   assert.equal(visible.updateProtocol.kind, 'state.update')
   assert.deepEqual(visible.updateProtocol.operations.increment.required, ['op', 'path', 'by', 'reason'])
+  assert.deepEqual(visible.updateProtocol.operations.increment.forbidden, ['value'])
+  assert.match(visible.updateProtocol.constraints.join('\n'), /increment uses by and never value/)
   assert.match(visible.updateProtocol.modes['rules-required'], /ruleId/)
+  assert.deepEqual(harness.effectType.diagnoseArguments({
+    kind: 'state.update', namespace: 'story', expectedRevision: 1,
+    payload: { changes: [{ op: 'increment', path: '/hp', value: -2, reason: '生命值下降' }] },
+  }, { path: 'effects[0]' }), [
+    '"effects[0].payload.changes[0]" uses op "increment": rename field "value" to "by" without changing its value.',
+  ])
 
   assert.equal(harness.diagnostic.inspect({ effects: [] }, { agent })[0].code, 'STATE_EVERY_TURN_MISSED')
   assert.deepEqual(harness.diagnostic.inspect({ effects: [{

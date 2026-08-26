@@ -293,6 +293,7 @@ export function failedAssistantStart(event) {
     failed: false,
     deleted: false,
     committed: false,
+    commitAttempted: false,
     commitSeq: undefined,
     finalAssistantSeq: undefined,
     finalAssistantTarget: undefined,
@@ -300,6 +301,7 @@ export function failedAssistantStart(event) {
     finalAssistantTime: undefined,
     finalAssistantEdited: false,
     finalAssistantInterrupted: false,
+    finalAssistantOwnsCommit: false,
     hostOpeningSeq: undefined,
     sharedAssetMutation: false,
     endReasonKind: undefined,
@@ -328,10 +330,25 @@ export function failedAssistantUpdate(state, event) {
   }
   if (event.type === 'assistant/message'
     && event.surfaceOp === 'append'
-    && event.data?.message?.source?.kind === 'model'
-    && assistantMessageText(event.data.message).trim().length > 0) {
+    && event.data?.message?.source?.kind === 'model') {
+    const text = assistantMessageText(event.data.message)
+    const ownsCommit = assistantCallsTool(event.data.message, 'rp_commit_turn')
+    if (text.trim().length === 0) {
+      return ownsCommit ? {
+        ...state,
+        commitAttempted: true,
+        // A tool-only commit belongs to the readable prose already emitted in
+        // this turn, so protect that prose from later acknowledgement rows.
+        finalAssistantOwnsCommit: Number.isSafeInteger(state.finalAssistantSeq)
+          || state.finalAssistantOwnsCommit === true,
+      } : state
+    }
+    // Once prose has crossed the atomic commit boundary, a later placeholder
+    // or acknowledgement must not replace it as the recoverable failed reply.
+    if (state.finalAssistantOwnsCommit === true && !ownsCommit) return state
     return {
       ...state,
+      commitAttempted: state.commitAttempted === true || ownsCommit,
       finalAssistantSeq: event.seq,
       finalAssistantTarget: {
         kind: 'message',
@@ -340,10 +357,11 @@ export function failedAssistantUpdate(state, event) {
         turn: event.data.turn,
         step: event.data.step,
       },
-      finalAssistantText: assistantMessageText(event.data.message),
+      finalAssistantText: text,
       finalAssistantTime: event.time,
       finalAssistantEdited: false,
       finalAssistantInterrupted: event.data.interrupted === true,
+      finalAssistantOwnsCommit: ownsCommit,
     }
   }
   if (event.type === 'tool/result'
@@ -357,15 +375,17 @@ export function failedAssistantUpdate(state, event) {
     return {
       ...state,
       committed: true,
+      commitAttempted: true,
       commitSeq: event.seq,
       failed: false,
       finalAssistantSeq: event.data.meta.assistant?.seq ?? state.finalAssistantSeq,
+      finalAssistantOwnsCommit: true,
     }
   }
   if (event.type === 'turn/end') {
     return {
       ...state,
-      failed: !state.committed && event.data.reason?.kind !== 'completed',
+      failed: !state.committed && (state.commitAttempted === true || event.data.reason?.kind !== 'completed'),
       endReasonKind: event.data.reason?.kind,
       endCancelKind: event.data.reason?.kind === 'aborted'
         ? event.data.reason.reason?.kind
@@ -418,4 +438,9 @@ function assistantMessageText(message) {
   return Array.isArray(message?.content)
     ? message.content.filter(part => part?.type === 'text' && typeof part.text === 'string').map(part => part.text).join('')
     : ''
+}
+
+function assistantCallsTool(message, name) {
+  return Array.isArray(message?.content)
+    && message.content.some(part => part?.type === 'tool-call' && part.name === name)
 }

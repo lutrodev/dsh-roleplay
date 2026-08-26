@@ -47,6 +47,7 @@ import {
   inject,
   InlineMessageEditor,
   isCanonicalAssistantAction,
+  isFailedCanonicalAssistantAction,
   messageRowForAction,
   nativeAssistantBranchButton,
   openingFloorNodeDefinition,
@@ -846,9 +847,12 @@ describe('Roleplay message action presentation', () => {
     expect(isCanonicalAssistantAction({ location, data: { seq: 12 } })).toBe(true)
     state.failed = true
     expect(isCanonicalAssistantAction({ location, data: { seq: 12 } })).toBe(false)
+    expect(isFailedCanonicalAssistantAction({ location, data: { seq: 8 } })).toBe(false)
+    expect(isFailedCanonicalAssistantAction({ location, data: { seq: 12 } })).toBe(true)
     location.turn.status = 'open'
     state.failed = false
     expect(isCanonicalAssistantAction({ location, data: { seq: 12 } })).toBe(false)
+    expect(isFailedCanonicalAssistantAction({ location, data: { seq: 12 } })).toBe(false)
   })
 
   it('settles a failed turn after its complete trace while preserving the native footer', () => {
@@ -869,6 +873,197 @@ describe('Roleplay message action presentation', () => {
     expect(failedAssistantTraceRows(effect)).not.toContain(partial)
     expect(failedAssistantTraceRows(effect, 'max-tokens')).not.toContain(maxTokens)
     expect(failedAssistantTraceRows(effect, 'max-tokens')).toContain(error)
+
+    const commitParent = document.createElement('div')
+    flowRow('user', commitParent)
+    const committedProse = readableAssistantRow(commitParent, '提交时已经展示的完整正文')
+    const committedActions = flowRow('rp-floor-assistant-actions', commitParent)
+    const committedMarker = document.createElement('span')
+    committedMarker.dataset.rpMessageActionsFailedCanonical = ''
+    committedActions.append(committedMarker)
+    const placeholder = readableAssistantRow(commitParent, '—')
+    const commitEffect = flowRow('rp-floor-failed-assistant', commitParent)
+
+    expect(failedAssistantTraceRows(commitEffect)).not.toContain(committedProse)
+    expect(failedAssistantTraceRows(commitEffect)).toContain(placeholder)
+  })
+
+  it('keeps failed commit prose canonical when a later model step emits a placeholder', () => {
+    const start = { seq: 60, time: 1060, type: 'turn/start', data: { turn: 6 } }
+    let state = failedAssistantNodeDefinition.start({}, {
+      event: start,
+      ...failedAssistantNodeDefinition.match(start),
+    })
+    const commitAssistant = {
+      seq: 61,
+      time: 1061,
+      type: 'assistant/message',
+      surfaceOp: 'append',
+      data: {
+        turn: 6,
+        step: 2,
+        message: {
+          id: 'assistant-commit-prose',
+          source: { kind: 'model', provider: 'mock', model: 'mock' },
+          content: [
+            { type: 'text', text: '提交时已经展示的完整正文' },
+            { type: 'tool-call', id: 'failed-commit', name: 'rp_commit_turn', arguments: '{}' },
+          ],
+        },
+      },
+    }
+    state = failedAssistantNodeDefinition.update({ state }, {
+      event: commitAssistant,
+      ...failedAssistantNodeDefinition.match(commitAssistant),
+    })
+    const placeholder = {
+      ...assistantEvent('assistant-placeholder', '—', 62),
+      data: {
+        ...assistantEvent('assistant-placeholder', '—', 62).data,
+        turn: 6,
+        step: 3,
+      },
+    }
+    state = failedAssistantNodeDefinition.update({ state }, {
+      event: placeholder,
+      ...failedAssistantNodeDefinition.match(placeholder),
+    })
+    const end = {
+      seq: 63,
+      time: 1063,
+      type: 'turn/end',
+      data: { turn: 6, reason: { kind: 'completed' } },
+    }
+    state = failedAssistantNodeDefinition.update({ state }, {
+      event: end,
+      ...failedAssistantNodeDefinition.match(end),
+    })
+    const turn = {
+      turn: 6,
+      status: 'closed',
+      start,
+      end,
+      data: new Map([['rp-floor-failed-assistant', state]]),
+    }
+    const selected = selectFailedAssistant({ turn })
+    expect(state).toMatchObject({
+      failed: true,
+      committed: false,
+      commitAttempted: true,
+      finalAssistantSeq: 61,
+      finalAssistantText: '提交时已经展示的完整正文',
+      finalAssistantOwnsCommit: true,
+      endReasonKind: 'completed',
+    })
+    expect(selected).toMatchObject({
+      target: { kind: 'message', messageId: 'assistant-commit-prose', turn: 6, step: 2 },
+      copyText: '提交时已经展示的完整正文',
+    })
+    expect(failedTurnStatus(selected, { canReroll: true, sharedAssetMutation: false })).toEqual({
+      state: 'error',
+      title: '回复未能完成保存',
+      message: '正文已保留，但本次会话变量变化没有生效，可以重新生成这条回复。',
+    })
+  })
+
+  it('keeps the original prose canonical after a tool-only commit retry succeeds', () => {
+    const start = { seq: 70, time: 1070, type: 'turn/start', data: { turn: 7 } }
+    let state = failedAssistantNodeDefinition.start({}, {
+      event: start,
+      ...failedAssistantNodeDefinition.match(start),
+    })
+    const prose = {
+      ...assistantEvent('assistant-retry-prose', '工具重试前已经展示的正文', 71),
+      data: {
+        ...assistantEvent('assistant-retry-prose', '工具重试前已经展示的正文', 71).data,
+        turn: 7,
+        step: 2,
+      },
+    }
+    state = failedAssistantNodeDefinition.update({ state }, {
+      event: prose,
+      ...failedAssistantNodeDefinition.match(prose),
+    })
+    const toolOnlyRetry = {
+      ...assistantEvent('assistant-tool-only-retry', '', 72),
+      data: {
+        ...assistantEvent('assistant-tool-only-retry', '', 72).data,
+        turn: 7,
+        step: 3,
+        message: {
+          id: 'assistant-tool-only-retry',
+          source: { kind: 'model', provider: 'mock', model: 'mock' },
+          content: [{ type: 'tool-call', id: 'retry-commit', name: 'rp_commit_turn', arguments: '{}' }],
+        },
+      },
+    }
+    state = failedAssistantNodeDefinition.update({ state }, {
+      event: toolOnlyRetry,
+      ...failedAssistantNodeDefinition.match(toolOnlyRetry),
+    })
+    const placeholder = {
+      ...assistantEvent('assistant-retry-placeholder', '—', 73),
+      data: {
+        ...assistantEvent('assistant-retry-placeholder', '—', 73).data,
+        turn: 7,
+        step: 4,
+      },
+    }
+    state = failedAssistantNodeDefinition.update({ state }, {
+      event: placeholder,
+      ...failedAssistantNodeDefinition.match(placeholder),
+    })
+    const commit = {
+      seq: 74,
+      time: 1074,
+      type: 'tool/result',
+      surfaceOp: 'append',
+      data: {
+        turn: 7,
+        step: 3,
+        message: { role: 'tool', content: [] },
+        meta: {
+          kind: 'rp-agent/turn-commit',
+          version: 2,
+          runId: 'run-7',
+          assistant: { seq: 71, messageId: 'assistant-retry-prose' },
+          effects: [],
+        },
+      },
+    }
+    state = failedAssistantNodeDefinition.update({ state }, {
+      event: commit,
+      ...failedAssistantNodeDefinition.match(commit),
+    })
+    const end = {
+      seq: 75,
+      time: 1075,
+      type: 'turn/end',
+      data: { turn: 7, reason: { kind: 'completed' } },
+    }
+    state = failedAssistantNodeDefinition.update({ state }, {
+      event: end,
+      ...failedAssistantNodeDefinition.match(end),
+    })
+    const turn = {
+      turn: 7,
+      status: 'closed',
+      start,
+      end,
+      data: new Map([['rp-floor-failed-assistant', state]]),
+    }
+    const location = { kind: 'turn', turn }
+
+    expect(state).toMatchObject({
+      failed: false,
+      committed: true,
+      commitAttempted: true,
+      finalAssistantSeq: 71,
+      finalAssistantText: '工具重试前已经展示的正文',
+      finalAssistantOwnsCommit: true,
+    })
+    expect(isCanonicalAssistantAction({ location, data: { seq: 71 } })).toBe(true)
+    expect(isCanonicalAssistantAction({ location, data: { seq: 73 } })).toBe(false)
   })
 
   it('targets a durable interrupted assistant for failed actions and falls back to the turn without one', () => {

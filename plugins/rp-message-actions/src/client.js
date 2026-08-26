@@ -363,6 +363,7 @@ function AssistantFloorEffects(props) {
   const roleplay = props.useSessions(state => isRoleplaySession(state, props.sessionId))
   if (!roleplay) return h(InactiveActionNodeMarker)
   if (props.node.data.deleted === true) return h(DeletedAssistantTraceMarker, { target: props.node.data.target })
+  if (isFailedCanonicalAssistantAction(props.node)) return h(FailedCanonicalAssistantMarker)
   if (!isCanonicalAssistantAction(props.node)) return h(InactiveActionNodeMarker)
   return h(React.Fragment, null,
     h(AssistantEffectNodeMarker),
@@ -399,12 +400,32 @@ export function isCanonicalAssistantAction(node) {
     && state.finalAssistantSeq === node.data?.seq
 }
 
+/** Mark the exact readable reply selected for recovery from a failed commit. */
+export function isFailedCanonicalAssistantAction(node) {
+  const location = node?.location
+  if ((location?.kind !== 'turn' && location?.kind !== 'step') || location.turn.status !== 'closed') return false
+  const state = location.turn.data?.get?.('rp-floor-failed-assistant')
+    ?? location.turn.data?.get?.('rp-message-failed-assistant')
+  return state?.failed === true
+    && Number.isSafeInteger(state?.finalAssistantSeq)
+    && state.finalAssistantSeq === node.data?.seq
+}
+
 function InactiveActionNodeMarker() {
   return h('span', { className: css.inactiveActionNodeMarker, hidden: true, 'aria-hidden': true })
 }
 
 function AssistantEffectNodeMarker() {
   return h('span', { className: css.assistantEffectNodeMarker, hidden: true, 'aria-hidden': true })
+}
+
+function FailedCanonicalAssistantMarker() {
+  return h('span', {
+    className: css.assistantEffectNodeMarker,
+    hidden: true,
+    'aria-hidden': true,
+    'data-rp-message-actions-failed-canonical': '',
+  })
 }
 
 function AssistantMessageActions(props) {
@@ -463,6 +484,16 @@ export function failedTurnStatus(matched, detail) {
       return `${base}本次已修改共享资料，不能直接重新生成。`
     }
     return detail?.canReroll === true ? retryable : `${base}你可以继续发送消息。`
+  }
+  if (matched.state?.commitAttempted === true && matched.state?.committed !== true) {
+    return {
+      state: 'error',
+      title: '回复未能完成保存',
+      message: recoveryMessage(
+        '正文已保留，但本次会话变量变化没有生效。',
+        '正文已保留，但本次会话变量变化没有生效，可以重新生成这条回复。',
+      ),
+    }
   }
   if (kind === 'error') {
     return {
@@ -619,13 +650,15 @@ export function settledTurnTailRow(host) {
 /** Collapse a closed failed turn while preserving its last readable partial. */
 export function failedAssistantTraceRows(host, endReasonKind) {
   const hidden = []
+  const selectedReply = failedCanonicalAssistantRow(host)
   let keptReadablePartial = false
   for (let row = host?.previousElementSibling ?? null; row !== null; row = row.previousElementSibling) {
     const kind = row.dataset?.chatFlowKind
     if (kind === 'user' || kind === 'steering') break
     if (kind === 'turn-tail') continue
     if (endReasonKind === 'max-tokens' && kind === 'turn-max-tokens') continue
-    if (kind === 'assistant-step' && !keptReadablePartial && readableAssistantRow(row)) {
+    if (row === selectedReply) continue
+    if (selectedReply === null && kind === 'assistant-step' && !keptReadablePartial && readableAssistantRow(row)) {
       keptReadablePartial = true
       continue
     }
@@ -633,6 +666,18 @@ export function failedAssistantTraceRows(host, endReasonKind) {
     hidden.push(row)
   }
   return hidden
+}
+
+function failedCanonicalAssistantRow(host) {
+  for (let row = host?.previousElementSibling ?? null; row !== null; row = row.previousElementSibling) {
+    const kind = row.dataset?.chatFlowKind
+    if (kind === 'user' || kind === 'steering') break
+    if (kind !== 'rp-floor-assistant-actions') continue
+    if (row.querySelector?.('[data-rp-message-actions-failed-canonical]') !== null) {
+      return messageRowForAction(row, 'assistant')
+    }
+  }
+  return null
 }
 
 function readableAssistantRow(row) {
