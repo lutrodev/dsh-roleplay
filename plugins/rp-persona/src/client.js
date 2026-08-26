@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Button, IconChevronLeftOutline14, IconEditOutline16, IconEllipsisOutline16, IconPlusOutline16, IconTrashOutline16, IconUserOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { domAnimation, LazyMotion, m, MotionConfig } from 'motion/react'
-import { domainValue } from './client-state.js'
+import { descriptionLabelInsertion, domainValue } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
 export const inject = ['slots', 'connection', 'rpAssetEditors']
@@ -235,16 +235,13 @@ function PersonaForm({ detail, connection, limits, disabled = false, onSaved, on
     const textarea = descriptionInput.current
     const start = textarea?.selectionStart ?? description.length
     const end = textarea?.selectionEnd ?? start
-    const prefix = start > 0 && description[start - 1] !== '\n' ? '\n' : ''
-    const insertion = `${prefix}${label}：\n`
-    const next = `${description.slice(0, start)}${insertion}${description.slice(end)}`
-    if ([...next].length > DESCRIPTION_LIMIT) { setError({ code: 'DESCRIPTION_TOO_LONG' }); return }
-    setDescription(next)
+    const insertion = descriptionLabelInsertion(description, label, start, end)
+    if ([...insertion.value].length > DESCRIPTION_LIMIT) { setError({ code: 'DESCRIPTION_TOO_LONG' }); return }
+    setDescription(insertion.value)
     setError(null)
     requestAnimationFrame(() => {
-      const caret = start + insertion.length
       descriptionInput.current?.focus()
-      descriptionInput.current?.setSelectionRange(caret, caret)
+      descriptionInput.current?.setSelectionRange(insertion.caret, insertion.caret)
     })
   }
 

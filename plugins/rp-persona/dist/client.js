@@ -6383,6 +6383,13 @@ get: (_target, key) => {
 			}
 			return domain.value;
 		}
+		function descriptionLabelInsertion(description, label, start, end = start) {
+			const insertion = `${start > 0 && description[start - 1] !== "\n" ? "\n" : ""}${label}：`;
+			return {
+				value: `${description.slice(0, start)}${insertion}${description.slice(end)}`,
+				caret: start + insertion.length
+			};
+		}
 		//#endregion
 		//#region src/client-styles.generated.js
 		const css = {
@@ -6880,18 +6887,16 @@ get: (_target, key) => {
 				const textarea = descriptionInput.current;
 				const start = textarea?.selectionStart ?? description.length;
 				const end = textarea?.selectionEnd ?? start;
-				const insertion = `${start > 0 && description[start - 1] !== "\n" ? "\n" : ""}${label}：\n`;
-				const next = `${description.slice(0, start)}${insertion}${description.slice(end)}`;
-				if ([...next].length > DESCRIPTION_LIMIT) {
+				const insertion = descriptionLabelInsertion(description, label, start, end);
+				if ([...insertion.value].length > DESCRIPTION_LIMIT) {
 					setError({ code: "DESCRIPTION_TOO_LONG" });
 					return;
 				}
-				setDescription(next);
+				setDescription(insertion.value);
 				setError(null);
 				requestAnimationFrame(() => {
-					const caret = start + insertion.length;
 					descriptionInput.current?.focus();
-					descriptionInput.current?.setSelectionRange(caret, caret);
+					descriptionInput.current?.setSelectionRange(insertion.caret, insertion.caret);
 				});
 			};
 			const submit = async (event) => {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { descriptionLabelInsertion } from '../src/client-state.js'
 
 test('我的人设使用固定侧栏入口，并通过表单支持默认人设、快捷描述和头像', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
@@ -67,4 +68,17 @@ test('人设插件向会话编排注册同一个创建与编辑表单', async ()
   assert.match(client, /ctx\.rpAssetEditors\.register\('persona', PersonaSessionEditor\)/)
   assert.match(client, /function PersonaSessionEditor/)
   assert.match(client, /h\(PersonaForm/)
+})
+
+test('描述快捷项另起一行，但光标停在字段名后的冒号处', () => {
+  assert.deepEqual(descriptionLabelInsertion('', '外貌', 0), {
+    value: '外貌：',
+    caret: '外貌：'.length,
+  })
+
+  const description = '外貌：银发'
+  assert.deepEqual(descriptionLabelInsertion(description, '年龄', description.length), {
+    value: '外貌：银发\n年龄：',
+    caret: '外貌：银发\n年龄：'.length,
+  })
 })
