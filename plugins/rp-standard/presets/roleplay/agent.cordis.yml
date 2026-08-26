@@ -1,6 +1,8 @@
 # The Roleplay preset contributes a focused narrative persona plus selected
-# agentic capabilities. It does not expose coding, shell, filesystem, planning,
-# goal, todo, or workflow tools.
+# agentic capabilities. Agent execution mode exposes the persistent shell and
+# str_replace_editor from Harness's minimal preset; Chat mode masks both through
+# rp-core's scoped tool restriction. Planning, goal, todo, and workflow tools
+# remain unavailable.
 
 - id: persona
   name: '@deepseek-ai/dsh-persona'
@@ -14,6 +16,60 @@
   name: __TOOL_PRESENTATION_MODULE__
   config:
     mode: native
+
+# Match Harness's minimal preset with one persistent model-facing shell per
+# platform. The PTY registry is preset-local, while its backend continues to use
+# the deployment's sandbox policy, subprocess provider, and Session workspace.
+- id: persistent-shell
+  name: cordis:group
+  group: true
+  isolate:
+    terminals: true
+  config:
+    - id: pty
+      name: __TERMINAL_MODULE__
+
+    - id: terminal-bash
+      name: __TERMINAL_BASH_MODULE__
+      disabled: !!js process.platform === 'win32'
+      config:
+        timeoutMs: 300000
+
+    - id: persistent-bash
+      name: __TOOL_BASH_PERSISTENT_MODULE__
+      disabled: !!js process.platform === 'win32'
+      config:
+        timeoutMs: 300000
+        description: |-
+          Run commands in a persistent bash shell.
+          * The working directory and shell state persist across command calls.
+          * Use bounded commands and line ranges when inspecting large files.
+          * Run long-lived commands in the background.
+
+    - id: terminal-pwsh
+      name: __TERMINAL_BASH_MODULE__
+      disabled: !!js process.platform !== 'win32'
+      config:
+        shellDialect: pwsh
+        timeoutMs: 300000
+
+    - id: persistent-pwsh
+      name: __TOOL_PWSH_PERSISTENT_MODULE__
+      disabled: !!js process.platform !== 'win32'
+      config:
+        timeoutMs: 300000
+        description: |-
+          Run commands in a persistent PowerShell shell.
+          * The working directory and shell state persist across command calls.
+          * Use native Windows paths and PowerShell syntax.
+          * Use bounded commands and run long-lived commands in the background.
+
+# Reuse the deployment's ctx.fs instead of the minimal preset's bare local
+# provider so workspace, sandbox, and remote-execution semantics stay intact.
+- id: str-replace-editor
+  name: __TOOL_STR_REPLACE_EDITOR_MODULE__
+  config:
+    maxOutputChars: 16000
 
 # Agent execution mode may use live web search. Chat execution mode masks this
 # tool at the Agent scope and sees only rp_write_turn, rp_commit_turn and

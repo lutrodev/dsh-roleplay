@@ -3,6 +3,7 @@
 import { RP_WRITE_ACTION } from './protocol.js'
 
 const WRITER_CALL = JSON.stringify({ action: RP_WRITE_ACTION })
+const WORKSPACE_SHELL_TOOL = process.platform === 'win32' ? 'pwsh' : 'bash'
 const ROLEPLAY_ENVELOPE_TAG_PATTERN = /<\s*\/?\s*(?:roleplay_request|request_policy|current_asset_bindings|specialist_catalog|roleplay_context|context_guide|roleplay_content|commit_context|commit_content)(?=[\s/>])[^>]*>/giu
 
 /** Version of the settings-facing prompt composition projection. */
@@ -212,6 +213,7 @@ export function buildRoleplayPromptPreview({
     ...(assetToolsEnabled ? ['rp_asset_read', 'rp_asset'] : []),
     ...(stateEnabled ? ['rp_state_read', 'rp_state'] : []),
     ...(subagentsEnabled ? ['rp_run_subagent'] : []),
+    WORKSPACE_SHELL_TOOL, 'str_replace_editor',
     'web_search', 'skill', 'ask_user_question',
   ]
   const conversationProfile = executionMode => ({

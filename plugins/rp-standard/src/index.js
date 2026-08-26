@@ -9,7 +9,7 @@ import { normalizeInitialSubagents } from 'dsh-roleplay-rp-subagent-manager'
 const PRESET_ID = 'roleplay'
 const PRESET_OWNER = 'dsh-roleplay-rp-standard'
 // Bump whenever managed composition or bundled guidance Skill files change.
-const PRESET_VERSION = 33
+const PRESET_VERSION = 34
 const MARKER_FILE = '.rp-standard.json'
 const COMPOSITION_FILE = 'agent.cordis.yml'
 const METADATA_FILE = 'preset.yml'
@@ -33,9 +33,14 @@ const INITIAL_SUBAGENT_CONFIG = Schema.object({
 const MODULES = {
   '__COMPACTION_BASIC_MODULE__': '@deepseek-ai/dsh-compaction-basic',
   '__SKILL_FILESYSTEM_MODULE__': '@deepseek-ai/dsh-skill-filesystem',
+  '__TERMINAL_MODULE__': '@deepseek-ai/dsh-terminal',
+  '__TERMINAL_BASH_MODULE__': '@deepseek-ai/dsh-terminal-bash',
   '__TOOL_ASK_USER_MODULE__': '@deepseek-ai/dsh-tool-ask-user',
+  '__TOOL_BASH_PERSISTENT_MODULE__': '@deepseek-ai/dsh-tool-bash-persistent',
+  '__TOOL_PWSH_PERSISTENT_MODULE__': '@deepseek-ai/dsh-tool-pwsh-persistent',
   '__TOOL_RESULT_PRUNER_MODULE__': '@deepseek-ai/dsh-compaction-tool-result-pruner',
   '__TOOL_SKILL_MODULE__': '@deepseek-ai/dsh-tool-skill',
+  '__TOOL_STR_REPLACE_EDITOR_MODULE__': '@deepseek-ai/dsh-tool-str-replace-editor',
   '__TOOL_WEB_MODULE__': '@deepseek-ai/dsh-tool-web',
   '__TOOL_PRESENTATION_MODULE__': '@deepseek-ai/dsh-agent-tool-presentation',
   '__RP_CORE_MODULE__': 'dsh-roleplay-rp-core',

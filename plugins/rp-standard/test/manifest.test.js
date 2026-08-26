@@ -97,12 +97,33 @@ test('Roleplay preset composes every standard Roleplay capability once', async (
   assert.equal(patch.match(/id: compaction-basic/g)?.length, 1)
   assert.equal(patch.match(/id: tool-result-pruner/g)?.length, 1)
   assert.equal(patch.match(/id: tool-subagent/g)?.length ?? 0, 0)
+  for (const id of ['persistent-shell', 'pty', 'terminal-bash', 'persistent-bash', 'terminal-pwsh', 'persistent-pwsh', 'str-replace-editor']) {
+    assert.equal(patch.match(new RegExp(`id: ${id}(?:\\n|$)`, 'g'))?.length, 1)
+  }
+  assert.match(patch, /id: persistent-bash[\s\S]*?name: __TOOL_BASH_PERSISTENT_MODULE__[\s\S]*?disabled: !!js process\.platform === 'win32'/)
+  assert.match(patch, /id: persistent-pwsh[\s\S]*?name: __TOOL_PWSH_PERSISTENT_MODULE__[\s\S]*?disabled: !!js process\.platform !== 'win32'/)
+  assert.match(patch, /id: str-replace-editor[\s\S]*?name: __TOOL_STR_REPLACE_EDITOR_MODULE__/)
+  assert.doesNotMatch(patch, /id: fs-local/)
   assert.match(patch, /fetch: false/)
   assert.match(patch, /rpSubagentManager: true/)
   assert.match(patch, /id: rp-subagent-manager[\s\S]*?name: __RP_SUBAGENT_MANAGER_MODULE__[\s\S]*?exposeBrowser: false/)
   assert.match(patch, /initialSubagents: __INITIAL_SUBAGENTS__/)
   assert.match(patch, /text: __RP_PERSONA_TEXT__/)
-  for (const tool of ['tool-bash', 'str-replace-editor', 'tool-fs', 'tool-goal', 'plan-mode', 'tool-todo', 'tool-workflow']) {
+  for (const tool of ['tool-fs', 'tool-goal', 'plan-mode', 'tool-todo', 'tool-workflow']) {
     assert.equal(patch.includes(tool), false)
+  }
+})
+
+test('Roleplay preset package declares every minimal workspace-tool module it composes', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+  for (const packageName of [
+    '@deepseek-ai/dsh-terminal',
+    '@deepseek-ai/dsh-terminal-bash',
+    '@deepseek-ai/dsh-tool-bash-persistent',
+    '@deepseek-ai/dsh-tool-pwsh-persistent',
+    '@deepseek-ai/dsh-tool-str-replace-editor',
+  ]) {
+    assert.equal(typeof manifest.dependencies?.[packageName], 'string')
+    assert.match(require.resolve(`${packageName}/package.json`), /package\.json$/)
   }
 })

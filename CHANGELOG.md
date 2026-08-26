@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- Roleplay Agent 模式新增 Harness 极简模式同款的持久终端与 `str_replace_editor`，用于检查、读取和按需编辑工作区文件；Chat 模式继续屏蔽这两项能力。
+
 ## 0.1.2 - 2026-08-26
 
 - Roleplay 管理接口改用 Harness 的可信 Host 边界，允许通过 Harness 明确信任的远端地址管理资料、消息操作和 Roleplay 设置。
