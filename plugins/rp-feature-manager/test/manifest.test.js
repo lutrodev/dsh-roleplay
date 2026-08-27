@@ -7,6 +7,15 @@ import { CORE_PACKAGES, DEFAULT_ENABLED_FEATURES, FEATURE_CATALOG, ROLEPLAY_SKIL
 
 const pluginDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pluginsDirectory = resolve(pluginDirectory, '..')
+const V0_1_5_NEW_ENTRY_IDS = ['rp-quick-replies', 'rp-state-display', 'rp-compact-access-mode']
+
+function patchEntry(patch, id) {
+  const marker = `    - id: ${id}\n`
+  const start = patch.indexOf(marker)
+  assert.notEqual(start, -1, `missing patch entry ${id}`)
+  const end = patch.indexOf('\n    - id: ', start + marker.length)
+  return patch.slice(start, end === -1 ? patch.length : end)
+}
 
 test('feature manager is the suite bundle and carries every managed Roleplay package', async () => {
   const manifest = JSON.parse(await readFile(resolve(pluginDirectory, 'package.json'), 'utf8'))
@@ -19,11 +28,20 @@ test('feature manager is the suite bundle and carries every managed Roleplay pac
   assert.equal(standard.dsh?.bundle, undefined)
   assert.match(patch, /id: rp-feature-manager[\s\S]*?id: rp-standard/)
   assert.match(patch, /id: rp-standard[\s\S]*?inject:\s+- rpFeatures/)
-  const stateDisplayEntry = patch.match(/- id: rp-state-display\n(?<entry>(?: {6}.*\n)+)/)?.groups?.entry ?? ''
+  assert.match(patchEntry(patch, 'rp-feature-manager'), /inject:\s+- settings/)
+  const stateDisplayEntry = patchEntry(patch, 'rp-state-display')
   assert.match(stateDisplayEntry, /name: dsh-roleplay-rp-state-display/)
-  assert.doesNotMatch(stateDisplayEntry, /disabled:/)
+  assert.match(stateDisplayEntry, /disabled: true/)
   assert.equal(DEFAULT_ENABLED_FEATURES.includes('state-display'), true)
   assert.match(patch.match(/enabledFeatures:([\s\S]*?)enabledSkills:/)?.[1] ?? '', /- state-display/)
+  for (const entryId of V0_1_5_NEW_ENTRY_IDS) {
+    assert.match(patchEntry(patch, entryId), /disabled: true/, `${entryId} must start parked`)
+  }
+  for (const entryId of FEATURE_CATALOG
+    .flatMap(feature => feature.hostEntryIds)
+    .filter(entryId => !V0_1_5_NEW_ENTRY_IDS.includes(entryId))) {
+    assert.doesNotMatch(patchEntry(patch, entryId), /disabled:/, `${entryId} must keep its existing activation path`)
+  }
 
   const managedPackages = new Set([
     ...CORE_PACKAGES.map(item => item.packageName),

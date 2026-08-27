@@ -36,11 +36,15 @@ function provideSystemPrompt(ctx) {
   })
 }
 
-function loaderEntry(id) {
+function loaderEntry(id, disabled = false) {
   return {
-    options: { id, disabled: false },
-    fiber: {},
-    async update(patch) { Object.assign(this.options, patch) },
+    options: { id, disabled },
+    fiber: disabled ? undefined : {},
+    get disabled() { return Boolean(this.options.disabled) },
+    async update(patch) {
+      Object.assign(this.options, patch)
+      this.fiber = this.disabled ? undefined : {}
+    },
   }
 }
 
@@ -73,7 +77,7 @@ test('manager reconciles independently selectable Host entries from one validate
     assert.deepEqual(manager.guidanceSkills().map(item => item.skillName), ['rp-guide-lorebook'])
     assert.deepEqual(
       manager.status().core.find(item => item.label === '会话总结'),
-      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.5', versionCompatible: true },
+      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.6', versionCompatible: true },
     )
     assert.equal(manager.status().core.some(item => item.label === '会话变量'), false)
     assert.equal(manager.status().features.find(item => item.id === 'state').active, false)
@@ -108,6 +112,68 @@ test('manager enables the display entry from the persisted feature selection', a
     await manager.settled()
     assert.equal(entry.options.disabled, false)
     assert.equal(manager.status().features.find(item => item.id === 'state-display').active, true)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('manager settles new 0.1.5 entries without changing stored old-feature switches', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  const newEntries = new Set(['rp-quick-replies', 'rp-state-display', 'rp-compact-access-mode'])
+  const entries = [
+    'rp-character-library',
+    'rp-message-actions',
+    ...newEntries,
+  ].map(id => loaderEntry(id, newEntries.has(id)))
+  ctx.provide('loader', { entries: () => entries })
+  try {
+    await ctx.plugin(MemorySettings, {
+      document: {
+        'roleplay-features': {
+          enabledFeatures: ['character-card'],
+          enabledSkills: [],
+          harnessIdentity: '',
+        },
+      },
+    })
+    await ctx.plugin(ManagerPlugin, { enabledFeatures: DEFAULT_ENABLED_FEATURES })
+    const byId = Object.fromEntries(entries.map(entry => [entry.options.id, entry]))
+    assert.equal(byId['rp-character-library'].options.disabled, false)
+    assert.equal(byId['rp-message-actions'].options.disabled, true)
+    assert.equal(byId['rp-quick-replies'].options.disabled, true)
+    assert.equal(byId['rp-state-display'].options.disabled, true)
+    assert.equal(byId['rp-compact-access-mode'].options.disabled, true)
+    assert.deepEqual(ctx.settings.get('roleplay-features').enabledFeatures, ['character-card'])
+    assert.deepEqual(ctx.get('rpFeatures').snapshot().enabledFeatures, ['character-card'])
+    for (const id of ['quick-replies', 'state-display', 'compact-access-mode']) {
+      const status = ctx.get('rpFeatures').status().features.find(feature => feature.id === id)
+      assert.equal(status.enabled, false)
+      assert.equal(status.active, false)
+    }
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('fresh 0.1.5 defaults activate all three parked entries before reporting them enabled', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  const entries = [
+    loaderEntry('rp-quick-replies', true),
+    loaderEntry('rp-state-display', true),
+    loaderEntry('rp-compact-access-mode', true),
+  ]
+  ctx.provide('loader', { entries: () => entries })
+  try {
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(ManagerPlugin, { enabledFeatures: DEFAULT_ENABLED_FEATURES })
+    for (const entry of entries) assert.equal(entry.disabled, false)
+    for (const id of ['quick-replies', 'state-display', 'compact-access-mode']) {
+      const status = ctx.get('rpFeatures').status().features.find(feature => feature.id === id)
+      assert.equal(status.enabled, true)
+      assert.equal(status.active, true)
+    }
   } finally {
     await ctx.fiber.dispose()
   }

@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-feature-manager",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Settings-based feature, Skill, and version management for the bundled Roleplay suite",
   "license": "MIT",
   "private": true,
@@ -44,7 +44,7 @@
       "platform": "web"
     },
     "roleplay": {
-      "suiteVersion": "0.1.5",
+      "suiteVersion": "0.1.6",
       "requiresDsh": "^0.1.1-rc.2"
     }
   },

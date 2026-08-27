@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-compact-access-mode",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Icon-only access mode trigger in the compact Harness composer",
   "license": "MIT",
   "private": true,

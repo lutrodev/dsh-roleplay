@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-core",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Event-sourced roleplay agent runtime for DeepSeek Harness",
   "license": "MIT",
   "private": true,

@@ -129,8 +129,20 @@ export class RpFeatureManager extends Service {
   }
 
   async settled() {
-    await this.migrationTail
-    await Promise.all([this.reconcileTail, this.listenerTail])
+    // Settings injection and its watchers activate on microtasks. Re-read the
+    // tails until no callback scheduled more migration or reconciliation work
+    // while the previous snapshot was settling.
+    await Promise.resolve()
+    while (true) {
+      const migrationTail = this.migrationTail
+      const reconcileTail = this.reconcileTail
+      const listenerTail = this.listenerTail
+      await Promise.all([migrationTail, reconcileTail, listenerTail])
+      await Promise.resolve()
+      if (migrationTail === this.migrationTail
+        && reconcileTail === this.reconcileTail
+        && listenerTail === this.listenerTail) return
+    }
   }
 
   status() {
@@ -257,7 +269,6 @@ export class RpFeatureManager extends Service {
     this.reconcileTail = this.reconcileTail
       .then(async () => {
         for (const entry of this.ctx.loader.entries()) await this.reconcileEntry(entry)
-        await this.ctx.loader.await()
       })
       .catch(error => { this.ctx.logger.warn(error) })
   }
@@ -308,7 +319,12 @@ async function resolveHarnessPromptSections(ctx) {
 
 export async function apply(ctx, config) {
   normalizeHarnessIdentityOverride(config.harnessIdentity)
-  new RpFeatureManager(ctx, config, await resolveHarnessPromptSections(ctx))
+  const manager = new RpFeatureManager(ctx, config, await resolveHarnessPromptSections(ctx))
+  // Keep the provider fiber pending until the persisted selection has loaded
+  // and every managed Loader row reflects that final selection. This prevents
+  // client discovery from publishing a bundle during the default-config
+  // window and leaving its browser contribution mounted after settings load.
+  await manager.settled()
 }
 
 function registerBrowserApi(ctx, manager) {

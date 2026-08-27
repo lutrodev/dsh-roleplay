@@ -114,7 +114,7 @@ function statusView(enabledFeatures, enabledSkills, revision = 0) {
     settings: { writable: true, revision },
     core: [
       { label: '回复运行时', description: '协调父代理、Writer、上下文与每轮写作流程。', packageVersion: '0.1.0', versionCompatible: true },
-      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.5', versionCompatible: true },
+      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.6', versionCompatible: true },
     ],
     features: FEATURE_CATALOG.map(item => ({
       ...item,
@@ -287,7 +287,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     fireEvent.click(await screen.findByText('查看核心组件'))
     const card = screen.getByText('会话总结').closest('li')
     expect(card).toBeTruthy()
-    expect(card.textContent).toContain('v0.1.5')
+    expect(card.textContent).toContain('v0.1.6')
     expect(card.textContent).toContain('压缩较早的对话，并向 Writer 提供独立的会话总结。')
   })
 

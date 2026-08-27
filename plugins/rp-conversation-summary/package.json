@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-conversation-summary",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Deferred narrative-history compaction and active summary context for Roleplay",
   "license": "MIT",
   "private": true,

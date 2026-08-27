@@ -1,6 +1,8 @@
 - insert:
     - id: rp-feature-manager
       name: dsh-roleplay-rp-feature-manager
+      inject:
+        - settings
       config:
         harnessIdentity: ''
         enabledFeatures:
@@ -136,16 +138,19 @@
         maxTextCharacters: 30000
         maxStylesPerSession: 16
         exposeBrowser: true
+    # New 0.1.5 browser contributions start parked. rp-feature-manager removes
+    # this flag only after the saved 0.1.5 selection has settled, so a feature
+    # cannot mount briefly while its settings card already says it is off.
     - id: rp-quick-replies
       name: dsh-roleplay-rp-quick-replies
+      disabled: true
       config: {}
     - id: rp-message-actions
       name: dsh-roleplay-rp-message-actions
       config: {}
-    # Activation is owned by the Feature Manager selection. A literal
-    # disabled flag here would override the persisted user toggle.
     - id: rp-state-display
       name: dsh-roleplay-rp-state-display
+      disabled: true
       config: {}
     - id: rp-message-avatar
       name: dsh-roleplay-rp-message-avatar
@@ -155,4 +160,5 @@
       config: {}
     - id: rp-compact-access-mode
       name: dsh-roleplay-rp-compact-access-mode
+      disabled: true
       config: {}
