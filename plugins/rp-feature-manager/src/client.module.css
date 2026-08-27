@@ -389,6 +389,7 @@
 }
 
 .feature {
+  position: relative;
   display: flex;
   min-width: 0;
   align-items: flex-start;
@@ -453,9 +454,345 @@
 
 .featureVersion {
   display: block;
-  margin-top: 6px;
   font-size: 10px;
   line-height: 15px;
+}
+
+.featureMeta {
+  display: flex;
+  min-height: 26px;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.featureSettings {
+  position: absolute;
+  right: 13px;
+  bottom: 12px;
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 7px;
+  padding: 3px 7px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  font: 500 10px/16px var(--dsw-font-family);
+}
+
+.featureSettings:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.featureSettings:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.featureSettings:disabled {
+  color: var(--dsw-alias-label-tertiary);
+  cursor: default;
+  opacity: .72;
+}
+
+.quickDialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(760px, calc(100dvh - 32px));
+}
+
+.quickDialogContent {
+  min-height: 0;
+}
+
+.quickLoadState {
+  display: flex;
+  min-height: 150px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.quickLoadState p {
+  margin: 0;
+}
+
+.quickLoadState button {
+  min-height: 30px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  font: 12px/18px var(--dsw-font-family);
+}
+
+.quickManager {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quickManagerToolbar {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+}
+
+.quickAddButton {
+  display: inline-flex;
+  min-height: 34px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  font: 600 12px/18px var(--dsw-font-family);
+}
+
+.quickAddButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.quickAddButton:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.quickNotice,
+.quickError {
+  padding: 9px 11px;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.quickNotice {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.quickError {
+  background: var(--dsw-alias-state-error-tertiary);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.quickReplyList {
+  display: flex;
+  max-height: min(500px, 55dvh);
+  min-height: 0;
+  flex-direction: column;
+  gap: 9px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 1px 3px 3px 1px;
+  list-style: none;
+}
+
+.quickReplyRow {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.quickOrder {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+  border-radius: 8px;
+  background: var(--dsw-specific-tip);
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.quickFields {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(120px, .38fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.quickLabelField,
+.quickContentField {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.quickLabelField > span,
+.quickContentField > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quickLabelField small,
+.quickContentField small {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.quickLabelField input,
+.quickContentField textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 9px;
+  outline: none;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+  font: 13px/20px var(--dsw-font-family);
+}
+
+.quickLabelField input {
+  min-height: 38px;
+  padding: 8px 9px;
+}
+
+.quickContentField textarea {
+  min-height: 58px;
+  resize: vertical;
+  padding: 7px 9px;
+}
+
+.quickLabelField input:focus,
+.quickContentField textarea:focus {
+  border-color: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);
+}
+
+.quickRowActions {
+  display: grid;
+  grid-template-columns: repeat(3, 30px);
+  gap: 5px;
+  padding-top: 18px;
+}
+
+.quickRowAction,
+.quickDangerAction {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.quickRowAction:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.quickDangerAction:hover:not(:disabled) {
+  background: var(--dsw-alias-state-error-tertiary);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.quickRowAction:disabled,
+.quickDangerAction:disabled {
+  cursor: default;
+  opacity: .3;
+}
+
+.quickEmpty {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--dsw-alias-label-tertiary);
+  text-align: center;
+  font-size: 12px;
+}
+
+.quickEmpty strong {
+  color: var(--dsw-alias-label-primary);
+  font-size: 15px;
+}
+
+.quickFooter {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quickFooter > span {
+  display: flex;
+  gap: 8px;
+}
+
+.quickResetButton {
+  min-height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  font: 12px/18px var(--dsw-font-family);
+}
+
+.quickResetButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.quickResetButton:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.quickAddButton:focus-visible,
+.quickRowAction:focus-visible,
+.quickDangerAction:focus-visible,
+.quickResetButton:focus-visible,
+.quickLoadState button:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
 }
 
 .switch {
@@ -1155,5 +1492,56 @@
 
   .promptLayerBody {
     padding-left: 12px;
+  }
+
+  .quickDialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .quickManagerToolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .quickFields {
+    grid-template-columns: 1fr;
+  }
+
+  .quickReplyRow {
+    grid-template-columns: 24px minmax(0, 1fr);
+    padding: 10px;
+  }
+
+  .quickOrder {
+    width: 24px;
+    height: 24px;
+    margin-top: 20px;
+  }
+
+  .quickRowActions {
+    grid-column: 2;
+    grid-template-columns: repeat(3, 34px);
+    padding-top: 0;
+  }
+
+  .quickRowAction,
+  .quickDangerAction {
+    width: 34px;
+    height: 34px;
+  }
+
+  .quickFooter {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .quickFooter > span {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .quickResetButton {
+    align-self: flex-start;
   }
 }

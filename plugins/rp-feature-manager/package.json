@@ -22,7 +22,7 @@
     "README.md"
   ],
   "scripts": {
-    "check": "node --check src/index.js && node --check src/catalog.js && node --check src/selection.js && node --check src/version.js && node --check src/client.js && node --check src/client-state.js",
+    "check": "node --check src/index.js && node --check src/catalog.js && node --check src/selection.js && node --check src/version.js && node --check src/client.js && node --check src/client-state.js && node --check src/quick-reply-settings.js",
     "test": "pnpm run test:node && pnpm run test:client",
     "test:node": "node --test test/*.test.js",
     "test:client": "vitest run test/client.client.spec.jsx",
@@ -67,6 +67,7 @@
     "dsh-roleplay-rp-library": "workspace:^",
     "dsh-roleplay-rp-message-actions": "workspace:^",
     "dsh-roleplay-rp-message-avatar": "workspace:^",
+    "dsh-roleplay-rp-quick-replies": "workspace:^",
     "dsh-roleplay-rp-dialogue-highlight": "workspace:^"
   },
   "peerDependencies": {

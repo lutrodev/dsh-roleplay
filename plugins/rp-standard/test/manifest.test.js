@@ -16,6 +16,7 @@ test('feature manager bundle provides the preset and every independently owned b
   assert.equal(patch.match(/id: rp-preset/g)?.length, 1)
   assert.equal(patch.match(/id: rp-writing-style/g)?.length, 1)
   assert.equal(patch.match(/id: rp-mvu-import/g)?.length, 1)
+  assert.equal(patch.match(/id: rp-quick-replies/g)?.length, 1)
   assert.equal(patch.match(/id: rp-message-actions/g)?.length, 1)
   assert.equal(patch.match(/id: rp-message-avatar/g)?.length, 1)
   assert.equal(patch.match(/id: rp-dialogue-highlight/g)?.length, 1)
@@ -52,6 +53,7 @@ test('browser asset packages expose package metadata for Harness client discover
   for (const packageName of [
     'dsh-roleplay-rp-subagent-manager',
     'dsh-roleplay-rp-library',
+    'dsh-roleplay-rp-quick-replies',
     'dsh-roleplay-rp-message-actions',
     'dsh-roleplay-rp-message-avatar',
     'dsh-roleplay-rp-dialogue-highlight',

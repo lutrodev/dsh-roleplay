@@ -78,6 +78,12 @@ export const FEATURE_CATALOG = Object.freeze([
     hostEntryIds: ['rp-subagent-manager'], runtimeKey: 'subagentManager',
   }),
   feature({
+    id: 'quick-replies', category: 'conversation', label: '快捷回复',
+    description: '在输入栏插入可自定义的常用回复与成对符号，不会自动发送。',
+    packageName: 'dsh-roleplay-rp-quick-replies',
+    hostEntryIds: ['rp-quick-replies'],
+  }),
+  feature({
     id: 'message-actions', category: 'conversation', label: '消息操作',
     description: '提供编辑、删除、重新生成和失败恢复等消息能力。',
     packageName: 'dsh-roleplay-rp-message-actions',

@@ -210,7 +210,7 @@ flowchart LR
 
 | 插件 | 权威职责 | 主要扩展面 |
 |---|---|---|
-| `rp-feature-manager` | RP 组合唯一用户入口、启用状态、硬依赖闭包、Host Loader 生命周期和 RP/DSH 版本契约；不下载、移除代码或删除资料 | Settings `roleplay-features`、`ctx.rpFeatures`、trusted-host `/rp-features`、Loader `disabled` 更新 |
+| `rp-feature-manager` | RP 组合唯一用户入口、启用状态、硬依赖闭包、Host Loader 生命周期和 RP/DSH 版本契约；在功能卡中承载已启用能力的用户设置入口，不下载、移除代码或删除资料 | Settings `roleplay-features`、公开 `settings.section` 的 `roleplay` 页面、`ctx.rpFeatures`、trusted-host `/rp-features`、Loader `disabled` 更新 |
 | `rp-core` | `RpRun`、Session Slot Context Build、固定 Writer 与隔离任务子 Agent、上下文预算、文本转换、按执行模式提交校验、统一消息操作 metadata 与助手实体生命周期 | `ctx.rpRuntime` 注册表、`rp_write_turn`、`rp_run_subagent`、`rpMessageAction` helper |
 | `rp-subagent-manager` | 全局 Writer 模型策略与独立任务子代理目录；持久化调用契约与启用状态，Host 管理界面和 preset 运行快照共享一个原子目录但 service realm 隔离 | `ctx.rpSubagentManager`、trusted-host `/rp-subagents`、侧栏“子代理”、`registerSubagentProfileProvider()` |
 | `rp-character-card` | V1/V2/V3 社区信息包、PNG/JSON 导入、V3 PNG 导出、隔离提示词、浏览器列表、详情与唯一角色卡编辑器；导出读取当前角色实体与最新关联世界书，使用官方 `ccv3` PNG 数据块且不恢复隔离提示 | `ctx.rpCharacterCards`、trusted-host `/rp-character-cards`、侧栏入口、`rpAssetEditors`、导入 transformer、`rp.card` source |
@@ -224,6 +224,7 @@ flowchart LR
 | `rp-compat-mvu` | 无实体的 MVU 社区适配；内聚角色卡源、开场、世界书初始化与只读模板语义 | character import transformer、Host/preset session materializer、lore activation adapter、开场/角色卡控制块文本转换 |
 
 | `rp-library` | 资产入口编排、会话绑定、Roleplay 引导、唯一资料编辑器能力注册表、故事上下文工作台、只读 State Wiki，以及活动运行边界；不持有五类资料字段 schema | trusted-host `/rp-assets`、`rpAssetEditors`、Sidebar、Composer dock、`rp-run-marker` Conversation Node |
+| `rp-quick-replies` | 全局可复用快捷回复设置；只把用户选择的内容写入当前浏览器草稿，不自动提交、不建立消息或 Session 旁路事实源；编辑器由功能管理器的“快捷回复”功能卡打开 | Settings `rp-quick-replies`、trusted-host `/rp-quick-replies`、公开 `./client-store`、`conversation.input.right`、`InputActions.setDraft()` |
 | `rp-message-avatar` | 用户消息、开场与普通助手回复的统一头像展示 | 三类自定义 Conversation Nodes、公开 `conversation.chat.node` renderer、局部 Portal、角色卡与人设浏览器 RPC |
 | `rp-message-actions` | Roleplay 消息复制、行内编辑、后缀删除、同会话重新生成、保存并重新生成、分支、回复指标及失败恢复 | trusted-host `/rp-message-actions`、`rpMessageAction`、原生 surface replacement、自定义 Conversation Nodes、`conversation.chat.node` / `commandview` / `turnTail`、局部 Portal |
 | `rp-dialogue-highlight` | Roleplay 助手正文的成对引号橙色高亮，不改写消息事实或占用可见操作 | 公开 `conversation.chat.assistant-actions` 隐藏锚点；优先使用 CSS Custom Highlight API，缺失或不可用时使用脱离 React 消息树的无障碍隐藏镜像层 |

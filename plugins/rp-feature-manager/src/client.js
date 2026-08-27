@@ -7,6 +7,7 @@ import {
   IconDataOutline16,
   IconEditOutline16,
   IconRefreshOutline16,
+  IconSettingsOutline14,
   IconSkillOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { SETTINGS_NAMESPACE } from './catalog.js'
@@ -22,6 +23,7 @@ import {
   toggleAnnouncement,
   unsetRoleplaySetting,
 } from './client-state.js'
+import { QuickReplyManager, createQuickReplyStore } from './quick-reply-settings.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
 export const inject = ['slots', 'locale', 'connection', 'settingsScope']
@@ -60,6 +62,8 @@ const zh = {
   versionDetails: '查看核心组件版本',
   applies: '资料入口会立即调整；Roleplay 运行能力从下一次新建或重新打开对话开始生效。',
   saveError: '启用状态没有保存，请稍后重试。',
+  quickRepliesConfigure: '设置快捷回复',
+  quickRepliesEnableFirst: '启用后设置',
   skillsTitle: 'Roleplay Skills',
   skillsDescription: '逐项选择 Roleplay 插件向 Agent 提供的工作指南。停用 Skill 不会停用插件，也不会删除资料。',
   skillsScope: '这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。',
@@ -172,6 +176,7 @@ const en = {
   roleplayVersion: 'Roleplay', dshVersion: 'DSH', versionDetails: 'View core component versions',
   applies: 'Material entries update immediately. Runtime changes apply to newly created or reopened conversations.',
   saveError: 'The enabled state was not saved. Try again.',
+  quickRepliesConfigure: 'Configure quick replies', quickRepliesEnableFirst: 'Enable to configure',
   skillsTitle: 'Roleplay Skills',
   skillsDescription: 'Select the guides Roleplay plugins expose to agents. Disabling a Skill does not disable its plugin or delete data.',
   skillsScope: 'This page only manages Skills contributed by Roleplay plugins. Project and user Skills are unaffected.',
@@ -251,6 +256,8 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
   const [request, setRequest] = useState(0)
   const [promptStatus, setPromptStatus] = useState({ phase: 'idle' })
   const [promptRequest, setPromptRequest] = useState(0)
+  const [quickReplyManagerOpen, setQuickReplyManagerOpen] = useState(false)
+  const quickReplyStore = useMemo(() => createQuickReplyStore(connection), [connection])
 
   useEffect(() => {
     let live = true
@@ -411,6 +418,9 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
               canWrite,
               reduced,
               onToggle: feature => { void toggleFeature(feature) },
+              onConfigure: feature => {
+                if (feature.id === 'quick-replies') setQuickReplyManagerOpen(true)
+              },
               t,
             })
           : activeTab === 'skills'
@@ -433,10 +443,15 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
                 onRetry: () => setPromptRequest(value => value + 1),
                 t,
               }))),
+      h(QuickReplyManager, {
+        open: quickReplyManagerOpen,
+        store: quickReplyStore,
+        onClose: () => setQuickReplyManagerOpen(false),
+      }),
       h('div', { className: css.liveNotice, 'aria-live': 'polite' }, notice))))
 }
 
-function FeaturesPanel({ status, enabled, pending, canWrite, reduced, onToggle, t }) {
+function FeaturesPanel({ status, enabled, pending, canWrite, reduced, onToggle, onConfigure, t }) {
   return h(React.Fragment, null,
     h('div', { className: css.panelIntro }, h('h3', null, t('featuresTitle')), h('p', null, t('featuresDescription'))),
     h('p', { className: css.applies }, t('applies')),
@@ -454,6 +469,7 @@ function FeaturesPanel({ status, enabled, pending, canWrite, reduced, onToggle, 
         status: status.features.find(item => item.id === feature.id),
         reduced,
         onToggle: () => onToggle(feature),
+        onConfigure: feature.id === 'quick-replies' ? () => onConfigure(feature) : undefined,
         t,
       }))))))
 }
@@ -802,9 +818,10 @@ function CoreSummary({ status, t }) {
         h('ul', null, ...status.core.map(item => h('li', { key: item.label }, h('span', null, item.label), h('code', null, item.packageVersion ?? '—')))))))
 }
 
-function FeatureRow({ feature, checked, pending, disabled, status, reduced, onToggle, t }) {
+function FeatureRow({ feature, checked, pending, disabled, status, reduced, onToggle, onConfigure, t }) {
   const requires = dependencyLabels(feature)
   const recommends = dependencyLabels(feature, 'recommends')
+  const configureReady = checked && status?.active === true && !pending
   return h(m.li, { className: css.feature, layout: !reduced },
     h('div', { className: css.featureCopy },
       h('div', { className: css.featureTitle },
@@ -814,7 +831,14 @@ function FeatureRow({ feature, checked, pending, disabled, status, reduced, onTo
       requires.length === 0 && recommends.length === 0 ? null : h('div', { className: css.dependencies },
         requires.length === 0 ? null : h('span', null, `需要：${requires.join('、')}`),
         recommends.length === 0 ? null : h('span', null, `建议搭配：${recommends.join('、')}`)),
-      h('code', { className: css.featureVersion }, `v${status?.packageVersion ?? '—'}`)),
+      h('div', { className: css.featureMeta },
+        h('code', { className: css.featureVersion }, `v${status?.packageVersion ?? '—'}`),
+        onConfigure === undefined ? null : h('button', {
+          type: 'button',
+          className: css.featureSettings,
+          disabled: !configureReady,
+          onClick: onConfigure,
+        }, h(IconSettingsOutline14, { size: 14, 'aria-hidden': true }), t(configureReady ? 'quickRepliesConfigure' : 'quickRepliesEnableFirst')))),
     h(Switch, { checked, disabled, reduced, label: `${checked ? '停用' : '启用'}${feature.label}`, onClick: onToggle }))
 }
 

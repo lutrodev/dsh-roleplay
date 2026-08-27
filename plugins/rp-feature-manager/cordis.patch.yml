@@ -12,6 +12,7 @@
           - state
           - compat-mvu
           - subagent-manager
+          - quick-replies
           - message-actions
           - message-avatar
           - dialogue-highlight
@@ -134,6 +135,9 @@
         maxTextCharacters: 30000
         maxStylesPerSession: 16
         exposeBrowser: true
+    - id: rp-quick-replies
+      name: dsh-roleplay-rp-quick-replies
+      config: {}
     - id: rp-message-actions
       name: dsh-roleplay-rp-message-actions
       config: {}

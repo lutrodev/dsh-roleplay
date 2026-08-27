@@ -222,6 +222,9 @@ importers:
       dsh-roleplay-rp-preset:
         specifier: workspace:^
         version: link:../rp-preset
+      dsh-roleplay-rp-quick-replies:
+        specifier: workspace:^
+        version: link:../rp-quick-replies
       dsh-roleplay-rp-session:
         specifier: workspace:^
         version: link:../rp-session
@@ -621,6 +624,52 @@ importers:
         specifier: 0.22.2
         version: 0.22.2
 
+  plugins/rp-quick-replies:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: ^3.18.1
+        version: 3.18.1
+      motion:
+        specifier: 12.43.0
+        version: 12.43.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.0.1
+        version: 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.2)
+      '@deepseek-ai/dsh-client-connection':
+        specifier: 0.1.1-rc.2
+        version: 0.1.1-rc.2(9b40f28fccfb9ee3f86188afc9586c29)
+      '@deepseek-ai/dsh-client-runtime':
+        specifier: 0.1.1-rc.2
+        version: 0.1.1-rc.2(cb4cb8169c074f46f5e849113e8ad34d)
+      '@deepseek-ai/dsh-client-ui-conversation':
+        specifier: 0.1.1-rc.2
+        version: 0.1.1-rc.2(7bf1aab074a15e252a07d54a203dc0c0)
+      '@deepseek-ai/dsh-client-ui-primitives':
+        specifier: 0.1.1-rc.2
+        version: 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-settings':
+        specifier: 0.1.1-rc.2
+        version: 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/schemastery@3.18.1)
+      '@testing-library/react':
+        specifier: 16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      jsdom:
+        specifier: 29.1.1
+        version: 29.1.1
+      react:
+        specifier: 18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: 18.3.1
+        version: 18.3.1(react@18.3.1)
+      tsdown:
+        specifier: 0.22.2
+        version: 0.22.2
+      vitest:
+        specifier: 4.1.8
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(jsdom@29.1.1)(vite@8.2.2(@types/node@26.2.0)(yaml@2.9.0))
+
   plugins/rp-session:
     dependencies:
       '@deepseek-ai/schemastery':
@@ -726,6 +775,9 @@ importers:
       dsh-roleplay-rp-preset:
         specifier: workspace:^
         version: link:../rp-preset
+      dsh-roleplay-rp-quick-replies:
+        specifier: workspace:^
+        version: link:../rp-quick-replies
       dsh-roleplay-rp-session:
         specifier: workspace:^
         version: link:../rp-session

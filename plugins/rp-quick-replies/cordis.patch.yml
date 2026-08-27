@@ -1,0 +1,4 @@
+- insert:
+    - id: rp-quick-replies
+      name: dsh-roleplay-rp-quick-replies
+      config: {}

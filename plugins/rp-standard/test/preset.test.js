@@ -27,7 +27,7 @@ const CONFIG = {
 
 const ALL_FEATURES = new Set([
   'character-card', 'lore-book', 'persona', 'preset', 'writing-style',
-  'state', 'compat-mvu', 'subagent-manager', 'message-actions', 'message-avatar', 'dialogue-highlight',
+  'state', 'compat-mvu', 'subagent-manager', 'quick-replies', 'message-actions', 'message-avatar', 'dialogue-highlight',
 ])
 const FEATURE_SERVICE = {
   assertCompatible() {},

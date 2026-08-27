@@ -4,13 +4,22 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
+  Button: ({ children, ...props }) => React.createElement('button', props, children),
+  Tooltip: ({ children }) => children,
+  Modal: ({ open, title, children, footer }) => open
+    ? React.createElement('div', { role: 'dialog', 'aria-label': title }, children, footer)
+    : null,
   IconCheckOutline16: () => null,
   IconChevronDownOutline14: () => null,
+  IconChevronUpOutline14: () => null,
   IconCodeOutline16: () => null,
   IconDataOutline16: () => null,
   IconEditOutline16: () => null,
+  IconPlusOutline16: () => null,
   IconRefreshOutline16: () => null,
+  IconSettingsOutline14: () => null,
   IconSkillOutline16: () => null,
+  IconTrashOutline16: () => null,
 }))
 
 vi.mock('motion/react', async () => {
@@ -38,7 +47,9 @@ vi.mock('motion/react', async () => {
 
 import { FEATURE_CATALOG, ROLEPLAY_SKILL_CATALOG } from '../src/catalog.js'
 import { RoleplaySettingsSection, apply } from '../src/client.js'
+import { QuickReplyManager } from '../src/quick-reply-settings.js'
 import { buildRoleplayPromptPreview } from 'dsh-roleplay-rp-core/prompts'
+import { DEFAULT_QUICK_REPLIES } from 'dsh-roleplay-rp-quick-replies/protocol'
 
 afterEach(cleanup)
 
@@ -51,6 +62,7 @@ const copy = {
   loadError: '暂时无法读取 Roleplay 设置。', retry: '重试', compatible: '版本兼容', incompatible: '版本不兼容',
   versionProblem: '版本不兼容', roleplayVersion: 'Roleplay', dshVersion: 'DSH', versionDetails: '查看核心组件版本',
   applies: '下一次对话生效。', saveError: '启用状态没有保存，请稍后重试。',
+  quickRepliesConfigure: '设置快捷回复', quickRepliesEnableFirst: '启用后设置',
   skillsTitle: 'Roleplay Skills', skillsDescription: '逐项选择 Roleplay 插件向 Agent 提供的工作指南。',
   skillsScope: '这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。',
   visibilityTitle: '可见性预览', parentAgent: 'Agent 模式父代理',
@@ -129,6 +141,7 @@ function harness(
   { remote = false } = {},
 ) {
   let status = statusView(enabledFeatures, enabledSkills)
+  let quickReplies = readyQuickReplyState()
   let snapshot = {
     status: remote ? 'unavailable' : 'ready',
     writable: !remote,
@@ -164,6 +177,10 @@ function harness(
   const connection = {
     rpc: {
       call: vi.fn(async (_path, endpoint, payload) => {
+        if (_path === '/rp-quick-replies') {
+          if (endpoint === 'replace') quickReplies = { ...quickReplies, replies: payload.replies, revision: quickReplies.revision + 1 }
+          return { ok: true, value: { ok: true, value: structuredClone(quickReplies) } }
+        }
         if (endpoint === 'settings/set') {
           const stored = Array.isArray(payload.value) ? [...payload.value] : payload.value
           snapshot = {
@@ -193,6 +210,25 @@ function harness(
     },
   }
   return { scope, connection }
+}
+
+function readyQuickReplyState(overrides = {}) {
+  return {
+    replies: DEFAULT_QUICK_REPLIES.map(reply => ({ ...reply })),
+    writable: true,
+    revision: 0,
+    limits: { replies: 12, labelCharacters: 12, contentCharacters: 2000, totalCharacters: 8000 },
+    ...overrides,
+  }
+}
+
+function fixedQuickReplyStore(snapshot = { phase: 'ready', error: null, ...readyQuickReplyState() }) {
+  return {
+    subscribe: () => () => {},
+    getSnapshot: () => snapshot,
+    load: vi.fn(async () => snapshot),
+    replace: vi.fn(async () => snapshot),
+  }
 }
 
 function promptView(enabledFeatures, identityOverride = '') {
@@ -239,6 +275,38 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     expect(inject).toHaveBeenCalledWith('settings.section', expect.any(Function))
     expect(registration).toMatchObject({ name: 'settings.section', id: 'roleplay', order: 25 })
     expect(registration.label()).toBe('Roleplay')
+  })
+
+  it('在快捷回复功能卡中提供设置入口，并保存完整的自定义列表', async () => {
+    const { scope, connection } = harness(['quick-replies'], [])
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+
+    fireEvent.click(await screen.findByRole('button', { name: '设置快捷回复' }))
+    expect(await screen.findByRole('dialog', { name: '设置快捷回复' })).toBeTruthy()
+    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-quick-replies', 'list', {}))
+
+    fireEvent.change(await screen.findByLabelText('第 1 项按钮名称'), { target: { value: '旁白' } })
+    fireEvent.change(screen.getByLabelText('第 1 项插入内容'), { target: { value: '请从旁白视角继续。' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存快捷回复' }))
+
+    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-quick-replies', 'replace', expect.objectContaining({ expectedRevision: 0 })))
+    const replaceCall = connection.rpc.call.mock.calls.find(([, endpoint]) => endpoint === 'replace')
+    expect(replaceCall[2].replies[0]).toEqual({ id: 'double-quote', label: '旁白', content: '请从旁白视角继续。' })
+  })
+
+  it('功能未启用时保留可发现但不可点击的设置入口', async () => {
+    const { scope, connection } = harness(['lore-book'])
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+    expect((await screen.findByRole('button', { name: '启用后设置' })).disabled).toBe(true)
+  })
+
+  it('快捷回复设置保留无效编辑并给出可执行错误', async () => {
+    const store = fixedQuickReplyStore()
+    render(React.createElement(QuickReplyManager, { open: true, store, onClose: vi.fn() }))
+    fireEvent.change(screen.getByLabelText('第 2 项按钮名称'), { target: { value: '“”' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存快捷回复' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('每个快捷回复需要使用不同的名称。')
+    expect(store.replace).not.toHaveBeenCalled()
   })
 
   it('通过顶部页签展示 Skill 精细选择和真实可见性', async () => {
