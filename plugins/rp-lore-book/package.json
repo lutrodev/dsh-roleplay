@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-lore-book",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Lorebook library and context activation for Roleplay",
   "license": "MIT",
   "private": true,

@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-session",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Event-sourced roleplay session profiles for DeepSeek Harness",
   "license": "MIT",
   "private": true,

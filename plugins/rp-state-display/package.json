@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-state-display",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Read-only current session variable card below the latest successful Roleplay reply",
   "license": "MIT",
   "private": true,

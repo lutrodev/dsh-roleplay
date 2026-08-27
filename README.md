@@ -40,7 +40,7 @@ GitHub 仓库用于查看源码、调试和参与开发；普通使用请安装 
 ### 环境准备
 
 - Node.js `^22.19.0` 或 `>=24.0.0`，推荐使用 [`.nvmrc`](.nvmrc) 中的版本。
-- pnpm `11.7.0`，可由 Corepack 按根 `package.json` 的声明启用。
+- pnpm `11.23.0`，可由 Corepack 按根 `package.json` 的声明启用。
 
 ```bash
 git clone https://github.com/lutrodev/dsh-roleplay.git

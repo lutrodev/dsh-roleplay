@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-standard",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Standard bundled roleplay preset for DeepSeek Harness",
   "license": "MIT",
   "private": true,

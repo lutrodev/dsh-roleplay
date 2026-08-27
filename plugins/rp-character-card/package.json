@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-character-card",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Community character-card library and importer for Roleplay",
   "license": "MIT",
   "private": true,
