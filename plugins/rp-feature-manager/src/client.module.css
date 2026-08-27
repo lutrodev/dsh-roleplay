@@ -471,17 +471,17 @@
   right: 13px;
   bottom: 12px;
   display: inline-flex;
-  min-height: 26px;
+  width: 26px;
+  height: 26px;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  flex: none;
   border: 0;
   border-radius: 7px;
-  padding: 3px 7px;
+  padding: 0;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
-  font: 500 10px/16px var(--dsw-font-family);
 }
 
 .featureSettings:hover:not(:disabled) {

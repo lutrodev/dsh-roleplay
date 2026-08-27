@@ -28,7 +28,7 @@
 .mobileWorkbenchDock { display: none; }
 .modeSwitchWrap { position: relative; display: inline-flex; align-items: center; }
 .modeSwitch { position: relative; display: grid; grid-template-columns: repeat(2, minmax(64px, 1fr)); min-height: 28px; overflow: hidden; padding: 2px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 999px; color: var(--dsw-alias-label-tertiary); background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 92%, transparent); box-shadow: inset 0 1px 2px color-mix(in srgb, black 4%, transparent); cursor: pointer; font: 10px/18px var(--dsw-font-family); }
-.modeSwitch[data-compact="true"] { grid-template-columns: repeat(2, minmax(60px, 1fr)); min-height: 34px; }
+.modeSwitch[data-compact="true"] { grid-template-columns: repeat(2, minmax(48px, 1fr)); min-height: 34px; }
 .modeSwitch:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
 .modeSwitch:disabled { cursor: not-allowed; opacity: .55; }
 .modeSwitch[data-pending="true"] { cursor: wait; }
@@ -599,8 +599,8 @@ button.slotPlaceholder:hover { border-color: color-mix(in srgb, var(--dsw-alias-
 @media (max-width: 720px) {
   .headerContextControls { display: none; }
   .contextControls { display: none; }
-  .workbenchMobileControls { display: grid; grid-template-columns: repeat(2, 44px); width: calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance)); max-width: var(--dsh-composer-card-max-width); align-items: center; justify-content: end; gap: 7px; margin: 0 auto 7px; }
-  .workbenchMobileControls .modeSwitchWrap { grid-column: 1 / -1; justify-self: end; }
+  .workbenchMobileControls { display: grid; grid-template-columns: minmax(0, 1fr) repeat(2, 44px); width: calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance)); max-width: var(--dsh-composer-card-max-width); align-items: center; justify-content: end; gap: 7px; margin: 0 auto 7px; }
+  .workbenchMobileControls .modeSwitchWrap { justify-self: end; }
   .mobileWorkbenchDock { display: grid; width: 44px; height: 44px; box-sizing: border-box; place-items: center; padding: 0; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); box-shadow: var(--dsw-shadow-lv1); cursor: pointer; }
   .mobileWorkbenchDock > svg { color: var(--dsw-alias-brand-primary); }
   .mobileWorkbenchDock > i,

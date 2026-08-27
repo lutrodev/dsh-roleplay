@@ -67,11 +67,12 @@
 }
 
 .menuCopy {
-  display: grid;
+  display: flex;
   min-width: 0;
-  grid-template-columns: minmax(54px, auto) minmax(0, 150px);
-  align-items: baseline;
-  gap: 10px;
+  max-width: min(220px, 60vw);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
 }
 
 .menuCopy strong,
@@ -87,6 +88,7 @@
 }
 
 .menuCopy small {
+  max-width: 100%;
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
 }

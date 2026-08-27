@@ -294,6 +294,7 @@ function RpMobileWorkbenchControl(props) {
   const detail = `${boundReferenceCount} 项资料${namespaceCount > 0 ? ` · ${namespaceCount} 组状态` : ''}`
   return h(RpMotionProvider, null,
     h('div', { className: css.workbenchMobileControls },
+      h(ExecutionModeSwitch, { connection, sessionId, session, profile, compact: true }),
       h(PromptTrigger, { profile, mobile: true, onClick: () => setPromptOpen(true) }),
       h(SessionWikiTrigger, { detail, mobile: true, onClick: () => setLibraryOpen(true) })),
     h(PromptModal, {

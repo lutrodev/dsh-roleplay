@@ -6601,7 +6601,7 @@ get: (_target, key) => {
 		};
 		const STYLE_ID = "dsh-roleplay-rp-quick-replies-styles";
 		const STYLE_OWNER = "dsh-roleplay-rp-quick-replies";
-		const STYLE_TEXT = ".rp-quick-replies-control {\n  display: flex;\n  min-width: 0;\n  align-items: center;\n  gap: 4px;\n  font-family: var(--dsw-font-family);\n}\n\n.rp-quick-replies-quickButton,\n.rp-quick-replies-menuTrigger {\n  display: inline-flex;\n  height: 28px;\n  flex: none;\n  align-items: center;\n  justify-content: center;\n  box-sizing: border-box;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n  font: 500 13px/20px var(--dsw-font-family);\n}\n\n.rp-quick-replies-quickButton {\n  min-width: 28px;\n  max-width: 80px;\n  padding: 0 8px;\n}\n\n.rp-quick-replies-quickButton > span {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-quick-replies-menuTrigger {\n  width: 28px;\n  padding: 0;\n}\n\n.rp-quick-replies-compactOnly {\n  display: none;\n}\n\n.rp-quick-replies-quickButton:hover:not(:disabled),\n.rp-quick-replies-menuTrigger:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-quick-replies-quickButton:focus-visible,\n.rp-quick-replies-menuTrigger:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-quick-replies-quickButton:disabled,\n.rp-quick-replies-menuTrigger:disabled {\n  cursor: default;\n  opacity: .45;\n}\n\n.rp-quick-replies-menu {\n  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);\n  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);\n}\n\n.rp-quick-replies-menuCopy {\n  display: grid;\n  min-width: 0;\n  grid-template-columns: minmax(54px, auto) minmax(0, 150px);\n  align-items: baseline;\n  gap: 10px;\n}\n\n.rp-quick-replies-menuCopy strong,\n.rp-quick-replies-menuCopy small {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-quick-replies-menuCopy strong {\n  color: var(--dsw-alias-label-primary);\n  font-weight: 600;\n}\n\n.rp-quick-replies-menuCopy small {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n}\n\n@container (max-width: 560px) {\n  .rp-quick-replies-quickButton {\n    display: none;\n  }\n\n  .rp-quick-replies-menuTrigger.rp-quick-replies-compactOnly {\n    display: inline-flex;\n  }\n}\n";
+		const STYLE_TEXT = ".rp-quick-replies-control {\n  display: flex;\n  min-width: 0;\n  align-items: center;\n  gap: 4px;\n  font-family: var(--dsw-font-family);\n}\n\n.rp-quick-replies-quickButton,\n.rp-quick-replies-menuTrigger {\n  display: inline-flex;\n  height: 28px;\n  flex: none;\n  align-items: center;\n  justify-content: center;\n  box-sizing: border-box;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n  font: 500 13px/20px var(--dsw-font-family);\n}\n\n.rp-quick-replies-quickButton {\n  min-width: 28px;\n  max-width: 80px;\n  padding: 0 8px;\n}\n\n.rp-quick-replies-quickButton > span {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-quick-replies-menuTrigger {\n  width: 28px;\n  padding: 0;\n}\n\n.rp-quick-replies-compactOnly {\n  display: none;\n}\n\n.rp-quick-replies-quickButton:hover:not(:disabled),\n.rp-quick-replies-menuTrigger:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-quick-replies-quickButton:focus-visible,\n.rp-quick-replies-menuTrigger:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-quick-replies-quickButton:disabled,\n.rp-quick-replies-menuTrigger:disabled {\n  cursor: default;\n  opacity: .45;\n}\n\n.rp-quick-replies-menu {\n  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);\n  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);\n}\n\n.rp-quick-replies-menuCopy {\n  display: flex;\n  min-width: 0;\n  max-width: min(220px, 60vw);\n  flex-direction: column;\n  align-items: flex-start;\n  gap: 1px;\n}\n\n.rp-quick-replies-menuCopy strong,\n.rp-quick-replies-menuCopy small {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-quick-replies-menuCopy strong {\n  color: var(--dsw-alias-label-primary);\n  font-weight: 600;\n}\n\n.rp-quick-replies-menuCopy small {\n  max-width: 100%;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n}\n\n@container (max-width: 560px) {\n  .rp-quick-replies-quickButton {\n    display: none;\n  }\n\n  .rp-quick-replies-menuTrigger.rp-quick-replies-compactOnly {\n    display: inline-flex;\n  }\n}\n";
 		function ensureStyles() {
 			document.getElementById(STYLE_ID)?.remove();
 			const style = document.createElement("style");
@@ -6654,7 +6654,7 @@ get: (_target, key) => {
 			};
 			const menuItems = ready ? state.replies.map((reply) => ({
 				id: `reply:${reply.id}`,
-				label: h("span", { className: css.menuCopy }, h("strong", null, reply.label), h("small", null, reply.content.replace(/\s+/g, " ").trim())),
+				label: renderMenuReply(reply),
 				disabled: busy
 			})) : state.phase === "error" ? [{
 				id: "load-error",
@@ -6736,6 +6736,15 @@ get: (_target, key) => {
 				compact: true,
 				className: css.menu
 			}) : null)));
+		}
+		function renderMenuReply(reply) {
+			const label = reply.label.replace(/\s+/g, " ").trim();
+			const content = reply.content.replace(/\s+/g, " ").trim();
+			const hasPreview = content !== label;
+			return h("span", {
+				className: css.menuCopy,
+				"data-has-preview": hasPreview ? "true" : "false"
+			}, h("strong", null, reply.label), hasPreview ? h("small", null, content) : null);
 		}
 		function applyReplyToComposer(inputActions, draft, content, target) {
 			const textarea = findComposerTextarea(target);

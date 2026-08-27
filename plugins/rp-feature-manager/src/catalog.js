@@ -102,6 +102,12 @@ export const FEATURE_CATALOG = Object.freeze([
     packageName: 'dsh-roleplay-rp-dialogue-highlight',
     hostEntryIds: ['rp-dialogue-highlight'],
   }),
+  feature({
+    id: 'compact-access-mode', category: 'conversation', label: '访问模式仅图标',
+    description: '在所有输入栏宽度下仅显示当前访问模式图标。',
+    packageName: 'dsh-roleplay-rp-compact-access-mode',
+    hostEntryIds: ['rp-compact-access-mode'],
+  }),
 ])
 
 export const FEATURE_IDS = Object.freeze(FEATURE_CATALOG.map(item => item.id))

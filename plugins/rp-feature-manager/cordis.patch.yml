@@ -16,6 +16,7 @@
           - message-actions
           - message-avatar
           - dialogue-highlight
+          - compact-access-mode
         enabledSkills:
           - rp-guide-character-card
           - rp-guide-lorebook
@@ -146,4 +147,7 @@
       config: {}
     - id: rp-dialogue-highlight
       name: dsh-roleplay-rp-dialogue-highlight
+      config: {}
+    - id: rp-compact-access-mode
+      name: dsh-roleplay-rp-compact-access-mode
       config: {}

@@ -145,4 +145,18 @@ describe('快捷回复输入栏', () => {
     render(React.createElement(QuickReplyControl, sessionProps(fixedStore(readyState({ replies })))))
     expect(screen.getByRole('button', { name: '更多快捷回复' }).className).not.toContain('compactOnly')
   })
+
+  it('does not repeat identical reply content and keeps custom content as secondary copy', () => {
+    const replies = [...DEFAULT_QUICK_REPLIES, { id: 'aside', label: '旁白', content: '请从旁白视角继续。' }]
+    render(React.createElement(QuickReplyControl, sessionProps(fixedStore(readyState({ replies })))))
+    fireEvent.click(screen.getByRole('button', { name: '更多快捷回复' }))
+
+    const quote = screen.getByRole('button', { name: '“”' })
+    expect(quote.textContent).toBe('“”')
+    expect(quote.querySelector('small')).toBeNull()
+
+    const aside = screen.getByRole('button', { name: '旁白请从旁白视角继续。' })
+    expect(aside.querySelector('strong')?.textContent).toBe('旁白')
+    expect(aside.querySelector('small')?.textContent).toBe('请从旁白视角继续。')
+  })
 })

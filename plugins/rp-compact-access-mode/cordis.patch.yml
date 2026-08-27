@@ -1,0 +1,4 @@
+- insert:
+    - id: rp-compact-access-mode
+      name: dsh-roleplay-rp-compact-access-mode
+      config: {}

@@ -51,6 +51,7 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.1",
     "motion": "12.43.0",
+    "dsh-roleplay-rp-compact-access-mode": "workspace:^",
     "dsh-roleplay-rp-standard": "workspace:^",
     "dsh-roleplay-rp-core": "workspace:^",
     "dsh-roleplay-rp-subagent-manager": "workspace:^",

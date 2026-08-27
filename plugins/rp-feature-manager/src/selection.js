@@ -8,6 +8,9 @@ import {
 
 const KNOWN_IDS = new Set(DEFAULT_ENABLED_FEATURES)
 const KNOWN_SKILL_IDS = new Set(SKILL_IDS)
+const PRE_COMPACT_ACCESS_MODE_DEFAULTS = Object.freeze(
+  DEFAULT_ENABLED_FEATURES.filter(id => id !== 'compact-access-mode'),
+)
 
 /** Normalize, close over hard prerequisites, and return catalog order. */
 export function normalizeFeatureSelection(value) {
@@ -54,6 +57,7 @@ export function assertFeatureSelection(value) {
 export function migrateLegacyFeatureSelection(value) {
   const normalized = normalizeFeatureSelection(value)
   if (new Set(value).size !== value.length) throw new TypeError('enabledFeatures must not contain duplicates')
+  if (sameSelection(normalized, PRE_COMPACT_ACCESS_MODE_DEFAULTS)) return DEFAULT_ENABLED_FEATURES
   const actual = new Set(value)
   const missing = normalized.filter(id => !actual.has(id))
   if (missing.length === 1
@@ -64,6 +68,10 @@ export function migrateLegacyFeatureSelection(value) {
     return normalized
   }
   return assertFeatureSelection(value)
+}
+
+function sameSelection(left, right) {
+  return left.length === right.length && left.every((value, index) => value === right[index])
 }
 
 /** Plan one reversible UI toggle, enabling prerequisites or disabling dependants. */

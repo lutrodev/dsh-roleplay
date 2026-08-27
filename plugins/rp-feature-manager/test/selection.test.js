@@ -41,6 +41,12 @@ test('the pre-optional-State MVU selection migrates without accepting other inco
   assert.throws(() => migrateLegacyFeatureSelection(['compat-mvu']), /missing required features/)
 })
 
+test('the previous full feature set adopts compact access mode without changing custom selections', () => {
+  const previousDefaults = DEFAULT_ENABLED_FEATURES.filter(id => id !== 'compact-access-mode')
+  assert.deepEqual(migrateLegacyFeatureSelection(previousDefaults), DEFAULT_ENABLED_FEATURES)
+  assert.deepEqual(migrateLegacyFeatureSelection(['dialogue-highlight']), ['dialogue-highlight'])
+})
+
 test('Roleplay Skills are independently selected in catalog order', () => {
   assert.deepEqual(normalizeSkillSelection(['rp-guide-state', 'rp-guide-character-card']), [
     'rp-guide-character-card',

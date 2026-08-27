@@ -3,7 +3,7 @@ import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import { SettingsProvider } from '@deepseek-ai/dsh-settings'
 import * as ManagerPlugin from '../src/index.js'
-import { DEFAULT_ENABLED_SKILLS } from '../src/catalog.js'
+import { DEFAULT_ENABLED_FEATURES, DEFAULT_ENABLED_SKILLS } from '../src/catalog.js'
 
 const DEFAULT_IDENTITY = 'You are an AI agent powered by DeepSeek Harness.'
 const HARNESS_SECTIONS = [
@@ -181,6 +181,31 @@ test('manager persists the legacy implicit-State MVU selection as an explicit de
     })
     assert.deepEqual(manager.snapshot().enabledFeatures, ['character-card', 'lore-book', 'state', 'compat-mvu'])
     assert.deepEqual(manager.snapshot().enabledSkills, DEFAULT_ENABLED_SKILLS)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('manager persists compact access mode for the previous full feature set', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  ctx.provide('loader', { entries: () => [], async await() {} })
+  try {
+    const previousDefaults = DEFAULT_ENABLED_FEATURES.filter(id => id !== 'compact-access-mode')
+    await ctx.plugin(MemorySettings, {
+      document: {
+        'roleplay-features': {
+          enabledFeatures: previousDefaults,
+          enabledSkills: DEFAULT_ENABLED_SKILLS,
+          harnessIdentity: '',
+        },
+      },
+    })
+    await ctx.plugin(ManagerPlugin, { enabledFeatures: [] })
+    const manager = ctx.get('rpFeatures')
+    await manager.settled()
+    assert.deepEqual(ctx.settings.get('roleplay-features').enabledFeatures, DEFAULT_ENABLED_FEATURES)
+    assert.deepEqual(manager.snapshot().enabledFeatures, DEFAULT_ENABLED_FEATURES)
   } finally {
     await ctx.fiber.dispose()
   }

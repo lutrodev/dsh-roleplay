@@ -52,9 +52,7 @@ export function QuickReplyControl(props) {
   const menuItems = ready
     ? state.replies.map(reply => ({
         id: `reply:${reply.id}`,
-        label: h('span', { className: css.menuCopy },
-          h('strong', null, reply.label),
-          h('small', null, reply.content.replace(/\s+/g, ' ').trim())),
+        label: renderMenuReply(reply),
         disabled: busy,
       }))
     : state.phase === 'error'
@@ -122,6 +120,15 @@ export function QuickReplyControl(props) {
           compact: true,
           className: css.menu,
         }) : null)))
+}
+
+function renderMenuReply(reply) {
+  const label = reply.label.replace(/\s+/g, ' ').trim()
+  const content = reply.content.replace(/\s+/g, ' ').trim()
+  const hasPreview = content !== label
+  return h('span', { className: css.menuCopy, 'data-has-preview': hasPreview ? 'true' : 'false' },
+    h('strong', null, reply.label),
+    hasPreview ? h('small', null, content) : null)
 }
 
 export function applyReplyToComposer(inputActions, draft, content, target) {

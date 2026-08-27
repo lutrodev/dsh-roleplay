@@ -228,6 +228,7 @@ flowchart LR
 | `rp-message-avatar` | 用户消息、开场与普通助手回复的统一头像展示 | 三类自定义 Conversation Nodes、公开 `conversation.chat.node` renderer、局部 Portal、角色卡与人设浏览器 RPC |
 | `rp-message-actions` | Roleplay 消息复制、行内编辑、后缀删除、同会话重新生成、保存并重新生成、分支、回复指标及失败恢复 | trusted-host `/rp-message-actions`、`rpMessageAction`、原生 surface replacement、自定义 Conversation Nodes、`conversation.chat.node` / `commandview` / `turnTail`、局部 Portal |
 | `rp-dialogue-highlight` | Roleplay 助手正文的成对引号橙色高亮，不改写消息事实或占用可见操作 | 公开 `conversation.chat.assistant-actions` 隐藏锚点；优先使用 CSS Custom Highlight API，缺失或不可用时使用脱离 React 消息树的无障碍隐藏镜像层 |
+| `rp-compact-access-mode` | 在所有输入栏宽度下，把有内置图标的访问模式按钮收起为仅图标显示；保留完整无障碍名称与原菜单行为 | 浏览器插件生命周期样式、`data-composer-card`、访问模式按钮公开无障碍名称 |
 | `rp-standard` | 内部受管理 `roleplay` preset 提供者，按 `rpFeatures` 选择运行时行与指导 Skill | Harness preset roster、私有 isolate realm |
 
 `rp-state` 是独立可选能力，不属于核心运行时。停用后不挂载变量 service、投影注册、上下文来源、读写工具或 `rp-guide-state`；原有 Session Event Log 不会被删除，重新启用后仍可从日志重建。`rp-compat-mvu` 硬依赖角色卡、世界书和 State，功能管理器负责依赖闭包；普通世界书不依赖 State，但带 `stateCondition` 的条目在 State gate 不可用时失败关闭。

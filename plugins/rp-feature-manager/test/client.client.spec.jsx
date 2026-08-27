@@ -281,7 +281,9 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     const { scope, connection } = harness(['quick-replies'], [])
     render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
 
-    fireEvent.click(await screen.findByRole('button', { name: '设置快捷回复' }))
+    const configureButton = await screen.findByRole('button', { name: '设置快捷回复' })
+    expect(configureButton.textContent).toBe('')
+    fireEvent.click(configureButton)
     expect(await screen.findByRole('dialog', { name: '设置快捷回复' })).toBeTruthy()
     await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-quick-replies', 'list', {}))
 

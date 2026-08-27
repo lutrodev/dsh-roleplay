@@ -9,6 +9,7 @@ import {
   IconRefreshOutline16,
   IconSettingsOutline14,
   IconSkillOutline16,
+  Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { SETTINGS_NAMESPACE } from './catalog.js'
 import {
@@ -822,6 +823,7 @@ function FeatureRow({ feature, checked, pending, disabled, status, reduced, onTo
   const requires = dependencyLabels(feature)
   const recommends = dependencyLabels(feature, 'recommends')
   const configureReady = checked && status?.active === true && !pending
+  const configureLabel = t(configureReady ? 'quickRepliesConfigure' : 'quickRepliesEnableFirst')
   return h(m.li, { className: css.feature, layout: !reduced },
     h('div', { className: css.featureCopy },
       h('div', { className: css.featureTitle },
@@ -833,12 +835,14 @@ function FeatureRow({ feature, checked, pending, disabled, status, reduced, onTo
         recommends.length === 0 ? null : h('span', null, `建议搭配：${recommends.join('、')}`)),
       h('div', { className: css.featureMeta },
         h('code', { className: css.featureVersion }, `v${status?.packageVersion ?? '—'}`),
-        onConfigure === undefined ? null : h('button', {
-          type: 'button',
-          className: css.featureSettings,
-          disabled: !configureReady,
-          onClick: onConfigure,
-        }, h(IconSettingsOutline14, { size: 14, 'aria-hidden': true }), t(configureReady ? 'quickRepliesConfigure' : 'quickRepliesEnableFirst')))),
+        onConfigure === undefined ? null : h(Tooltip, { label: configureLabel, side: 'top', delayMs: 400 },
+          h('button', {
+            type: 'button',
+            className: css.featureSettings,
+            disabled: !configureReady,
+            'aria-label': configureLabel,
+            onClick: onConfigure,
+          }, h(IconSettingsOutline14, { size: 14, 'aria-hidden': true }))))),
     h(Switch, { checked, disabled, reduced, label: `${checked ? '停用' : '启用'}${feature.label}`, onClick: onToggle }))
 }
 
