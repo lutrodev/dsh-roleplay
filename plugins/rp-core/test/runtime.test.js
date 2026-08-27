@@ -142,7 +142,7 @@ test('commit exposes registered effect schemas and returns structured correction
   await ctx.fiber.dispose()
 })
 
-test('Chat parent receives only commit-delivery context while Agent keeps the complete Slot context', async () => {
+test('Writer receives narrative context while both parent modes receive separate commit-delivery context', async () => {
   const ctx = new Context()
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register() {} })
@@ -153,7 +153,8 @@ test('Chat parent receives only commit-delivery context while Agent keeps the co
   })
   runtime.registerContextSource({
     id: 'rp.state', label: '会话变量', parentDelivery: 'commit',
-    defaultSlot: { id: 'state', label: '状态' }, prepare: () => ({ revision: 3, text: 'state revision 3' }),
+    defaultSlot: { id: 'state', label: '状态' },
+    prepare: () => ({ revision: 3, text: 'current state: gate open', parentText: 'state revision 3 and update rules' }),
   })
   runtime.registerContextSource({
     id: 'rp.lore', label: '世界书', defaultSlot: { id: 'lore', label: '世界书' },
@@ -166,9 +167,10 @@ test('Chat parent receives only commit-delivery context while Agent keeps the co
   const chatRun = await runtime.prepareRun(chatAgent, 1, [input])
   const chatReady = runtime.writerReadyMessage(chatRun).content.map(block => block.text ?? '').join('')
   assert.match(chatReady, /<commit_context read_only="true">/)
-  assert.match(chatReady, /state revision 3/)
-  assert.doesNotMatch(chatReady, /secret lore text|<roleplay_context/)
-  assert.match(chatRun.contextText, /state revision 3/)
+  assert.match(chatReady, /state revision 3 and update rules/)
+  assert.doesNotMatch(chatReady, /current state: gate open|secret lore text|<roleplay_context/)
+  assert.match(chatRun.contextText, /current state: gate open/)
+  assert.doesNotMatch(chatRun.contextText, /state revision 3 and update rules/)
   assert.match(chatRun.contextText, /secret lore text/)
 
   ctx.provide('rpSessions', { get: () => ({
@@ -182,9 +184,17 @@ test('Chat parent receives only commit-delivery context while Agent keeps the co
   const agentRun = await runtime.prepareRun({ session: { events: [], append() {} } }, 2, [input])
   const agentReady = runtime.writerReadyMessage(agentRun).content.map(block => block.text ?? '').join('')
   assert.match(agentReady, /<roleplay_context read_only="true">/)
-  assert.match(agentReady, /state revision 3/)
+  assert.match(agentReady, /current state: gate open/)
   assert.match(agentReady, /secret lore text/)
-  assert.doesNotMatch(agentReady, /<commit_context/)
+  assert.match(agentReady, /<commit_context read_only="true">/)
+  assert.match(agentReady, /state revision 3 and update rules/)
+  assert.doesNotMatch(agentRun.contextText, /state revision 3 and update rules/)
+
+  runtime.registerContextSource({ id: 'orphan-parent-text', prepare: () => ({ text: 'visible', parentText: 'hidden' }) })
+  await assert.rejects(
+    runtime.prepareRun({ session: { events: [], append() {} } }, 3, [input]),
+    /returned parentText without parent delivery/,
+  )
   await ctx.fiber.dispose()
 })
 

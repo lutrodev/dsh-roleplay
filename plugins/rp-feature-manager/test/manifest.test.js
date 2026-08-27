@@ -3,7 +3,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CORE_PACKAGES, FEATURE_CATALOG, ROLEPLAY_SKILL_CATALOG, ROLEPLAY_SUITE_VERSION, SUPPORTED_DSH_RANGE } from '../src/catalog.js'
+import { CORE_PACKAGES, DEFAULT_ENABLED_FEATURES, FEATURE_CATALOG, ROLEPLAY_SKILL_CATALOG, ROLEPLAY_SUITE_VERSION, SUPPORTED_DSH_RANGE } from '../src/catalog.js'
 
 const pluginDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pluginsDirectory = resolve(pluginDirectory, '..')
@@ -19,6 +19,11 @@ test('feature manager is the suite bundle and carries every managed Roleplay pac
   assert.equal(standard.dsh?.bundle, undefined)
   assert.match(patch, /id: rp-feature-manager[\s\S]*?id: rp-standard/)
   assert.match(patch, /id: rp-standard[\s\S]*?inject:\s+- rpFeatures/)
+  const stateDisplayEntry = patch.match(/- id: rp-state-display\n(?<entry>(?: {6}.*\n)+)/)?.groups?.entry ?? ''
+  assert.match(stateDisplayEntry, /name: dsh-roleplay-rp-state-display/)
+  assert.doesNotMatch(stateDisplayEntry, /disabled:/)
+  assert.equal(DEFAULT_ENABLED_FEATURES.includes('state-display'), true)
+  assert.match(patch.match(/enabledFeatures:([\s\S]*?)enabledSkills:/)?.[1] ?? '', /- state-display/)
 
   const managedPackages = new Set([
     ...CORE_PACKAGES.map(item => item.packageName),

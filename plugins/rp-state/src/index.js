@@ -69,7 +69,7 @@ export class RpState extends Service {
     ctx.rpRuntime.registerContextSource({
       id: STATE_CONTEXT_SOURCE_ID,
       label: '会话变量',
-      description: '当前对话拥有的变量值、结构与语义更新规则。',
+      description: '当前对话拥有的变量命名空间、说明与当前值。',
       kind: 'session-projection',
       promptCategory: 'factual',
       parentDelivery: 'commit',
@@ -267,6 +267,14 @@ export class RpState extends Service {
       throw new RpStateError('NAMESPACE_LIMIT', `State contains ${entries.length} namespaces; maximum complete context is ${this.config.maxNamespacesInContext}.`)
     }
     const text = JSON.stringify({
+      namespaces: entries.map(([namespace, snapshot]) => ({
+        namespace,
+        title: snapshot.definition.title,
+        ...(snapshot.definition.description === undefined ? {} : { description: snapshot.definition.description }),
+        value: snapshot.value,
+      })),
+    }, null, 2)
+    const parentText = JSON.stringify({
       protocolVersion: RP_STATE_PROTOCOL_VERSION,
       updateProtocol: {
         kind: 'state.update',
@@ -303,6 +311,7 @@ export class RpState extends Service {
     return {
       revision: state.revision,
       text,
+      parentText,
       diagnostics: { namespaces: entries.map(([namespace]) => namespace) },
     }
   }

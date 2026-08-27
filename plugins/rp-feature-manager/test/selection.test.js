@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DEFAULT_ENABLED_FEATURES, DEFAULT_ENABLED_SKILLS, guidanceSkillsFor } from '../src/catalog.js'
+import { DEFAULT_ENABLED_FEATURES, DEFAULT_ENABLED_SKILLS, FEATURE_IDS, guidanceSkillsFor } from '../src/catalog.js'
 import {
   assertFeatureSelection,
   assertSkillSelection,
@@ -25,6 +25,15 @@ test('disabling a prerequisite also disables dependants without touching indepen
   assert.deepEqual(toggleSideEffects(current, 'state', false), ['compat-mvu'])
 })
 
+test('the reply variable card is known, requires State, and is on by default', () => {
+  assert.equal(FEATURE_IDS.includes('state-display'), true)
+  assert.equal(DEFAULT_ENABLED_FEATURES.includes('state-display'), true)
+  assert.deepEqual(normalizeFeatureSelection(['state-display']), ['state', 'state-display'])
+  assert.deepEqual(toggleFeature([], 'state-display', true), ['state', 'state-display'])
+  assert.deepEqual(toggleFeature(['state', 'state-display'], 'state', false), [])
+  assert.deepEqual(toggleSideEffects(['state', 'state-display'], 'state', false), ['state-display'])
+})
+
 test('selection validation rejects unknown, duplicate, and incomplete input', () => {
   assert.throws(() => assertFeatureSelection(['unknown']), /unknown feature/)
   assert.throws(() => assertFeatureSelection(['persona', 'persona']), /duplicates/)
@@ -41,9 +50,11 @@ test('the pre-optional-State MVU selection migrates without accepting other inco
   assert.throws(() => migrateLegacyFeatureSelection(['compat-mvu']), /missing required features/)
 })
 
-test('the previous full feature set adopts compact access mode without changing custom selections', () => {
-  const previousDefaults = DEFAULT_ENABLED_FEATURES.filter(id => id !== 'compact-access-mode')
-  assert.deepEqual(migrateLegacyFeatureSelection(previousDefaults), DEFAULT_ENABLED_FEATURES)
+test('the previous full feature set adopts compact access mode without changing the saved display choice', () => {
+  const previousDefaults = FEATURE_IDS.filter(id => id !== 'state-display' && id !== 'compact-access-mode')
+  const migratedDefaults = FEATURE_IDS.filter(id => id !== 'state-display')
+  assert.deepEqual(migrateLegacyFeatureSelection(previousDefaults), migratedDefaults)
+  assert.deepEqual(migrateLegacyFeatureSelection(migratedDefaults), migratedDefaults)
   assert.deepEqual(migrateLegacyFeatureSelection(['dialogue-highlight']), ['dialogue-highlight'])
 })
 

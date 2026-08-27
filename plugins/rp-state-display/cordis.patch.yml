@@ -1,0 +1,4 @@
+- insert:
+    - id: rp-state-display
+      name: dsh-roleplay-rp-state-display
+      config: {}

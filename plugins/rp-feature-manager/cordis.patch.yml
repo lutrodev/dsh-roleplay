@@ -14,6 +14,7 @@
           - subagent-manager
           - quick-replies
           - message-actions
+          - state-display
           - message-avatar
           - dialogue-highlight
           - compact-access-mode
@@ -140,6 +141,11 @@
       config: {}
     - id: rp-message-actions
       name: dsh-roleplay-rp-message-actions
+      config: {}
+    # Activation is owned by the Feature Manager selection. A literal
+    # disabled flag here would override the persisted user toggle.
+    - id: rp-state-display
+      name: dsh-roleplay-rp-state-display
       config: {}
     - id: rp-message-avatar
       name: dsh-roleplay-rp-message-avatar

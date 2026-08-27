@@ -51,6 +51,7 @@ test('manager reconciles independently selectable Host entries from one validate
     loaderEntry('rp-character-library'),
     loaderEntry('rp-lore-library'),
     loaderEntry('rp-message-actions'),
+    loaderEntry('rp-state-display'),
   ]
   ctx.provide('loader', {
     entries: () => entries,
@@ -66,6 +67,7 @@ test('manager reconciles independently selectable Host entries from one validate
     assert.equal(entries[0].options.disabled, true)
     assert.equal(entries[1].options.disabled, false)
     assert.equal(entries[2].options.disabled, false)
+    assert.equal(entries[3].options.disabled, true)
     assert.equal(manager.status().compatible, true)
     assert.deepEqual(manager.status().settings, { writable: false, revision: null })
     assert.deepEqual(manager.guidanceSkills().map(item => item.skillName), ['rp-guide-lorebook'])
@@ -75,8 +77,37 @@ test('manager reconciles independently selectable Host entries from one validate
     )
     assert.equal(manager.status().core.some(item => item.label === '会话变量'), false)
     assert.equal(manager.status().features.find(item => item.id === 'state').active, false)
+    assert.equal(manager.status().features.find(item => item.id === 'state-display').enabled, false)
     assert.equal(manager.status().skills.find(item => item.id === 'rp-guide-lorebook').enabled, true)
     assert.equal(manager.status().skills.find(item => item.id === 'rp-guide-state').featureEnabled, false)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('manager enables the display entry from the persisted feature selection', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  const entry = loaderEntry('rp-state-display')
+  entry.options.disabled = true
+  entry.fiber = undefined
+  entry.update = async function update(patch) {
+    Object.assign(this.options, patch)
+    this.fiber = this.options.disabled ? undefined : {}
+  }
+  ctx.provide('loader', {
+    entries: () => [entry],
+    async await() {},
+  })
+  try {
+    await ctx.plugin(ManagerPlugin, {
+      enabledFeatures: ['state', 'state-display'],
+      enabledSkills: [],
+    })
+    const manager = ctx.get('rpFeatures')
+    await manager.settled()
+    assert.equal(entry.options.disabled, false)
+    assert.equal(manager.status().features.find(item => item.id === 'state-display').active, true)
   } finally {
     await ctx.fiber.dispose()
   }
@@ -190,12 +221,13 @@ test('manager persists the legacy implicit-State MVU selection as an explicit de
   }
 })
 
-test('manager persists compact access mode for the previous full feature set', async () => {
+test('manager persists compact access mode without changing the saved display choice', async () => {
   const ctx = new Context()
   provideSystemPrompt(ctx)
   ctx.provide('loader', { entries: () => [], async await() {} })
   try {
-    const previousDefaults = DEFAULT_ENABLED_FEATURES.filter(id => id !== 'compact-access-mode')
+    const previousDefaults = DEFAULT_ENABLED_FEATURES.filter(id => id !== 'state-display' && id !== 'compact-access-mode')
+    const migratedDefaults = DEFAULT_ENABLED_FEATURES.filter(id => id !== 'state-display')
     await ctx.plugin(MemorySettings, {
       document: {
         'roleplay-features': {
@@ -208,8 +240,8 @@ test('manager persists compact access mode for the previous full feature set', a
     await ctx.plugin(ManagerPlugin, { enabledFeatures: [] })
     const manager = ctx.get('rpFeatures')
     await manager.settled()
-    assert.deepEqual(ctx.settings.get('roleplay-features').enabledFeatures, DEFAULT_ENABLED_FEATURES)
-    assert.deepEqual(manager.snapshot().enabledFeatures, DEFAULT_ENABLED_FEATURES)
+    assert.deepEqual(ctx.settings.get('roleplay-features').enabledFeatures, migratedDefaults)
+    assert.deepEqual(manager.snapshot().enabledFeatures, migratedDefaults)
   } finally {
     await ctx.fiber.dispose()
   }

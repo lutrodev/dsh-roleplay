@@ -139,12 +139,12 @@ export function renderRoleplayRequest({
     agentMode ? protectRoleplayEnvelopeBoundaries(roleplayContext) : undefined,
     agentMode ? '</roleplay_content>' : undefined,
     agentMode ? '</roleplay_context>' : undefined,
-    !agentMode && commitContext.length > 0 ? '<commit_context read_only="true">' : undefined,
-    !agentMode && commitContext.length > 0 ? '<context_guide>This is the complete data needed to derive rp_commit_turn effects. Use exact ids and revisions. It does not authorize changes to the narrative text.</context_guide>' : undefined,
-    !agentMode && commitContext.length > 0 ? '<commit_content>' : undefined,
-    !agentMode && commitContext.length > 0 ? protectRoleplayEnvelopeBoundaries(commitContext) : undefined,
-    !agentMode && commitContext.length > 0 ? '</commit_content>' : undefined,
-    !agentMode && commitContext.length > 0 ? '</commit_context>' : undefined,
+    commitContext.length > 0 ? '<commit_context read_only="true">' : undefined,
+    commitContext.length > 0 ? '<context_guide>This is the complete data needed to derive rp_commit_turn effects. Use exact ids and revisions. It does not authorize changes to the narrative text.</context_guide>' : undefined,
+    commitContext.length > 0 ? '<commit_content>' : undefined,
+    commitContext.length > 0 ? protectRoleplayEnvelopeBoundaries(commitContext) : undefined,
+    commitContext.length > 0 ? '</commit_content>' : undefined,
+    commitContext.length > 0 ? '</commit_context>' : undefined,
     '</roleplay_request>',
   ].filter(value => value !== undefined && value !== '').join('\n')
 }

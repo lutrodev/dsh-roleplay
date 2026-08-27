@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-	id: "dsh-roleplay-rp-feature-manager",
+	id: "dsh-roleplay-rp-state-display",
 	factory: (require) => {
 		var module = { exports: {} };
 		var exports = module.exports;
@@ -6777,675 +6777,351 @@ get: (_target, key) => {
 			...gestureAnimations
 		};
 		//#endregion
-		//#region ../../node_modules/.pnpm/framer-motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/framer-motion/dist/es/utils/reduced-motion/use-reduced-motion.mjs
-		/**
-		* A hook that returns `true` if we should be using reduced motion based on the current device's Reduced Motion setting.
-		*
-		* This can be used to implement changes to your UI based on Reduced Motion. For instance, replacing motion-sickness inducing
-		* `x`/`y` animations with `opacity`, disabling the autoplay of background videos, or turning off parallax motion.
-		*
-		* It will actively respond to changes and re-render your components with the latest setting.
-		*
-		* ```jsx
-		* export function Sidebar({ isOpen }) {
-		*   const shouldReduceMotion = useReducedMotion()
-		*   const closedX = shouldReduceMotion ? 0 : "-100%"
-		*
-		*   return (
-		*     <motion.div animate={{
-		*       opacity: isOpen ? 1 : 0,
-		*       x: isOpen ? 0 : closedX
-		*     }} />
-		*   )
-		* }
-		* ```
-		*
-		* @return boolean
-		*
-		* @public
-		*/
-		function useReducedMotion() {
-			/**
-			* Lazy initialisation of prefersReducedMotion
-			*/
-			!hasReducedMotionListener.current && initPrefersReducedMotion();
-			const [shouldReduceMotion] = (0, react.useState)(prefersReducedMotion.current);
-			/**
-			* TODO See if people miss automatically updating shouldReduceMotion setting
-			*/
-			return shouldReduceMotion;
-		}
-		//#endregion
 		//#region ../../node_modules/.pnpm/motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/motion/dist/es/react.mjs
 		const m = m$1;
 		//#endregion
-		//#region src/catalog.js
-		const SETTINGS_NAMESPACE = "roleplay-features";
-		Object.freeze([
-			Object.freeze({
-				packageName: "dsh-roleplay-rp-feature-manager",
-				label: "功能管理",
-				description: "管理 Roleplay 功能、Skills、版本兼容状态和设置入口。"
-			}),
-			Object.freeze({
-				packageName: "dsh-roleplay-rp-standard",
-				label: "Roleplay 模式",
-				description: "组合 Roleplay 核心运行时、工具与默认工作流。"
-			}),
-			Object.freeze({
-				packageName: "dsh-roleplay-rp-core",
-				label: "回复运行时",
-				description: "协调父代理、Writer、上下文与每轮写作流程。"
-			}),
-			Object.freeze({
-				packageName: "dsh-roleplay-rp-conversation-summary",
-				label: "会话总结",
-				description: "压缩较早的对话，并向 Writer 提供独立的会话总结。"
-			}),
-			Object.freeze({
-				packageName: "dsh-roleplay-rp-session",
-				label: "对话配置",
-				description: "保存当前会话的模式、资料绑定与故事设置。"
-			}),
-			Object.freeze({
-				packageName: "dsh-roleplay-rp-macro",
-				label: "名称宏",
-				description: "在提示词中展开当前角色与用户的名称。"
-			}),
-			Object.freeze({
-				packageName: "dsh-roleplay-rp-asset-tools",
-				label: "资料工具",
-				description: "为 Agent 提供统一、精简的共享资料操作入口。"
-			}),
-			Object.freeze({
-				packageName: "dsh-roleplay-rp-library",
-				label: "故事设置",
-				description: "提供资料导航、会话绑定与 Prompt 编辑界面。"
-			})
-		]);
-		const FEATURE_CATALOG = Object.freeze([
-			feature({
-				id: "character-card",
-				category: "materials",
-				label: "角色卡",
-				description: "管理角色设定、开场白和角色卡导入。",
-				packageName: "dsh-roleplay-rp-character-card",
-				hostEntryIds: ["rp-character-library"],
-				runtimeKey: "characterCard",
-				recommends: ["lore-book"],
-				skillName: "rp-guide-character-card",
-				skillLabel: "角色卡指南",
-				skillDescription: "在应用、检查或按明确要求修改角色卡时，提供安全边界与操作步骤。"
-			}),
-			feature({
-				id: "lore-book",
-				category: "materials",
-				label: "世界书",
-				description: "按当前对话激活世界设定、人物知识和重要规则。",
-				packageName: "dsh-roleplay-rp-lore-book",
-				hostEntryIds: ["rp-lore-library"],
-				runtimeKey: "loreBook",
-				skillName: "rp-guide-lorebook",
-				skillLabel: "世界书指南",
-				skillDescription: "在使用、检查或按明确要求修改世界书时，维护连续性、激活规则与用户控制权。"
-			}),
-			feature({
-				id: "persona",
-				category: "materials",
-				label: "我的人设",
-				description: "保存用户在故事中的身份，并可作为当前对话的人设。",
-				packageName: "dsh-roleplay-rp-persona",
-				hostEntryIds: ["rp-persona"],
-				runtimeKey: "persona",
-				skillName: "rp-guide-persona",
-				skillLabel: "我的人设指南",
-				skillDescription: "在使用或按明确要求修改“我的人设”时，保持身份内容由用户决定。"
-			}),
-			feature({
-				id: "preset",
-				category: "materials",
-				label: "创作预设",
-				description: "组合任务说明、写作指导和输出要求。",
-				packageName: "dsh-roleplay-rp-preset",
-				hostEntryIds: ["rp-preset"],
-				runtimeKey: "preset",
-				skillName: "rp-guide-preset",
-				skillLabel: "创作预设指南",
-				skillDescription: "在应用、修改或从 SillyTavern 迁移创作预设时，解释栏位作用与叙事优先级。",
-				supportingSkillNames: ["rp-guide-preset-sillytavern"]
-			}),
-			feature({
-				id: "writing-style",
-				category: "materials",
-				label: "文风",
-				description: "为当前对话叠加有序的叙事语言与节奏要求。",
-				packageName: "dsh-roleplay-rp-writing-style",
-				hostEntryIds: ["rp-writing-style"],
-				runtimeKey: "writingStyle",
-				skillName: "rp-guide-writing-style",
-				skillLabel: "文风指南",
-				skillDescription: "在应用或按明确要求修改文风时，协调多项文风的顺序、语言与节奏。"
-			}),
-			feature({
-				id: "state",
-				category: "creation",
-				label: "会话变量",
-				description: "在当前对话中维护可回放的数值、关系和故事状态。",
-				packageName: "dsh-roleplay-rp-state",
-				runtimeKey: "state",
-				skillName: "rp-guide-state",
-				skillLabel: "会话变量指南",
-				skillDescription: "在用户明确要求变量工作时，设计、检查、配置或诊断会话变量。"
-			}),
-			feature({
-				id: "compat-mvu",
-				category: "creation",
-				label: "MVU 兼容",
-				description: "转换受支持的社区 MVU 变量与条件规则安全子集。",
-				packageName: "dsh-roleplay-rp-compat-mvu",
-				hostEntryIds: ["rp-mvu-import"],
-				runtimeKey: "compatMvu",
-				requires: [
-					"character-card",
-					"lore-book",
-					"state"
-				]
-			}),
-			feature({
-				id: "subagent-manager",
-				category: "creation",
-				label: "子代理",
-				description: "配置固定 Writer，以及按各自调用契约运行的可插拔独立任务子代理。",
-				packageName: "dsh-roleplay-rp-subagent-manager",
-				hostEntryIds: ["rp-subagent-manager"],
-				runtimeKey: "subagentManager"
-			}),
-			feature({
-				id: "quick-replies",
-				category: "conversation",
-				label: "快捷回复",
-				description: "在输入栏插入可自定义的常用回复与成对符号，不会自动发送。",
-				packageName: "dsh-roleplay-rp-quick-replies",
-				hostEntryIds: ["rp-quick-replies"]
-			}),
-			feature({
-				id: "message-actions",
-				category: "conversation",
-				label: "消息操作",
-				description: "提供编辑、删除、重新生成和失败恢复等消息能力。",
-				packageName: "dsh-roleplay-rp-message-actions",
-				hostEntryIds: ["rp-message-actions"]
-			}),
-			feature({
-				id: "state-display",
-				category: "conversation",
-				label: "会话变量卡片",
-				description: "在最新助手回复下方，以易读结构展示当前会话变量。",
-				packageName: "dsh-roleplay-rp-state-display",
-				hostEntryIds: ["rp-state-display"],
-				requires: ["state"]
-			}),
-			feature({
-				id: "message-avatar",
-				category: "conversation",
-				label: "消息头像",
-				description: "在用户、开场和最终回复旁显示相应角色头像。",
-				packageName: "dsh-roleplay-rp-message-avatar",
-				hostEntryIds: ["rp-message-avatar"],
-				recommends: ["character-card", "persona"]
-			}),
-			feature({
-				id: "dialogue-highlight",
-				category: "conversation",
-				label: "对白高亮",
-				description: "在助手正文中突出显示成对引号内的对白。",
-				packageName: "dsh-roleplay-rp-dialogue-highlight",
-				hostEntryIds: ["rp-dialogue-highlight"]
-			}),
-			feature({
-				id: "compact-access-mode",
-				category: "conversation",
-				label: "访问模式仅图标",
-				description: "在所有输入栏宽度下仅显示当前访问模式图标。",
-				packageName: "dsh-roleplay-rp-compact-access-mode",
-				hostEntryIds: ["rp-compact-access-mode"]
-			})
-		]);
-		const FEATURE_IDS = Object.freeze(FEATURE_CATALOG.map((item) => item.id));
-		/** Roleplay-owned Skills that can be selected independently from their plugin. */
-		const ROLEPLAY_SKILL_CATALOG = Object.freeze(FEATURE_CATALOG.flatMap((item) => item.skillName === void 0 ? [] : [Object.freeze({
-			id: item.skillName,
-			label: item.skillLabel,
-			description: item.skillDescription,
-			featureId: item.id,
-			featureLabel: item.label,
-			packageName: item.packageName,
-			skillName: item.skillName
-		})]));
-		const SKILL_IDS = Object.freeze(ROLEPLAY_SKILL_CATALOG.map((item) => item.id));
-		const byId = new Map(FEATURE_CATALOG.map((item) => [item.id, item]));
-		new Map(ROLEPLAY_SKILL_CATALOG.map((item) => [item.id, item]));
-		/** Resolve one known feature definition. */
-		function featureById(id) {
-			return byId.get(id);
-		}
-		function feature(input) {
-			return Object.freeze({
-				...input,
-				requires: Object.freeze([...input.requires ?? []]),
-				recommends: Object.freeze([...input.recommends ?? []]),
-				hostEntryIds: Object.freeze([...input.hostEntryIds ?? []]),
-				supportingSkillNames: Object.freeze([...input.supportingSkillNames ?? []])
-			});
-		}
-		//#endregion
-		//#region src/selection.js
-		const KNOWN_IDS = new Set(FEATURE_IDS);
-		const KNOWN_SKILL_IDS = new Set(SKILL_IDS);
-		Object.freeze(FEATURE_IDS.filter((id) => id !== "state-display" && id !== "compact-access-mode"));
-		Object.freeze(FEATURE_IDS.filter((id) => id !== "state-display"));
-		/** Normalize, close over hard prerequisites, and return catalog order. */
-		function normalizeFeatureSelection(value) {
-			if (!Array.isArray(value)) throw new TypeError("enabledFeatures must be an array");
-			const enabled = /* @__PURE__ */ new Set();
-			for (const id of value) {
-				if (typeof id !== "string" || !KNOWN_IDS.has(id)) throw new TypeError(`enabledFeatures contains an unknown feature: ${String(id)}`);
-				enabled.add(id);
-			}
-			let changed = true;
-			while (changed) {
-				changed = false;
-				for (const id of [...enabled]) for (const required of featureById(id).requires) {
-					if (enabled.has(required)) continue;
-					enabled.add(required);
-					changed = true;
-				}
-			}
-			return FEATURE_CATALOG.filter((item) => enabled.has(item.id)).map((item) => item.id);
-		}
-		/** Plan one reversible UI toggle, enabling prerequisites or disabling dependants. */
-		function toggleFeature(current, id, enabled) {
-			if (!KNOWN_IDS.has(id)) throw new TypeError(`unknown Roleplay feature: ${String(id)}`);
-			const selected = new Set(normalizeFeatureSelection(current));
-			if (enabled) {
-				selected.add(id);
-				return normalizeFeatureSelection([...selected]);
-			}
-			selected.delete(id);
-			let changed = true;
-			while (changed) {
-				changed = false;
-				for (const feature of FEATURE_CATALOG) {
-					if (!selected.has(feature.id)) continue;
-					if (feature.requires.some((required) => !selected.has(required))) {
-						selected.delete(feature.id);
-						changed = true;
-					}
-				}
-			}
-			return FEATURE_CATALOG.filter((item) => selected.has(item.id)).map((item) => item.id);
-		}
-		/** Features changed indirectly by a requested toggle. */
-		function toggleSideEffects(current, id, enabled) {
-			const before = new Set(normalizeFeatureSelection(current));
-			const next = toggleFeature(current, id, enabled);
-			return next.filter((item) => item !== id && !before.has(item)).concat([...before].filter((item) => item !== id && !next.includes(item)));
-		}
-		/** Validate and return a Roleplay Skill selection in catalog order. */
-		function normalizeSkillSelection(value) {
-			if (!Array.isArray(value)) throw new TypeError("enabledSkills must be an array");
-			const enabled = /* @__PURE__ */ new Set();
-			for (const id of value) {
-				if (typeof id !== "string" || !KNOWN_SKILL_IDS.has(id)) throw new TypeError(`enabledSkills contains an unknown Skill: ${String(id)}`);
-				enabled.add(id);
-			}
-			return ROLEPLAY_SKILL_CATALOG.filter((item) => enabled.has(item.id)).map((item) => item.id);
-		}
-		/** Plan one independent Roleplay Skill selection change. */
-		function toggleSkill(current, id, enabled) {
-			if (!KNOWN_SKILL_IDS.has(id)) throw new TypeError(`unknown Roleplay Skill: ${String(id)}`);
-			const selected = new Set(normalizeSkillSelection(current));
-			if (enabled) selected.add(id);
-			else selected.delete(id);
-			return ROLEPLAY_SKILL_CATALOG.filter((item) => selected.has(item.id)).map((item) => item.id);
-		}
-		//#endregion
 		//#region src/client-state.js
-		const CATEGORY_ORDER = Object.freeze([
-			"materials",
-			"creation",
-			"conversation"
-		]);
-		function groupedFeatures() {
-			return CATEGORY_ORDER.map((category) => ({
-				category,
-				features: FEATURE_CATALOG.filter((item) => item.category === category)
-			}));
+		const STATE_DISPLAY_ANCHOR_KIND = "rp-state-display-anchor";
+		const STATE_DISPLAY_RETRACTION_KIND = "rp-state-display-retraction";
+		const STATE_ACTIVITY_PROJECTION_KEY = "rp/state/activity";
+		const RP_COMMIT_TOOL = "rp_commit_turn";
+		const latestAnchorCache = /* @__PURE__ */ new WeakMap();
+		/** Match one Turn lifecycle that can end in a durable assistant reply. */
+		function stateDisplayAnchorMatch(event) {
+			const turn = event?.data?.turn;
+			if (!Number.isSafeInteger(turn)) return null;
+			if (event.type === "turn/start") return {
+				id: String(turn),
+				role: "start"
+			};
+			if (event.type === "assistant/message" || event.type === "tool/result" || event.type === "turn/end") return {
+				id: String(turn),
+				role: "update"
+			};
+			return null;
 		}
-		function planFeatureToggle(current, id, enabled) {
+		function stateDisplayAnchorStart(event) {
 			return {
-				enabledFeatures: toggleFeature(current, id, enabled),
-				sideEffects: toggleSideEffects(current, id, enabled)
+				turn: event.data.turn,
+				lastReadableAssistantSeq: void 0,
+				commitAssistantSeq: void 0,
+				canonicalAssistantSeq: void 0,
+				commitAttempted: false,
+				committed: false,
+				successful: false,
+				endSeq: void 0
 			};
 		}
-		function dependencyLabels(feature, relation = "requires") {
-			return feature[relation].map((id) => featureById(id).label);
-		}
-		function toggleAnnouncement(feature, enabled, sideEffects) {
-			const action = enabled ? "启用" : "停用";
-			if (sideEffects.length === 0) return `已${action}${feature.label}。`;
-			const related = sideEffects.map((id) => featureById(id).label).join("、");
-			return enabled ? `已启用${feature.label}，并同时启用${related}。` : `已停用${feature.label}，并同时停用依赖它的${related}。`;
-		}
-		function planSkillToggle(current, id, enabled) {
-			return toggleSkill(current, id, enabled);
-		}
-		function skillToggleAnnouncement(skill, enabled) {
-			return `已${enabled ? "启用" : "停用"}${skill.label}。`;
-		}
-		async function featureStatus(connection) {
-			return roleplayFeatureRequest(connection, "status", "Roleplay 功能状态读取失败");
-		}
-		async function promptPreview(connection) {
-			return roleplayFeatureRequest(connection, "prompts", "代理提示词预览读取失败");
-		}
-		async function setRoleplaySetting(connection, field, value, expectedRevision) {
-			return roleplayFeatureRequest(connection, "settings/set", "Roleplay 设置保存失败", {
-				field,
-				value,
-				expectedRevision
-			});
-		}
-		async function unsetRoleplaySetting(connection, field, expectedRevision) {
-			return roleplayFeatureRequest(connection, "settings/unset", "Roleplay 设置重置失败", {
-				field,
-				expectedRevision
-			});
-		}
-		async function roleplayFeatureRequest(connection, endpoint, fallbackMessage, payload = {}) {
-			const response = await connection.rpc.call("/rp-features", endpoint, payload);
-			const domain = response?.ok === true && response.value?.ok !== void 0 ? response.value : response;
-			if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? fallbackMessage), { code: domain?.error?.code });
-			return domain.value;
-		}
-		//#endregion
-		//#region ../rp-quick-replies/src/protocol.js
-		const QUICK_REPLIES_RPC_PATH = "/rp-quick-replies";
-		const MAX_QUICK_REPLY_CONTENT_CHARACTERS = 2e3;
-		const MAX_QUICK_REPLY_TOTAL_CHARACTERS = 8e3;
-		const DEFAULT_QUICK_REPLIES = Object.freeze([
-			Object.freeze({
-				id: "double-quote",
-				label: "“”",
-				content: "“”"
-			}),
-			Object.freeze({
-				id: "parentheses",
-				label: "（）",
-				content: "（）"
-			}),
-			Object.freeze({
-				id: "continue",
-				label: "继续",
-				content: "继续"
-			})
-		]);
-		/** Validate and detach the complete global quick-reply list. */
-		function normalizeQuickReplies(value) {
-			if (!Array.isArray(value)) throw coded("INVALID_REQUEST", "Quick replies must be an array.");
-			if (value.length > 12) throw coded("LIMIT_EXCEEDED", `At most 12 quick replies can be stored.`);
-			const ids = /* @__PURE__ */ new Set();
-			const labels = /* @__PURE__ */ new Set();
-			let totalCharacters = 0;
-			const replies = value.map((item, index) => {
-				if (!record(item)) throw coded("INVALID_REQUEST", `Quick reply ${index + 1} must be an object.`);
-				const id = text(item.id)?.trim();
-				const label = text(item.label)?.trim();
-				const content = text(item.content)?.replace(/\r\n?/g, "\n");
-				if (id === void 0 || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(id)) throw coded("INVALID_REQUEST", `Quick reply ${index + 1} has an invalid id.`);
-				if (ids.has(id)) throw coded("DUPLICATE_REPLY", "Quick reply ids must be unique.");
-				ids.add(id);
-				if (label === void 0 || label.length === 0) throw coded("INVALID_REQUEST", `Quick reply ${index + 1} needs a label.`);
-				if (characters$1(label) > 12) throw coded("LIMIT_EXCEEDED", `Quick reply labels cannot exceed 12 characters.`);
-				const normalizedLabel = label.toLocaleLowerCase();
-				if (labels.has(normalizedLabel)) throw coded("DUPLICATE_LABEL", "Quick reply labels must be unique.");
-				labels.add(normalizedLabel);
-				if (content === void 0 || content.trim().length === 0) throw coded("INVALID_REQUEST", `Quick reply ${index + 1} needs content.`);
-				const contentCharacters = characters$1(content);
-				if (contentCharacters > 2e3) throw coded("LIMIT_EXCEEDED", `Quick reply content cannot exceed ${MAX_QUICK_REPLY_CONTENT_CHARACTERS} characters.`);
-				totalCharacters += contentCharacters;
+		/** Fold only the evidence needed to publish a successful reply anchor. */
+		function stateDisplayAnchorUpdate(state, event) {
+			if (event.type === "assistant/message" && event.surfaceOp === "append") {
+				const message = event.data?.message;
+				if (!displayableAssistant(message) || state.committed) return state;
+				const ownsCommit = assistantCallsTool(message, RP_COMMIT_TOOL);
+				const text = assistantText(message);
 				return {
-					id,
-					label,
-					content
+					...state,
+					lastReadableAssistantSeq: text.trim().length > 0 ? event.seq : state.lastReadableAssistantSeq,
+					commitAssistantSeq: ownsCommit && text.trim().length > 0 ? event.seq : state.commitAssistantSeq,
+					commitAttempted: state.commitAttempted || ownsCommit
 				};
-			});
-			if (totalCharacters > 8e3) throw coded("LIMIT_EXCEEDED", `Quick replies cannot exceed ${MAX_QUICK_REPLY_TOTAL_CHARACTERS} total characters.`);
-			return replies;
-		}
-		function characters$1(value) {
-			return [...value].length;
-		}
-		function text(value) {
-			return typeof value === "string" ? value : void 0;
-		}
-		function record(value) {
-			return typeof value === "object" && value !== null && !Array.isArray(value);
-		}
-		function coded(code, message) {
-			return Object.assign(new Error(message), { code });
-		}
-		//#endregion
-		//#region ../rp-quick-replies/src/client-store.js
-		const DEFAULT_QUICK_REPLY_LIMITS = Object.freeze({
-			replies: 12,
-			labelCharacters: 12,
-			contentCharacters: MAX_QUICK_REPLY_CONTENT_CHARACTERS,
-			totalCharacters: MAX_QUICK_REPLY_TOTAL_CHARACTERS
-		});
-		/** Shared browser store used by the composer and the Roleplay settings surface. */
-		function createQuickReplyStore(connection) {
-			let snapshot = Object.freeze({
-				phase: "idle",
-				replies: [],
-				writable: false,
-				revision: null,
-				limits: DEFAULT_QUICK_REPLY_LIMITS,
-				error: null
-			});
-			let request = null;
-			const listeners = /* @__PURE__ */ new Set();
-			const publish = (next) => {
-				snapshot = Object.freeze(next);
-				for (const listener of listeners) listener();
+			}
+			if (event.type === "tool/result" && successfulCommitResult(state, event)) return {
+				...state,
+				committed: true,
+				commitAttempted: true,
+				canonicalAssistantSeq: Number.isSafeInteger(event.data?.meta?.assistant?.seq) ? event.data.meta.assistant.seq : state.commitAssistantSeq ?? state.lastReadableAssistantSeq
 			};
-			const adopt = (value) => ({
-				phase: "ready",
-				replies: normalizeQuickReplies(value.replies),
-				writable: value.writable === true,
-				revision: Number.isSafeInteger(value.revision) ? value.revision : null,
-				limits: {
-					...DEFAULT_QUICK_REPLY_LIMITS,
-					...value.limits ?? {}
-				},
-				error: null
-			});
-			const load = async () => {
-				if (request !== null) return request;
-				publish({
-					...snapshot,
-					phase: "loading",
-					error: null
-				});
-				request = quickReplyRequest(connection, "list").then((value) => {
-					publish(adopt(value));
-					return snapshot;
-				}).catch((error) => {
-					publish({
-						...snapshot,
-						phase: "error",
-						replies: [],
-						error: friendlyQuickReplyRequestError(error, "load")
-					});
-					throw error;
-				}).finally(() => {
-					request = null;
-				});
-				return request;
-			};
-			const replace = async (replies) => {
-				if (!Number.isSafeInteger(snapshot.revision)) throw Object.assign(/* @__PURE__ */ new Error("快捷回复设置暂时不能保存。"), { code: "SETTINGS_UNAVAILABLE" });
-				const previous = snapshot;
-				publish({
-					...snapshot,
-					phase: "saving",
-					error: null
-				});
-				try {
-					const value = await quickReplyRequest(connection, "replace", {
-						replies,
-						expectedRevision: previous.revision
-					});
-					publish(adopt(value));
-					return snapshot;
-				} catch (error) {
-					publish({
-						...previous,
-						phase: "ready",
-						error: null
-					});
-					throw error;
-				}
-			};
+			if (event.type === "turn/end") {
+				const assistantSeq = state.canonicalAssistantSeq ?? state.commitAssistantSeq ?? state.lastReadableAssistantSeq;
+				return {
+					...state,
+					canonicalAssistantSeq: assistantSeq,
+					successful: event.data?.reason?.kind === "completed" && Number.isSafeInteger(assistantSeq) && (!state.commitAttempted || state.committed),
+					endSeq: event.seq
+				};
+			}
+			return state;
+		}
+		const stateDisplayAnchorNodeDefinition = {
+			kind: STATE_DISPLAY_ANCHOR_KIND,
+			target: "chat",
+			match: stateDisplayAnchorMatch,
+			start: (_context, match) => stateDisplayAnchorStart(match.event),
+			update: (context, match) => stateDisplayAnchorUpdate(context.state, match.event),
+			publication: (match) => match.event.type === "turn/end" ? "immediate" : "none",
+			buildViewNode: (context) => {
+				const state = context.state;
+				if (state?.successful !== true || !Number.isSafeInteger(state.canonicalAssistantSeq)) return null;
+				return {
+					key: context.key,
+					kind: STATE_DISPLAY_ANCHOR_KIND,
+					id: context.id,
+					target: "chat",
+					anchorSeq: state.canonicalAssistantSeq + .11,
+					location: { kind: "session" },
+					visibility: "visible",
+					data: {
+						turn: state.turn,
+						assistantSeq: state.canonicalAssistantSeq,
+						endSeq: state.endSeq
+					}
+				};
+			}
+		};
+		/** Match a delete/reroll carrier so historical anchors follow surface rollback. */
+		function stateDisplayRetractionMatch(event) {
+			const action = messageAction(event);
+			return action?.operation === "delete" || action?.operation === "reroll" ? {
+				id: String(event.seq),
+				role: "start"
+			} : null;
+		}
+		function stateDisplayRetractionStart(event) {
+			const action = messageAction(event);
 			return {
-				subscribe(listener) {
-					listeners.add(listener);
-					return () => listeners.delete(listener);
-				},
-				getSnapshot() {
-					return snapshot;
-				},
-				load,
-				replace
+				seq: event.seq,
+				replacementStart: event.surfaceOp?.op === "replace" && Number.isSafeInteger(event.surfaceOp.start) ? event.surfaceOp.start : void 0,
+				removedTurns: [...new Set((action?.targets ?? []).map((target) => target?.turn).filter(Number.isSafeInteger))]
 			};
 		}
-		function friendlyQuickReplyRequestError(error, intent) {
-			if (error?.code === "REVISION_CONFLICT") return "快捷回复刚刚在其他页面更新。请关闭设置界面，重新打开后再修改。";
-			if (error?.code === "SETTINGS_UNAVAILABLE") return "当前环境不能保存快捷回复设置。";
-			if (intent === "save") return error instanceof Error && error.message ? error.message : "快捷回复没有保存，请稍后重试。";
-			return "暂时无法读取快捷回复，请稍后重试。";
+		const stateDisplayRetractionNodeDefinition = {
+			kind: STATE_DISPLAY_RETRACTION_KIND,
+			target: "chat",
+			match: stateDisplayRetractionMatch,
+			start: (_context, match) => stateDisplayRetractionStart(match.event),
+			update: (context) => context.state,
+			buildViewNode: (context) => !Number.isSafeInteger(context.state?.seq) ? null : {
+				key: context.key,
+				kind: STATE_DISPLAY_RETRACTION_KIND,
+				id: context.id,
+				target: "chat",
+				anchorSeq: context.state.seq + .105,
+				location: { kind: "session" },
+				visibility: "visible",
+				data: context.state
+			}
+		};
+		/** Select the sole reply anchor that should own the live current-State card. */
+		function latestStateDisplayAnchorKey(chat) {
+			const order = chat?.order;
+			const nodes = chat?.nodes;
+			if (!Array.isArray(order) || typeof nodes?.get !== "function") return void 0;
+			const cached = latestAnchorCache.get(order);
+			if (cached?.nodes === nodes) return cached.key;
+			let anchors = [];
+			for (const key of order) {
+				const node = nodes.get(key);
+				if (node?.kind === "rp-state-display-anchor") {
+					anchors.push(node);
+					continue;
+				}
+				if (node?.kind !== "rp-state-display-retraction") continue;
+				anchors = anchors.filter((anchor) => !retractionRemovesAnchor(node.data, anchor.data));
+			}
+			const key = anchors.at(-1)?.key;
+			latestAnchorCache.set(order, {
+				nodes,
+				key
+			});
+			return key;
 		}
-		async function quickReplyRequest(connection, endpoint, payload = {}) {
-			const response = await connection.rpc.call(QUICK_REPLIES_RPC_PATH, endpoint, payload);
-			const domain = response?.ok === true && response.value?.ok !== void 0 ? response.value : response;
-			if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? "快捷回复请求失败"), { code: domain?.error?.code });
-			return domain.value;
+		function retractionRemovesAnchor(retraction, anchor) {
+			if (retraction?.removedTurns?.includes(anchor?.turn)) return true;
+			if (!Number.isSafeInteger(retraction?.replacementStart) || !Number.isSafeInteger(retraction?.seq) || !Number.isSafeInteger(anchor?.assistantSeq)) return false;
+			return anchor.assistantSeq >= retraction.replacementStart && anchor.assistantSeq < retraction.seq;
+		}
+		/** Schema-first object ordering, with unknown runtime keys retained afterwards. */
+		function orderedStateEntries(value, schema) {
+			if (Array.isArray(value)) return value.map((item, index) => [String(index), item]);
+			if (!isComplexStateValue(value)) return [];
+			const entries = Object.entries(value);
+			const schemaKeys = Object.keys(schema?.properties ?? {});
+			if (schemaKeys.length === 0) return entries;
+			const ordered = schemaKeys.filter((key) => Object.hasOwn(value, key)).map((key) => [key, value[key]]);
+			const known = new Set(schemaKeys);
+			return ordered.concat(entries.filter(([key]) => !known.has(key)));
+		}
+		function stateFieldSchema(schema, key, array = false) {
+			return array ? schema?.items : schema?.properties?.[key];
+		}
+		function stateFieldLabel(key, schema, array = false) {
+			if (array) return `第 ${Number(key) + 1} 项`;
+			return typeof schema?.title === "string" && schema.title.trim().length > 0 ? schema.title : key;
+		}
+		function stateNamespaceTitle(id, snapshot) {
+			if (typeof snapshot?.definition?.title === "string" && snapshot.definition.title.trim().length > 0) return snapshot.definition.title;
+			const known = {
+				variables: "故事变量",
+				world: "世界状态",
+				relationship: "关系状态"
+			};
+			if (known[id] !== void 0) return known[id];
+			return (String(id).split(/[./:]/u).filter(Boolean).at(-1) ?? String(id)).replaceAll(/[-_]+/gu, " ").replace(/^./u, (character) => character.toLocaleUpperCase());
+		}
+		function countStateLeaves(value) {
+			if (!isComplexStateValue(value)) return 1;
+			return orderedStateEntries(value).reduce((total, [, child]) => total + countStateLeaves(child), 0);
+		}
+		function countStateActivity(activity) {
+			return Object.values(activity?.namespaces ?? {}).reduce((total, changes) => total + (Array.isArray(changes) ? changes.length : 0), 0);
+		}
+		/** Resolve one leaf row's canonical before/after values from the latest reply activity. */
+		function stateActivityTransition(activity, namespace, path) {
+			if (activity?.available !== true || typeof path !== "string") return void 0;
+			const changes = Array.isArray(activity.namespaces?.[namespace]) ? activity.namespaces[namespace] : [];
+			const rowSegments = parseActivityPointer(path);
+			if (rowSegments === void 0) return void 0;
+			const candidates = changes.map((change) => ({
+				change,
+				segments: parseActivityPointer(change?.path)
+			})).filter((candidate) => candidate.segments !== void 0 && pointerStartsWith(rowSegments, candidate.segments)).sort((left, right) => right.segments.length - left.segments.length);
+			for (const candidate of candidates) {
+				const relative = rowSegments.slice(candidate.segments.length);
+				const before = activityDescendant(candidate.change.before, relative);
+				const after = activityDescendant(candidate.change.after, relative);
+				if (before === void 0 || after === void 0) continue;
+				if (relative.length > 0 && sameActivityValue(before, after)) continue;
+				return {
+					before,
+					after,
+					op: candidate.change.op,
+					path: candidate.change.path,
+					reason: candidate.change.reason
+				};
+			}
+		}
+		function parseActivityPointer(pointer) {
+			if (pointer === "") return [];
+			if (typeof pointer !== "string" || !pointer.startsWith("/")) return void 0;
+			return pointer.slice(1).split("/").map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"));
+		}
+		function pointerStartsWith(value, prefix) {
+			return prefix.length <= value.length && prefix.every((segment, index) => value[index] === segment);
+		}
+		function activityDescendant(snapshot, segments) {
+			if (snapshot === null || typeof snapshot !== "object" || typeof snapshot.exists !== "boolean") return void 0;
+			if (!snapshot.exists) return { exists: false };
+			let value = snapshot.value;
+			for (const segment of segments) {
+				if (value === null || typeof value !== "object" || !Object.hasOwn(value, segment)) return { exists: false };
+				value = value[segment];
+			}
+			return {
+				exists: true,
+				value
+			};
+		}
+		function sameActivityValue(left, right) {
+			if (left.exists !== right.exists) return false;
+			if (!left.exists) return true;
+			return JSON.stringify(left.value) === JSON.stringify(right.value);
+		}
+		function presentStatePrimitive(value) {
+			if (value === null || value === void 0) return {
+				text: "未设置",
+				kind: "empty",
+				empty: true,
+				long: false
+			};
+			if (value === "") return {
+				text: "空文本",
+				kind: "empty",
+				empty: true,
+				long: false
+			};
+			if (typeof value === "boolean") return {
+				text: value ? "是" : "否",
+				kind: "boolean",
+				empty: false,
+				long: false
+			};
+			if (typeof value === "number") return {
+				text: String(value),
+				kind: "number",
+				empty: false,
+				long: false
+			};
+			const text = String(value);
+			return {
+				text,
+				kind: "text",
+				empty: false,
+				long: [...text].length > 120 || text.split(/\r?\n/u).length > 3
+			};
+		}
+		function isComplexStateValue(value) {
+			return value !== null && typeof value === "object";
+		}
+		function escapeStatePointer(segment) {
+			return String(segment).replaceAll("~", "~0").replaceAll("/", "~1");
+		}
+		function displayableAssistant(message) {
+			const source = message?.source;
+			if (source?.rpMessageAction !== void 0) return false;
+			return source?.kind === "model" || source?.provider === "rp-session" && source?.model === "selected-opening";
+		}
+		function assistantText(message) {
+			return Array.isArray(message?.content) ? message.content.filter((block) => block?.type === "text" && typeof block.text === "string").map((block) => block.text).join("") : "";
+		}
+		function assistantCallsTool(message, name) {
+			return Array.isArray(message?.content) && message.content.some((block) => block?.type === "tool-call" && block.name === name);
+		}
+		function successfulCommitResult(_state, event) {
+			return event.surfaceOp === "append" && event.data?.meta?.kind === "rp-agent/turn-commit" && event.data?.message?.isError !== true;
+		}
+		function messageAction(event) {
+			if (event?.type !== "assistant/message" && event?.type !== "user/message") return void 0;
+			const action = (event.type === "assistant/message" ? event.data?.message?.source : event.data?.source)?.rpMessageAction;
+			if (action?.kind !== "rp-agent/message-action" || action.version !== 1 || ![
+				"edit",
+				"delete",
+				"reroll"
+			].includes(action.operation) || !Array.isArray(action.targets)) return void 0;
+			return action;
 		}
 		//#endregion
 		//#region src/client-styles.generated.js
 		const css = {
-			"applies": "rp-features-applies",
-			"core": "rp-features-core",
-			"coreCopy": "rp-features-coreCopy",
-			"coreIcon": "rp-features-coreIcon",
-			"corePluginDescription": "rp-features-corePluginDescription",
-			"corePluginHeader": "rp-features-corePluginHeader",
-			"coreTitle": "rp-features-coreTitle",
-			"coreVersions": "rp-features-coreVersions",
-			"dependencies": "rp-features-dependencies",
-			"failure": "rp-features-failure",
-			"feature": "rp-features-feature",
-			"featureCopy": "rp-features-featureCopy",
-			"featureList": "rp-features-featureList",
-			"featureMeta": "rp-features-featureMeta",
-			"featureSettings": "rp-features-featureSettings",
-			"featureTitle": "rp-features-featureTitle",
-			"featureVersion": "rp-features-featureVersion",
-			"header": "rp-features-header",
-			"identityCancel": "rp-features-identityCancel",
-			"identityDescription": "rp-features-identityDescription",
-			"identityEdit": "rp-features-identityEdit",
-			"identityEditor": "rp-features-identityEditor",
-			"identityEditorActions": "rp-features-identityEditorActions",
-			"identityError": "rp-features-identityError",
-			"identityField": "rp-features-identityField",
-			"identityHeader": "rp-features-identityHeader",
-			"identityMeta": "rp-features-identityMeta",
-			"identityPanel": "rp-features-identityPanel",
-			"identityPreview": "rp-features-identityPreview",
-			"identityReset": "rp-features-identityReset",
-			"identitySave": "rp-features-identitySave",
-			"identityTitle": "rp-features-identityTitle",
-			"liveNotice": "rp-features-liveNotice",
-			"page": "rp-features-page",
-			"panelIntro": "rp-features-panelIntro",
-			"promptDetail": "rp-features-promptDetail",
-			"promptEmpty": "rp-features-promptEmpty",
-			"promptKind": "rp-features-promptKind",
-			"promptLayer": "rp-features-promptLayer",
-			"promptLayerBody": "rp-features-promptLayerBody",
-			"promptLayerIndex": "rp-features-promptLayerIndex",
-			"promptLayerList": "rp-features-promptLayerList",
-			"promptLayerTitle": "rp-features-promptLayerTitle",
-			"promptNoTools": "rp-features-promptNoTools",
-			"promptNotes": "rp-features-promptNotes",
-			"promptOrderHeading": "rp-features-promptOrderHeading",
-			"promptProfile": "rp-features-promptProfile",
-			"promptProfileHeader": "rp-features-promptProfileHeader",
-			"promptRole": "rp-features-promptRole",
-			"promptRoleButton": "rp-features-promptRoleButton",
-			"promptRoleNav": "rp-features-promptRoleNav",
-			"promptRoute": "rp-features-promptRoute",
-			"promptScope": "rp-features-promptScope",
-			"promptScopeIcon": "rp-features-promptScopeIcon",
-			"promptSelect": "rp-features-promptSelect",
-			"promptToolBlock": "rp-features-promptToolBlock",
-			"promptTools": "rp-features-promptTools",
-			"promptWorkspace": "rp-features-promptWorkspace",
-			"quickAddButton": "rp-features-quickAddButton",
-			"quickContentField": "rp-features-quickContentField",
-			"quickDangerAction": "rp-features-quickDangerAction",
-			"quickDialog": "rp-features-quickDialog",
-			"quickDialogContent": "rp-features-quickDialogContent",
-			"quickEmpty": "rp-features-quickEmpty",
-			"quickError": "rp-features-quickError",
-			"quickFields": "rp-features-quickFields",
-			"quickFooter": "rp-features-quickFooter",
-			"quickLabelField": "rp-features-quickLabelField",
-			"quickLoadState": "rp-features-quickLoadState",
-			"quickManager": "rp-features-quickManager",
-			"quickManagerToolbar": "rp-features-quickManagerToolbar",
-			"quickNotice": "rp-features-quickNotice",
-			"quickOrder": "rp-features-quickOrder",
-			"quickReplyList": "rp-features-quickReplyList",
-			"quickReplyRow": "rp-features-quickReplyRow",
-			"quickResetButton": "rp-features-quickResetButton",
-			"quickRowAction": "rp-features-quickRowAction",
-			"quickRowActions": "rp-features-quickRowActions",
-			"section": "rp-features-section",
-			"sectionHeading": "rp-features-sectionHeading",
-			"skill": "rp-features-skill",
-			"skillCopy": "rp-features-skillCopy",
-			"skillList": "rp-features-skillList",
-			"skillMark": "rp-features-skillMark",
-			"skillMeta": "rp-features-skillMeta",
-			"skillScope": "rp-features-skillScope",
-			"skillVisibility": "rp-features-skillVisibility",
-			"state": "rp-features-state",
-			"switch": "rp-features-switch",
-			"tabIndicator": "rp-features-tabIndicator",
-			"tabPanel": "rp-features-tabPanel",
-			"tabs": "rp-features-tabs",
-			"versionState": "rp-features-versionState",
-			"versionSummary": "rp-features-versionSummary",
-			"versionWarning": "rp-features-versionWarning",
-			"visibility": "rp-features-visibility",
-			"visibilityBody": "rp-features-visibilityBody",
-			"visibilityIcon": "rp-features-visibilityIcon"
+			"bodyMotion": "rp-state-display-bodyMotion",
+			"breadcrumb": "rp-state-display-breadcrumb",
+			"breadcrumbCurrent": "rp-state-display-breadcrumbCurrent",
+			"breadcrumbSegment": "rp-state-display-breadcrumbSegment",
+			"breadcrumbSeparator": "rp-state-display-breadcrumbSeparator",
+			"card": "rp-state-display-card",
+			"cardBody": "rp-state-display-cardBody",
+			"cardHeader": "rp-state-display-cardHeader",
+			"changedSummary": "rp-state-display-changedSummary",
+			"chevron": "rp-state-display-chevron",
+			"emptyGroup": "rp-state-display-emptyGroup",
+			"groupChildren": "rp-state-display-groupChildren",
+			"groupHeader": "rp-state-display-groupHeader",
+			"headerIcon": "rp-state-display-headerIcon",
+			"headerMeta": "rp-state-display-headerMeta",
+			"headerTitle": "rp-state-display-headerTitle",
+			"hiddenMarker": "rp-state-display-hiddenMarker",
+			"namespace": "rp-state-display-namespace",
+			"namespaceHeader": "rp-state-display-namespaceHeader",
+			"namespaceTitle": "rp-state-display-namespaceTitle",
+			"srOnly": "rp-state-display-srOnly",
+			"transitionArrow": "rp-state-display-transitionArrow",
+			"transitionBefore": "rp-state-display-transitionBefore",
+			"transitionCurrent": "rp-state-display-transitionCurrent",
+			"transitionValue": "rp-state-display-transitionValue",
+			"updatedDot": "rp-state-display-updatedDot",
+			"valueClamped": "rp-state-display-valueClamped",
+			"valueColumn": "rp-state-display-valueColumn",
+			"valueToggle": "rp-state-display-valueToggle",
+			"variableGroup": "rp-state-display-variableGroup",
+			"variableName": "rp-state-display-variableName",
+			"variableNameLine": "rp-state-display-variableNameLine",
+			"variableRow": "rp-state-display-variableRow",
+			"variableTree": "rp-state-display-variableTree",
+			"variableValue": "rp-state-display-variableValue"
 		};
-		const STYLE_ID = "dsh-roleplay-rp-feature-manager-styles";
-		const STYLE_OWNER = "dsh-roleplay-rp-feature-manager";
-		const STYLE_TEXT = ".rp-features-page {\n  display: flex;\n  flex-direction: column;\n  gap: 18px;\n  width: 100%;\n  max-width: 820px;\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-header {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 24px;\n}\n\n.rp-features-header h2,\n.rp-features-header p,\n.rp-features-panelIntro h3,\n.rp-features-panelIntro p,\n.rp-features-sectionHeading h3,\n.rp-features-sectionHeading p,\n.rp-features-core h3,\n.rp-features-core p,\n.rp-features-feature p,\n.rp-features-applies,\n.rp-features-failure p {\n  margin: 0;\n}\n\n.rp-features-header h2 {\n  font-size: 18px;\n  line-height: 26px;\n  font-weight: 650;\n}\n\n.rp-features-header p {\n  max-width: 560px;\n  margin-top: 4px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-tabs {\n  display: flex;\n  gap: 24px;\n  border-bottom: 1px solid var(--dsw-alias-separator-primary);\n}\n\n.rp-features-tabs button {\n  position: relative;\n  min-height: 40px;\n  border: 0;\n  padding: 0 2px;\n  background: transparent;\n  color: var(--dsw-alias-label-tertiary);\n  cursor: pointer;\n  font: 13px/20px var(--dsw-font-family);\n}\n\n.rp-features-tabs button[aria-selected='true'] {\n  color: var(--dsw-alias-label-primary);\n  font-weight: 600;\n}\n\n.rp-features-tabs button:focus-visible {\n  border-radius: 4px;\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-tabIndicator {\n  position: absolute;\n  right: 0;\n  bottom: -1px;\n  left: 0;\n  height: 2px;\n  border-radius: 2px 2px 0 0;\n  background: var(--dsw-alias-label-primary);\n}\n\n.rp-features-tabPanel {\n  display: flex;\n  flex-direction: column;\n  gap: 18px;\n}\n\n.rp-features-panelIntro h3 {\n  font-size: 16px;\n  line-height: 24px;\n  font-weight: 650;\n}\n\n.rp-features-panelIntro p {\n  max-width: 620px;\n  margin-top: 3px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 19px;\n}\n\n.rp-features-versionSummary {\n  display: grid;\n  flex: none;\n  grid-template-columns: auto auto;\n  gap: 2px 12px;\n  border-radius: 8px;\n  padding: 8px 10px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-versionState {\n  grid-column: 1 / -1;\n  color: var(--dsw-alias-state-success-primary);\n  font-weight: 600;\n}\n\n.rp-features-versionSummary[data-compatible='false'] .rp-features-versionState {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-versionWarning {\n  border-radius: 8px;\n  padding: 10px 12px;\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 9%, transparent);\n  color: var(--dsw-alias-state-error-primary);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-applies {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-core {\n  display: grid;\n  grid-template-columns: 38px minmax(0, 1fr);\n  gap: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 14px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-coreIcon {\n  display: grid;\n  width: 38px;\n  height: 38px;\n  place-items: center;\n  border-radius: 9px;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-coreCopy {\n  min-width: 0;\n}\n\n.rp-features-coreTitle {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n}\n\n.rp-features-coreTitle h3 {\n  font-size: 14px;\n  line-height: 20px;\n}\n\n.rp-features-coreTitle > span {\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  color: var(--dsw-alias-state-success-primary);\n  font-size: 11px;\n  white-space: nowrap;\n}\n\n.rp-features-coreCopy > p {\n  margin-top: 3px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-coreVersions {\n  margin-top: 8px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n}\n\n.rp-features-coreVersions summary {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  cursor: pointer;\n}\n\n.rp-features-coreVersions summary:focus-visible {\n  border-radius: 4px;\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-coreVersions[open] summary svg {\n  transform: rotate(180deg);\n}\n\n.rp-features-coreVersions ul {\n  display: grid;\n  grid-template-columns: repeat(2, minmax(0, 1fr));\n  gap: 8px;\n  margin: 10px 0 0;\n  padding: 0;\n  list-style: none;\n}\n\n.rp-features-coreVersions li {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 4px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  padding: 10px 11px;\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-corePluginHeader {\n  display: flex;\n  min-width: 0;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 10px;\n}\n\n.rp-features-corePluginHeader strong {\n  min-width: 0;\n  overflow: hidden;\n  color: var(--dsw-alias-label-primary);\n  font-size: 12px;\n  line-height: 18px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-corePluginDescription {\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-coreVersions code,\n.rp-features-featureVersion,\n.rp-features-skillMeta code {\n  color: var(--dsw-alias-label-tertiary);\n  font-family: var(--ds-font-family-code);\n}\n\n.rp-features-coreVersions code {\n  flex: none;\n  font-size: 10px;\n  line-height: 16px;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-skillScope {\n  margin: -8px 0 0;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-visibility {\n  display: grid;\n  grid-template-columns: 38px minmax(0, 1fr);\n  gap: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 14px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-visibilityIcon,\n.rp-features-skillMark {\n  display: grid;\n  place-items: center;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-visibilityIcon {\n  width: 38px;\n  height: 38px;\n  border-radius: 9px;\n}\n\n.rp-features-visibilityBody h3 {\n  margin: 0;\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-visibilityBody dl {\n  display: grid;\n  gap: 4px;\n  margin: 7px 0 0;\n}\n\n.rp-features-visibilityBody dl > div {\n  display: grid;\n  grid-template-columns: 110px minmax(0, 1fr);\n  gap: 8px;\n}\n\n.rp-features-visibilityBody dt,\n.rp-features-visibilityBody dd {\n  margin: 0;\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-visibilityBody dt {\n  color: var(--dsw-alias-label-primary);\n  font-weight: 600;\n}\n\n.rp-features-visibilityBody dd {\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-skillList {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.rp-features-skill {\n  display: grid;\n  grid-template-columns: 32px minmax(0, 1fr) 38px;\n  align-items: start;\n  gap: 11px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 12px 13px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-skill[data-available='false'] {\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-skillMark {\n  width: 32px;\n  height: 32px;\n  border-radius: 8px;\n}\n\n.rp-features-skill[data-available='false'] .rp-features-skillMark {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-features-skillCopy {\n  min-width: 0;\n}\n\n.rp-features-skillCopy > p {\n  margin: 4px 0 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-skillMeta {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 3px 10px;\n  margin-top: 6px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-skillVisibility {\n  color: var(--dsw-alias-label-tertiary) !important;\n  font-size: 10px !important;\n  line-height: 16px !important;\n}\n\n.rp-features-section {\n  display: flex;\n  flex-direction: column;\n  gap: 9px;\n}\n\n.rp-features-sectionHeading {\n  padding: 0 2px;\n}\n\n.rp-features-sectionHeading h3 {\n  font-size: 13px;\n  line-height: 20px;\n  font-weight: 650;\n}\n\n.rp-features-sectionHeading p {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-featureList {\n  display: grid;\n  grid-template-columns: repeat(2, minmax(0, 1fr));\n  gap: 8px;\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.rp-features-feature {\n  position: relative;\n  display: flex;\n  min-width: 0;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 14px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 12px 13px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-featureCopy {\n  min-width: 0;\n}\n\n.rp-features-featureTitle {\n  display: flex;\n  align-items: center;\n  gap: 7px;\n}\n\n.rp-features-featureTitle strong {\n  min-width: 0;\n  overflow: hidden;\n  font-size: 13px;\n  line-height: 19px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-featureTitle span {\n  flex: none;\n  border-radius: 5px;\n  padding: 1px 5px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-featureTitle span[data-enabled='true'] {\n  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 9%, transparent);\n  color: var(--dsw-alias-state-success-primary);\n}\n\n.rp-features-feature p {\n  margin-top: 4px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-dependencies {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 2px 9px;\n  margin-top: 5px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-featureVersion {\n  display: block;\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-featureMeta {\n  display: flex;\n  min-height: 26px;\n  align-items: center;\n  gap: 10px;\n  margin-top: 5px;\n}\n\n.rp-features-featureSettings {\n  position: absolute;\n  right: 13px;\n  bottom: 12px;\n  display: inline-flex;\n  width: 26px;\n  height: 26px;\n  align-items: center;\n  justify-content: center;\n  flex: none;\n  border: 0;\n  border-radius: 7px;\n  padding: 0;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n}\n\n.rp-features-featureSettings:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-featureSettings:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-featureSettings:disabled {\n  color: var(--dsw-alias-label-tertiary);\n  cursor: default;\n  opacity: .72;\n}\n\n.rp-features-quickDialog {\n  width: min(760px, calc(100vw - 32px));\n  max-height: min(760px, calc(100dvh - 32px));\n}\n\n.rp-features-quickDialogContent {\n  min-height: 0;\n}\n\n.rp-features-quickLoadState {\n  display: flex;\n  min-height: 150px;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 10px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-quickLoadState p {\n  margin: 0;\n}\n\n.rp-features-quickLoadState button {\n  min-height: 30px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  padding: 0 10px;\n  background: transparent;\n  color: var(--dsw-alias-label-primary);\n  cursor: pointer;\n  font: 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-quickManager {\n  display: flex;\n  min-height: 0;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.rp-features-quickManagerToolbar {\n  display: flex;\n  min-height: 36px;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n}\n\n.rp-features-quickAddButton {\n  display: inline-flex;\n  min-height: 34px;\n  flex: none;\n  align-items: center;\n  justify-content: center;\n  gap: 6px;\n  padding: 0 11px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 9px;\n  background: transparent;\n  color: var(--dsw-alias-label-primary);\n  cursor: pointer;\n  font: 600 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-quickAddButton:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n\n.rp-features-quickAddButton:disabled {\n  cursor: not-allowed;\n  opacity: .45;\n}\n\n.rp-features-quickNotice,\n.rp-features-quickError {\n  padding: 9px 11px;\n  border-radius: 9px;\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-quickNotice {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-quickError {\n  background: var(--dsw-alias-state-error-tertiary);\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-quickReplyList {\n  display: flex;\n  max-height: min(500px, 55dvh);\n  min-height: 0;\n  flex-direction: column;\n  gap: 9px;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n  margin: 0;\n  padding: 1px 3px 3px 1px;\n  list-style: none;\n}\n\n.rp-features-quickReplyRow {\n  display: grid;\n  grid-template-columns: 28px minmax(0, 1fr) auto;\n  align-items: start;\n  gap: 10px;\n  padding: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 12px;\n  background: var(--dsw-alias-bg-layer-1);\n}\n\n.rp-features-quickOrder {\n  display: inline-flex;\n  width: 26px;\n  height: 26px;\n  align-items: center;\n  justify-content: center;\n  margin-top: 20px;\n  border-radius: 8px;\n  background: var(--dsw-specific-tip);\n  color: var(--dsw-alias-state-business-primary);\n  font-size: 11px;\n  font-weight: 650;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-quickFields {\n  display: grid;\n  min-width: 0;\n  grid-template-columns: minmax(120px, .38fr) minmax(0, 1fr);\n  gap: 10px;\n}\n\n.rp-features-quickLabelField,\n.rp-features-quickContentField {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 5px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.rp-features-quickLabelField > span,\n.rp-features-quickContentField > span {\n  display: flex;\n  justify-content: space-between;\n  gap: 8px;\n}\n\n.rp-features-quickLabelField small,\n.rp-features-quickContentField small {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  font-weight: 400;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-quickLabelField input,\n.rp-features-quickContentField textarea {\n  width: 100%;\n  box-sizing: border-box;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 9px;\n  outline: none;\n  background: var(--dsw-alias-bg-layer-2);\n  color: var(--dsw-alias-label-primary);\n  font: 13px/20px var(--dsw-font-family);\n}\n\n.rp-features-quickLabelField input {\n  min-height: 38px;\n  padding: 8px 9px;\n}\n\n.rp-features-quickContentField textarea {\n  min-height: 58px;\n  resize: vertical;\n  padding: 7px 9px;\n}\n\n.rp-features-quickLabelField input:focus,\n.rp-features-quickContentField textarea:focus {\n  border-color: var(--dsw-alias-state-business-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);\n}\n\n.rp-features-quickRowActions {\n  display: grid;\n  grid-template-columns: repeat(3, 30px);\n  gap: 5px;\n  padding-top: 18px;\n}\n\n.rp-features-quickRowAction,\n.rp-features-quickDangerAction {\n  display: inline-flex;\n  width: 30px;\n  height: 30px;\n  align-items: center;\n  justify-content: center;\n  padding: 0;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n}\n\n.rp-features-quickRowAction:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-quickDangerAction:hover:not(:disabled) {\n  background: var(--dsw-alias-state-error-tertiary);\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-quickRowAction:disabled,\n.rp-features-quickDangerAction:disabled {\n  cursor: default;\n  opacity: .3;\n}\n\n.rp-features-quickEmpty {\n  display: flex;\n  min-height: 180px;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 5px;\n  color: var(--dsw-alias-label-tertiary);\n  text-align: center;\n  font-size: 12px;\n}\n\n.rp-features-quickEmpty strong {\n  color: var(--dsw-alias-label-primary);\n  font-size: 15px;\n}\n\n.rp-features-quickFooter {\n  display: flex;\n  width: 100%;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n}\n\n.rp-features-quickFooter > span {\n  display: flex;\n  gap: 8px;\n}\n\n.rp-features-quickResetButton {\n  min-height: 34px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n  font: 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-quickResetButton:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-quickResetButton:disabled {\n  cursor: not-allowed;\n  opacity: .45;\n}\n\n.rp-features-quickAddButton:focus-visible,\n.rp-features-quickRowAction:focus-visible,\n.rp-features-quickDangerAction:focus-visible,\n.rp-features-quickResetButton:focus-visible,\n.rp-features-quickLoadState button:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-switch {\n  position: relative;\n  width: 38px;\n  height: 22px;\n  flex: none;\n  border: 0;\n  border-radius: 999px;\n  padding: 0;\n  background: var(--dsw-alias-border-l1);\n  cursor: pointer;\n}\n\n.rp-features-switch[aria-checked='true'] {\n  background: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-switch:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-switch:disabled {\n  cursor: not-allowed;\n  opacity: 0.55;\n}\n\n.rp-features-switch span {\n  position: absolute;\n  top: 2px;\n  left: 0;\n  width: 18px;\n  height: 18px;\n  border-radius: 50%;\n  background: white;\n  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);\n}\n\n.rp-features-promptScope {\n  display: grid;\n  grid-template-columns: 38px minmax(0, 1fr);\n  gap: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 13px 14px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-promptScope p {\n  align-self: center;\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-features-promptScopeIcon {\n  display: grid;\n  width: 38px;\n  height: 38px;\n  place-items: center;\n  border-radius: 9px;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-identityPanel {\n  display: flex;\n  flex-direction: column;\n  gap: 9px;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 24%, var(--dsw-alias-border-l2));\n  border-radius: 10px;\n  padding: 13px 14px;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 5%, var(--dsw-alias-bg-layer-3));\n}\n\n.rp-features-identityHeader {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 14px;\n}\n\n.rp-features-identityTitle {\n  display: flex;\n  min-width: 0;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 7px;\n}\n\n.rp-features-identityTitle > div {\n  display: flex;\n  min-width: 0;\n  align-items: baseline;\n  gap: 7px;\n}\n\n.rp-features-identityTitle h4 {\n  margin: 0;\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-identityTitle code {\n  color: var(--dsw-alias-label-tertiary);\n  font: 9px/14px var(--ds-font-family-code);\n}\n\n.rp-features-identityTitle > span {\n  border-radius: 5px;\n  padding: 1px 5px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 14px;\n}\n\n.rp-features-identityTitle > span[data-customized='true'] {\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-identityDescription {\n  max-width: 660px;\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-features-identityEdit,\n.rp-features-identityReset,\n.rp-features-identityCancel,\n.rp-features-identitySave {\n  display: inline-flex;\n  min-height: 30px;\n  align-items: center;\n  justify-content: center;\n  gap: 5px;\n  border-radius: 7px;\n  padding: 5px 10px;\n  cursor: pointer;\n  font: 11px/18px var(--dsw-font-family);\n}\n\n.rp-features-identityEdit,\n.rp-features-identityReset,\n.rp-features-identityCancel {\n  border: 1px solid var(--dsw-alias-border-l2);\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-identitySave {\n  border: 1px solid var(--dsw-alias-state-business-primary);\n  background: var(--dsw-alias-state-business-primary);\n  color: white;\n}\n\n.rp-features-identityEdit:disabled,\n.rp-features-identityReset:disabled,\n.rp-features-identityCancel:disabled,\n.rp-features-identitySave:disabled {\n  cursor: not-allowed;\n  opacity: 0.5;\n}\n\n.rp-features-identityPreview {\n  border-radius: 8px;\n  padding: 9px 11px;\n  background: var(--dsw-alias-markdown-code-block);\n}\n\n.rp-features-identityPreview pre {\n  max-height: 140px;\n  overflow: auto;\n  margin: 0;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n}\n\n.rp-features-identityPreview code {\n  color: var(--dsw-alias-label-secondary);\n  font: 10px/17px var(--ds-font-family-code);\n}\n\n.rp-features-identityEditor {\n  display: flex;\n  flex-direction: column;\n  gap: 7px;\n}\n\n.rp-features-identityField {\n  display: flex;\n  flex-direction: column;\n  gap: 5px;\n  color: var(--dsw-alias-label-primary);\n  font-size: 11px;\n  line-height: 17px;\n  font-weight: 600;\n}\n\n.rp-features-identityField textarea {\n  width: 100%;\n  min-height: 108px;\n  resize: vertical;\n  box-sizing: border-box;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  padding: 9px 10px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-primary);\n  font: 11px/18px var(--ds-font-family-code);\n}\n\n.rp-features-identityMeta {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 15px;\n}\n\n.rp-features-identityMeta > span:first-child {\n  max-width: 570px;\n}\n\n.rp-features-identityMeta > span:last-child {\n  flex: none;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-identityMeta > span[data-invalid='true'],\n.rp-features-identityError {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-identityError {\n  min-height: 15px;\n  font-size: 9px;\n  line-height: 15px;\n}\n\n.rp-features-identityEditorActions {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n}\n\n.rp-features-identityEditorActions > span:last-child {\n  display: flex;\n  gap: 7px;\n}\n\n.rp-features-promptWorkspace {\n  display: grid;\n  grid-template-columns: 164px minmax(0, 1fr);\n  align-items: start;\n  gap: 16px;\n}\n\n.rp-features-promptRoleNav {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.rp-features-promptRoleButton {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 1px;\n  border: 1px solid transparent;\n  border-radius: 8px;\n  padding: 9px 10px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  text-align: left;\n  cursor: pointer;\n}\n\n.rp-features-promptRoleButton strong {\n  font: 600 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-promptRoleButton span {\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n  font: 10px/16px var(--dsw-font-family);\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-promptRoleButton:hover {\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-promptRoleButton[data-selected='true'] {\n  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 24%, var(--dsw-alias-border-l2));\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-promptRoleButton:focus-visible,\n.rp-features-promptLayer summary:focus-visible,\n.rp-features-promptSelect select:focus-visible,\n.rp-features-identityEdit:focus-visible,\n.rp-features-identityReset:focus-visible,\n.rp-features-identityCancel:focus-visible,\n.rp-features-identitySave:focus-visible,\n.rp-features-identityField textarea:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-promptDetail,\n.rp-features-promptProfile,\n.rp-features-promptProfileHeader > div:first-child {\n  min-width: 0;\n}\n\n.rp-features-promptSelect {\n  display: grid;\n  grid-template-columns: auto minmax(0, 220px);\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  margin-bottom: 12px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-promptSelect select {\n  min-width: 0;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 7px;\n  padding: 6px 28px 6px 9px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-primary);\n  font: 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-promptEmpty {\n  border: 1px dashed var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 28px 24px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 19px;\n  text-align: center;\n}\n\n.rp-features-promptProfile {\n  display: flex;\n  flex-direction: column;\n  gap: 11px;\n}\n\n.rp-features-promptProfileHeader {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 16px;\n}\n\n.rp-features-promptProfileHeader h4,\n.rp-features-promptProfileHeader p {\n  margin: 0;\n}\n\n.rp-features-promptProfileHeader h4 {\n  font-size: 14px;\n  line-height: 21px;\n}\n\n.rp-features-promptProfileHeader p {\n  margin-top: 2px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-promptRoute {\n  display: flex;\n  flex: none;\n  align-items: center;\n  gap: 6px;\n  border-radius: 6px;\n  padding: 4px 7px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 16px;\n}\n\n.rp-features-promptRoute strong {\n  color: var(--dsw-alias-label-secondary);\n  font-weight: 600;\n}\n\n.rp-features-promptNotes {\n  display: grid;\n  gap: 3px;\n  margin: 0;\n  padding: 9px 12px 9px 26px;\n  border-left: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent);\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 5%, transparent);\n  color: var(--dsw-alias-label-secondary);\n  font-size: 10px;\n  line-height: 16px;\n}\n\n.rp-features-promptOrderHeading {\n  color: var(--dsw-alias-label-primary);\n  font-size: 11px;\n  line-height: 17px;\n  font-weight: 650;\n}\n\n.rp-features-promptLayerList {\n  overflow: hidden;\n  margin: -3px 0 0;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 0;\n  background: var(--dsw-alias-bg-layer-3);\n  list-style: none;\n}\n\n.rp-features-promptLayerList > li:not(:last-child) {\n  border-bottom: 1px solid var(--dsw-alias-separator-primary);\n}\n\n.rp-features-promptLayer summary {\n  display: grid;\n  grid-template-columns: 22px minmax(130px, 1fr) auto auto 12px;\n  align-items: center;\n  gap: 8px;\n  padding: 10px 11px;\n  cursor: pointer;\n  list-style: none;\n}\n\n.rp-features-promptLayer summary::-webkit-details-marker {\n  display: none;\n}\n\n.rp-features-promptLayer summary > svg {\n  color: var(--dsw-alias-label-tertiary);\n  transition: transform 140ms ease;\n}\n\n.rp-features-promptLayer[open] summary > svg {\n  transform: rotate(180deg);\n}\n\n.rp-features-promptLayerIndex {\n  display: grid;\n  width: 20px;\n  height: 20px;\n  place-items: center;\n  border-radius: 50%;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-promptLayerTitle {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n}\n\n.rp-features-promptLayerTitle strong {\n  overflow: hidden;\n  font-size: 11px;\n  line-height: 17px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-promptLayerTitle small {\n  display: flex;\n  min-width: 0;\n  overflow: hidden;\n  align-items: center;\n  gap: 5px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 14px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-promptLayerTitle small span {\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n\n.rp-features-promptLayerTitle small code {\n  flex: none;\n  color: inherit;\n  font: inherit;\n}\n\n.rp-features-promptRole,\n.rp-features-promptKind {\n  border-radius: 5px;\n  padding: 2px 6px;\n  font-size: 9px;\n  line-height: 14px;\n  white-space: nowrap;\n}\n\n.rp-features-promptRole {\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n  font-family: var(--ds-font-family-code);\n}\n\n.rp-features-promptRole[data-role='user'] {\n  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 9%, transparent);\n  color: var(--dsw-alias-state-success-primary);\n}\n\n.rp-features-promptRole[data-role='tools'] {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-promptKind {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-features-promptLayerBody {\n  border-top: 1px solid var(--dsw-alias-separator-primary);\n  padding: 10px 12px 12px 41px;\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-promptLayerBody p {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 10px;\n  line-height: 17px;\n}\n\n.rp-features-promptLayerBody pre {\n  max-height: 360px;\n  overflow: auto;\n  margin: 0;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n}\n\n.rp-features-promptLayerBody pre code {\n  color: var(--dsw-alias-label-secondary);\n  font: 10px/17px var(--ds-font-family-code);\n}\n\n.rp-features-promptToolBlock {\n  display: grid;\n  gap: 6px;\n  margin-top: 9px;\n}\n\n.rp-features-promptToolBlock > span,\n.rp-features-promptNoTools {\n  color: var(--dsw-alias-label-tertiary) !important;\n  font-size: 9px !important;\n  line-height: 14px !important;\n}\n\n.rp-features-promptTools {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 5px;\n}\n\n.rp-features-promptTools code {\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 5px;\n  padding: 2px 6px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-secondary);\n  font: 9px/14px var(--ds-font-family-code);\n}\n\n.rp-features-state,\n.rp-features-failure {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-failure {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-failure button {\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 6px;\n  padding: 4px 10px;\n  background: transparent;\n  color: var(--dsw-alias-label-primary);\n  font: inherit;\n  cursor: pointer;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .rp-features-promptLayer summary > svg {\n    transition: none;\n  }\n}\n\n.rp-features-liveNotice {\n  min-height: 18px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n@media (max-width: 720px) {\n  .rp-features-header {\n    flex-direction: column;\n    gap: 12px;\n  }\n\n  .rp-features-versionSummary,\n  .rp-features-featureList {\n    width: 100%;\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .rp-features-coreVersions ul {\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .rp-features-visibilityBody dl > div {\n    grid-template-columns: minmax(0, 1fr);\n    gap: 0;\n  }\n\n  .rp-features-skill {\n    grid-template-columns: 32px minmax(0, 1fr) 38px;\n  }\n\n  .rp-features-promptWorkspace {\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .rp-features-promptRoleNav {\n    display: grid;\n    grid-template-columns: repeat(2, minmax(0, 1fr));\n  }\n\n  .rp-features-promptProfileHeader,\n  .rp-features-promptSelect {\n    grid-template-columns: minmax(0, 1fr);\n    flex-direction: column;\n    align-items: stretch;\n  }\n\n  .rp-features-identityHeader,\n  .rp-features-identityMeta,\n  .rp-features-identityEditorActions {\n    align-items: stretch;\n    flex-direction: column;\n  }\n\n  .rp-features-identityEdit {\n    align-self: flex-start;\n  }\n\n  .rp-features-identityEditorActions > span:last-child {\n    justify-content: flex-end;\n  }\n\n  .rp-features-promptLayer summary {\n    grid-template-columns: 22px minmax(0, 1fr) auto 12px;\n  }\n\n  .rp-features-promptKind {\n    display: none;\n  }\n\n  .rp-features-promptLayerBody {\n    padding-left: 12px;\n  }\n\n  .rp-features-quickDialog {\n    width: calc(100vw - 16px);\n    max-height: calc(100dvh - 16px);\n  }\n\n  .rp-features-quickManagerToolbar {\n    align-items: flex-start;\n    flex-direction: column;\n  }\n\n  .rp-features-quickFields {\n    grid-template-columns: 1fr;\n  }\n\n  .rp-features-quickReplyRow {\n    grid-template-columns: 24px minmax(0, 1fr);\n    padding: 10px;\n  }\n\n  .rp-features-quickOrder {\n    width: 24px;\n    height: 24px;\n    margin-top: 20px;\n  }\n\n  .rp-features-quickRowActions {\n    grid-column: 2;\n    grid-template-columns: repeat(3, 34px);\n    padding-top: 0;\n  }\n\n  .rp-features-quickRowAction,\n  .rp-features-quickDangerAction {\n    width: 34px;\n    height: 34px;\n  }\n\n  .rp-features-quickFooter {\n    align-items: stretch;\n    flex-direction: column-reverse;\n  }\n\n  .rp-features-quickFooter > span {\n    display: grid;\n    grid-template-columns: 1fr 1fr;\n  }\n\n  .rp-features-quickResetButton {\n    align-self: flex-start;\n  }\n}\n";
+		const STYLE_ID = "dsh-roleplay-rp-state-display-styles";
+		const STYLE_OWNER = "dsh-roleplay-rp-state-display";
+		const STYLE_TEXT = "[data-chat-flow-kind=\"rp-state-display-retraction\"],\n[data-chat-flow-kind=\"rp-state-display-anchor\"]:not(:has([data-rp-state-display-card])) {\n  display: none;\n}\n\n.rp-state-display-hiddenMarker { display: none; }\n\n.rp-state-display-srOnly {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n  clip: rect(0, 0, 0, 0);\n  clip-path: inset(50%);\n  white-space: nowrap;\n}\n\n.rp-state-display-card {\n  container-type: inline-size;\n  width: min(100%, 760px);\n  box-sizing: border-box;\n  overflow: hidden;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 84%, transparent);\n  border-radius: 12px;\n  color: var(--dsw-alias-label-primary);\n  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 98%, var(--dsw-specific-selector));\n  font-family: var(--dsw-font-family);\n}\n\n.rp-state-display-cardHeader {\n  display: grid;\n  width: 100%;\n  min-height: 48px;\n  box-sizing: border-box;\n  grid-template-columns: 28px minmax(0, 1fr) max-content 16px;\n  align-items: center;\n  gap: 9px;\n  padding: 7px 11px;\n  border: 0;\n  outline: none;\n  color: inherit;\n  background: transparent;\n  text-align: left;\n  cursor: pointer;\n  font-family: inherit;\n}\n\n.rp-state-display-cardHeader:hover { background: var(--dsw-alias-interactive-bg-hover); }\n.rp-state-display-cardHeader:focus-visible { box-shadow: inset 0 0 0 2px var(--dsw-alias-brand-primary); }\n\n.rp-state-display-headerIcon {\n  display: grid;\n  width: 28px;\n  height: 28px;\n  box-sizing: border-box;\n  place-items: center;\n  border-radius: 8px;\n  color: var(--dsw-alias-brand-primary);\n  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, var(--dsw-alias-bg-layer-2));\n}\n\n.rp-state-display-headerTitle,\n.rp-state-display-namespaceTitle,\n.rp-state-display-variableName {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n}\n\n.rp-state-display-headerTitle strong { font-size: 12px; line-height: 18px; font-weight: 620; }\n.rp-state-display-headerTitle small {\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: 9px;\n  line-height: 14px;\n}\n\n.rp-state-display-headerMeta,\n.rp-state-display-variableNameLine {\n  display: flex;\n  min-width: 0;\n  align-items: center;\n}\n\n.rp-state-display-headerMeta { justify-content: flex-end; }\n.rp-state-display-changedSummary {\n  display: inline-flex;\n  flex: none;\n  align-items: center;\n  justify-content: center;\n  padding: 1px 7px;\n  border-radius: 999px;\n  color: var(--dsw-alias-brand-primary);\n  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, transparent);\n  white-space: nowrap;\n  font-size: 9px;\n  line-height: 16px;\n}\n\n.rp-state-display-chevron {\n  display: grid;\n  width: 16px;\n  height: 16px;\n  place-items: center;\n  color: var(--dsw-alias-label-tertiary);\n  transform: rotate(-90deg);\n  transition: transform 160ms cubic-bezier(.2, 0, 0, 1);\n}\n\n.rp-state-display-chevron[data-expanded=\"true\"] { transform: rotate(0deg); }\n.rp-state-display-bodyMotion { overflow: hidden; }\n\n.rp-state-display-cardBody {\n  display: flex;\n  flex-direction: column;\n  padding: 0 12px 6px;\n  border-top: 1px solid color-mix(in srgb, var(--dsw-alias-separator-primary) 76%, transparent);\n}\n\n.rp-state-display-namespace {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  padding: 8px 0 4px;\n  border-top: 1px solid color-mix(in srgb, var(--dsw-alias-separator-primary) 64%, transparent);\n}\n\n.rp-state-display-namespace:first-child { border-top: 0; }\n.rp-state-display-namespaceHeader { display: flex; min-width: 0; align-items: center; padding: 0 2px 6px; }\n.rp-state-display-namespaceTitle strong { overflow-wrap: anywhere; font-size: 11px; line-height: 17px; font-weight: 620; }\n\n.rp-state-display-variableTree,\n.rp-state-display-groupChildren {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n}\n\n.rp-state-display-variableTree {\n  --rp-state-display-key-column: minmax(108px, 26%);\n  overflow: hidden;\n  border-block: 1px solid color-mix(in srgb, var(--dsw-alias-separator-primary) 72%, transparent);\n}\n\n.rp-state-display-variableRow {\n  display: grid;\n  min-width: 0;\n  grid-template-columns: var(--rp-state-display-key-column) minmax(0, 1fr);\n  align-items: start;\n  gap: 10px;\n  padding: 6px 8px;\n  border-top: 1px solid color-mix(in srgb, var(--dsw-alias-separator-primary) 60%, transparent);\n}\n\n.rp-state-display-variableTree > .rp-state-display-variableRow:first-child,\n.rp-state-display-groupChildren > .rp-state-display-variableRow:first-child { border-top: 0; }\n.rp-state-display-variableRow[data-updated=\"true\"] { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 2.5%, transparent); }\n\n.rp-state-display-variableName { position: relative; padding: 1px 0 0 10px; }\n.rp-state-display-variableName strong {\n  min-width: 0;\n  overflow-wrap: anywhere;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 10px;\n  line-height: 18px;\n  font-weight: 590;\n}\n\n.rp-state-display-updatedDot {\n  position: absolute;\n  top: 8px;\n  left: 2px;\n  width: 5px;\n  height: 5px;\n  border-radius: 50%;\n  background: var(--dsw-alias-brand-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, transparent);\n}\n\n.rp-state-display-valueColumn {\n  display: flex;\n  min-width: 0;\n  align-items: flex-start;\n  flex-direction: column;\n  gap: 2px;\n}\n\n.rp-state-display-variableValue {\n  display: block;\n  width: 100%;\n  box-sizing: border-box;\n  overflow-wrap: anywhere;\n  white-space: pre-wrap;\n  color: var(--dsw-alias-label-primary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-state-display-variableValue[data-kind=\"number\"] { font-variant-numeric: tabular-nums; font-weight: 590; }\n.rp-state-display-variableValue[data-kind=\"boolean\"] { width: auto; color: var(--dsw-alias-brand-primary); font-weight: 590; }\n.rp-state-display-variableValue[data-empty=\"true\"] { color: var(--dsw-alias-label-tertiary); font-style: italic; }\n.rp-state-display-valueClamped { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }\n\n.rp-state-display-transitionValue {\n  display: grid;\n  width: 100%;\n  min-width: 0;\n  grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr);\n  align-items: start;\n  gap: 4px;\n}\n\n.rp-state-display-transitionValue .rp-state-display-transitionBefore { color: var(--dsw-alias-label-tertiary); font-weight: 450; }\n.rp-state-display-transitionCurrent { color: var(--dsw-alias-label-primary); }\n.rp-state-display-transitionArrow {\n  color: var(--dsw-alias-label-tertiary);\n  text-align: center;\n  font-size: 10px;\n  line-height: 18px;\n}\n\n.rp-state-display-valueToggle {\n  padding: 0;\n  border: 0;\n  color: var(--dsw-alias-brand-primary);\n  background: transparent;\n  cursor: pointer;\n  font: 9px/14px var(--dsw-font-family);\n}\n\n.rp-state-display-valueToggle:hover { text-decoration: underline; }\n.rp-state-display-valueToggle:focus-visible { border-radius: 3px; outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }\n\n.rp-state-display-variableGroup {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  border-top: 1px solid color-mix(in srgb, var(--dsw-alias-separator-primary) 68%, transparent);\n}\n\n.rp-state-display-variableTree > .rp-state-display-variableGroup:first-child { border-top: 0; }\n.rp-state-display-groupHeader {\n  display: flex;\n  min-width: 0;\n  align-items: center;\n  padding: 5px 8px 5px 18px;\n  background: color-mix(in srgb, var(--dsw-specific-selector) 28%, transparent);\n}\n\n.rp-state-display-breadcrumb {\n  display: flex;\n  min-width: 0;\n  align-items: center;\n  gap: 6px;\n  overflow: hidden;\n  white-space: nowrap;\n  font-size: 10px;\n  line-height: 18px;\n}\n\n.rp-state-display-breadcrumbSegment,\n.rp-state-display-breadcrumbCurrent {\n  min-width: 0;\n  max-width: 180px;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n\n.rp-state-display-breadcrumbSegment { color: var(--dsw-alias-label-tertiary); font-weight: 540; }\n.rp-state-display-breadcrumbCurrent { color: var(--dsw-alias-label-primary); font-weight: 620; }\n.rp-state-display-breadcrumbSeparator { flex: none; color: var(--dsw-alias-label-tertiary); }\n\n.rp-state-display-emptyGroup {\n  padding: 6px 8px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 18px;\n}\n\n@container (max-width: 380px) {\n  .rp-state-display-cardHeader { grid-template-columns: 26px minmax(0, 1fr) 16px; gap: 8px; padding-inline: 9px; }\n  .rp-state-display-headerIcon { width: 26px; height: 26px; }\n  .rp-state-display-headerMeta { display: none; }\n  .rp-state-display-cardBody { padding-inline: 8px; }\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .rp-state-display-chevron { transition: none; }\n}\n";
 		function ensureStyles() {
 			document.getElementById(STYLE_ID)?.remove();
 			const style = document.createElement("style");
@@ -7456,1162 +7132,295 @@ get: (_target, key) => {
 			return () => style.remove();
 		}
 		//#endregion
-		//#region src/quick-reply-settings.js
-		const h$1 = react.default.createElement;
-		/** Roleplay Settings owns customization; the composer only inserts saved replies. */
-		function QuickReplyManager({ open, store, onClose }) {
-			const state = (0, react.useSyncExternalStore)(store.subscribe, store.getSnapshot);
-			(0, react.useEffect)(() => {
-				if (!open || state.phase !== "idle") return;
-				store.load().catch(() => {});
-			}, [
-				open,
-				state.phase,
-				store
-			]);
-			if (!open) return null;
-			if (!(state.phase === "ready" || state.phase === "saving")) {
-				const failed = state.phase === "error";
-				return h$1(_deepseek_ai_dsh_client_ui_primitives.Modal, {
-					open: true,
-					onClose,
-					title: "设置快捷回复",
-					closeLabel: "关闭快捷回复设置",
-					description: "前三项会显示在输入栏；更多项目会收进“更多快捷回复”菜单。",
-					className: css.quickDialog,
-					contentClassName: css.quickDialogContent
-				}, h$1("div", { className: css.quickLoadState }, h$1("p", { role: failed ? "alert" : "status" }, failed ? state.error : "正在读取快捷回复…"), failed ? h$1("button", {
-					type: "button",
-					onClick: () => {
-						store.load().catch(() => {});
-					}
-				}, "重新加载") : null));
-			}
-			return h$1(QuickReplyEditor, {
-				state,
-				store,
-				onClose
-			});
-		}
-		function QuickReplyEditor({ state, store, onClose }) {
-			const reduced = useReducedMotion();
-			const [draft, setDraft] = (0, react.useState)(() => state.replies.map((reply) => ({ ...reply })));
-			const [error, setError] = (0, react.useState)("");
-			const saving = state.phase === "saving";
-			const changed = JSON.stringify(draft) !== JSON.stringify(state.replies);
-			const totalCharacters = draft.reduce((total, reply) => total + characters(reply.content), 0);
-			const update = (id, field, value) => setDraft((current) => current.map((reply) => reply.id === id ? {
-				...reply,
-				[field]: value
-			} : reply));
-			const remove = (id) => setDraft((current) => current.filter((reply) => reply.id !== id));
-			const move = (index, direction) => setDraft((current) => moveReply(current, index, direction));
-			const add = () => {
-				if (draft.length >= state.limits.replies) return;
-				const used = new Set(draft.map((reply) => reply.label));
-				let ordinal = draft.length + 1;
-				while (used.has(`新回复 ${ordinal}`)) ordinal += 1;
-				setDraft((current) => [...current, {
-					id: createReplyId(),
-					label: `新回复 ${ordinal}`,
-					content: ""
-				}]);
-			};
-			const save = async (event) => {
-				event.preventDefault();
-				if (!state.writable || saving) return;
-				let normalized;
-				try {
-					normalized = normalizeQuickReplies(draft);
-				} catch (validationError) {
-					setError(validationMessage(validationError));
-					return;
-				}
-				try {
-					await store.replace(normalized);
-					onClose();
-				} catch (requestError) {
-					setError(friendlyQuickReplyRequestError(requestError, "save"));
-				}
-			};
-			const footer = h$1("div", { className: css.quickFooter }, h$1("button", {
-				type: "button",
-				className: css.quickResetButton,
-				disabled: saving,
-				onClick: () => {
-					setDraft(DEFAULT_QUICK_REPLIES.map((reply) => ({ ...reply })));
-					setError("");
-				}
-			}, "恢复默认"), h$1("span", null, h$1(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				variant: "outline",
-				disabled: saving,
-				onClick: onClose
-			}, "取消"), h$1(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				variant: "primary",
-				disabled: !state.writable || saving || !changed,
-				onClick: (event) => {
-					save(event);
-				}
-			}, saving ? "正在保存…" : "保存快捷回复")));
-			return h$1(_deepseek_ai_dsh_client_ui_primitives.Modal, {
-				open: true,
-				onClose: saving ? () => {} : onClose,
-				title: "设置快捷回复",
-				closeLabel: "关闭快捷回复设置",
-				description: "前三项会显示在输入栏；更多项目会收进“更多快捷回复”菜单。点击后只会插入草稿，不会立即发送。",
-				className: css.quickDialog,
-				contentClassName: css.quickDialogContent,
-				footer
-			}, h$1("form", {
-				className: css.quickManager,
-				onSubmit: (event) => {
-					save(event);
-				}
-			}, h$1("div", { className: css.quickManagerToolbar }, h$1("span", null, `${draft.length} / ${state.limits.replies} 项 · ${totalCharacters} / ${state.limits.totalCharacters} 字符`), h$1(m.button, {
-				type: "button",
-				className: css.quickAddButton,
-				disabled: saving || draft.length >= state.limits.replies,
-				whileTap: { scale: .98 },
-				onClick: add
-			}, h$1(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 15 }), "新增快捷回复")), !state.writable ? h$1("div", {
-				className: css.quickNotice,
-				role: "status"
-			}, "当前环境可以使用已有快捷回复，但不能保存修改。") : null, error.length > 0 ? h$1("div", {
-				className: css.quickError,
-				role: "alert"
-			}, error) : null, draft.length === 0 ? h$1("div", { className: css.quickEmpty }, h$1("strong", null, "还没有快捷回复"), h$1("span", null, "新增一项后，输入时就能一键插入常用内容。")) : h$1("ol", { className: css.quickReplyList }, h$1(AnimatePresence, { initial: false }, ...draft.map((reply, index) => h$1(ReplyEditorRow, {
-				key: reply.id,
-				reply,
-				index,
-				total: draft.length,
-				limits: state.limits,
-				saving,
-				reduced,
-				onUpdate: (field, value) => update(reply.id, field, value),
-				onMove: (direction) => move(index, direction),
-				onRemove: () => remove(reply.id)
-			}))))));
-		}
-		function ReplyEditorRow({ reply, index, total, limits, saving, reduced, onUpdate, onMove, onRemove }) {
-			return h$1(m.li, {
-				className: css.quickReplyRow,
-				layout: true,
-				initial: reduced ? false : {
-					opacity: 0,
-					y: 5
-				},
-				animate: {
-					opacity: 1,
-					y: 0
-				},
-				exit: reduced ? { opacity: 0 } : {
-					opacity: 0,
-					x: 12
-				},
-				transition: { duration: reduced ? 0 : .14 }
-			}, h$1("span", {
-				className: css.quickOrder,
-				"aria-hidden": true
-			}, index + 1), h$1("div", { className: css.quickFields }, h$1("label", { className: css.quickLabelField }, h$1("span", null, "按钮名称", h$1("small", null, `${characters(reply.label)} / ${limits.labelCharacters}`)), h$1("input", {
-				value: reply.label,
-				disabled: saving,
-				placeholder: "例如：继续",
-				"aria-label": `第 ${index + 1} 项按钮名称`,
-				onChange: (event) => onUpdate("label", event.target.value)
-			})), h$1("label", { className: css.quickContentField }, h$1("span", null, "插入内容", h$1("small", null, `${characters(reply.content)} / ${limits.contentCharacters}`)), h$1("textarea", {
-				rows: 2,
-				value: reply.content,
-				disabled: saving,
-				placeholder: "填写点击后插入输入框的完整内容",
-				"aria-label": `第 ${index + 1} 项插入内容`,
-				onChange: (event) => onUpdate("content", event.target.value)
-			}))), h$1("div", { className: css.quickRowActions }, h$1(ActionButton, {
-				label: "上移",
-				disabled: saving || index === 0,
-				onClick: () => onMove(-1)
-			}, h$1(_deepseek_ai_dsh_client_ui_primitives.IconChevronUpOutline14, { size: 14 })), h$1(ActionButton, {
-				label: "下移",
-				disabled: saving || index === total - 1,
-				onClick: () => onMove(1)
-			}, h$1(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 })), h$1(ActionButton, {
-				label: "删除",
-				danger: true,
-				disabled: saving,
-				onClick: onRemove
-			}, h$1(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, { size: 14 }))));
-		}
-		function ActionButton({ label, disabled, danger = false, onClick, children }) {
-			return h$1(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
-				label,
-				side: "top",
-				delayMs: 400,
-				disabled
-			}, h$1(m.button, {
-				type: "button",
-				className: danger ? css.quickDangerAction : css.quickRowAction,
-				disabled,
-				"aria-label": label,
-				whileTap: { scale: .94 },
-				onClick
-			}, children));
-		}
-		function moveReply(replies, index, direction) {
-			const target = index + direction;
-			if (index < 0 || index >= replies.length || target < 0 || target >= replies.length) return replies;
-			const next = [...replies];
-			[next[index], next[target]] = [next[target], next[index]];
-			return next;
-		}
-		function characters(value) {
-			return [...value].length;
-		}
-		function createReplyId() {
-			const uuid = globalThis.crypto?.randomUUID?.();
-			return uuid === void 0 ? `reply-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}` : `reply-${uuid}`;
-		}
-		function validationMessage(error) {
-			if (error?.code === "DUPLICATE_LABEL" || error?.code === "DUPLICATE_REPLY") return "每个快捷回复需要使用不同的名称。";
-			if (error?.code === "LIMIT_EXCEEDED") return "快捷回复数量或内容超过上限，请精简后再保存。";
-			return "请填写每项快捷回复的按钮名称和插入内容。";
-		}
-		//#endregion
 		//#region src/client.js
-		const inject = [
-			"slots",
-			"locale",
-			"connection",
-			"settingsScope"
-		];
+		const inject = ["slots", "conversationEvents"];
 		const h = react.default.createElement;
-		const NS = "settings.roleplayFeatures";
-		const TAB_IDS = Object.freeze([
-			"features",
-			"skills",
-			"prompts"
-		]);
-		const CATEGORY_COPY = {
-			materials: ["资料", "选择故事使用的共享资料类型。停用后资料文件和已有对话绑定仍会保留。"],
-			creation: ["创作能力", "管理会话变量、兼容转换和 Agent 写作增强。"],
-			conversation: ["对话体验", "控制消息区域中的附加交互与呈现。"]
-		};
-		const zh = {
-			nav: "Roleplay",
-			title: "Roleplay",
-			description: "管理 Roleplay 功能、Skills 与代理提示词。",
-			featuresTab: "功能",
-			skillsTab: "Skills",
-			promptsTab: "系统提示词",
-			featuresTitle: "Roleplay 功能",
-			featuresDescription: "这些功能已随 Roleplay 组合提供。启用只控制是否加载，不会改变已提供的代码，也不会删除资料。",
-			coreTitle: "核心运行时",
-			coreDescription: "回复运行、对话配置、名称宏和故事设置始终启用。",
-			alwaysEnabled: "始终启用",
-			enabled: "已启用",
-			disabled: "未启用",
-			enabling: "正在更新…",
-			loading: "正在读取 Roleplay 设置…",
-			loadError: "暂时无法读取 Roleplay 设置。",
-			retry: "重试",
-			compatible: "版本兼容",
-			incompatible: "版本不兼容",
-			versionProblem: "当前版本组合不兼容。请先对齐 Roleplay 与 DSH 版本，再调整功能或 Skills。",
-			roleplayVersion: "Roleplay",
-			dshVersion: "DSH",
-			versionDetails: "查看核心组件",
-			applies: "资料入口会立即调整；Roleplay 运行能力从下一次新建或重新打开对话开始生效。",
-			saveError: "启用状态没有保存，请稍后重试。",
-			quickRepliesConfigure: "设置快捷回复",
-			quickRepliesEnableFirst: "启用后设置",
-			skillsTitle: "Roleplay Skills",
-			skillsDescription: "逐项选择 Roleplay 插件向 Agent 提供的工作指南。停用 Skill 不会停用插件，也不会删除资料。",
-			skillsScope: "这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。",
-			visibilityTitle: "可见性预览",
-			parentAgent: "Agent 模式父代理",
-			parentAgentVisibility: "可以看到当前已启用的 Roleplay Skills。",
-			customSubagents: "自定义子代理",
-			customSubagentsVisibility: "仅当“子代理”功能已启用，且该子代理允许使用 Skills 时可见。",
-			writer: "Writer",
-			writerVisibility: "始终不可见。启用或停用“子代理”功能都不会改变 Writer。",
-			pluginDisabled: "插件未启用",
-			waitingForPlugin: "等待插件启用",
-			sourcePlugin: "来自",
-			visibleParent: "当前可见：Agent 模式父代理",
-			visibleSubagents: "、允许 Skills 的自定义子代理",
-			subagentsUnavailable: "；“子代理”功能当前未启用",
-			invisibleSkill: "当前不可见：此 Skill 未启用。",
-			invisiblePlugin: "当前不可见：请先在“功能”中启用对应插件。",
-			promptsTitle: "代理提示词",
-			promptsDescription: "查看主对话、Writer 与自定义子代理最终接收哪些指令，以及它们按什么顺序进入模型。",
-			promptsScope: "Harness 身份、源码位置和 Web 运行环境会从当前版本读取并分别展示；Roleplay 规则与实际运行共用同一套渲染器。当前对话、资料、Skills 和工具清单仍按每次请求生成，因此这里只展示模板或来源，不读取某次对话的私有内容。",
-			promptsLoading: "正在读取代理提示词…",
-			promptsLoadError: "暂时无法读取代理提示词。",
-			identityTitle: "Roleplay 统一身份",
-			identityDescription: "覆盖所有 Roleplay 预设中 Chat、Agent、Writer 和自定义子代理的 harness:identity；其他 Agent 预设继续使用 Harness 默认身份。",
-			identityDefault: "使用 Harness 默认值",
-			identityCustomized: "已自定义",
-			identityEdit: "编辑统一身份",
-			identityField: "统一身份 System 提示词",
-			identityHelper: "保存后，从下一次模型请求开始统一生效。Harness 源码位置和 Web 运行环境不会被修改。",
-			identityCharacters: "字符",
-			identityRequired: "统一身份不能为空。",
-			identityTooLong: "统一身份超过允许的最大长度。",
-			identityCancel: "取消",
-			identitySave: "保存统一身份",
-			identitySaving: "正在保存…",
-			identityReset: "恢复 Harness 默认值",
-			identitySaved: "已更新 Roleplay 统一身份；下一次模型请求开始使用。",
-			identityResetDone: "已恢复 Harness 默认身份。",
-			identitySaveError: "统一身份没有保存，请稍后重试。",
-			promptRoles: "选择代理",
-			parentChatPrompt: "Chat 父代理",
-			parentChatHint: "Writer 直接交付正文",
-			parentAgentPrompt: "Agent 父代理",
-			parentAgentHint: "规划并审阅正文",
-			writerPrompt: "Writer",
-			writerPromptHint: "只负责本轮正文",
-			customPrompt: "自定义子代理",
-			customPromptHint: "独立完成一个任务",
-			customPromptSelect: "选择自定义子代理",
-			noCustomPrompts: "当前没有可预览的自定义子代理。启用“子代理”功能并创建一个子代理后，这里会显示它的实际工作指令。",
-			promptOrder: "模型接收顺序",
-			modelRoute: "模型",
-			sessionModel: "当前对话模型",
-			inheritedModel: "继承父代理模型",
-			systemRole: "System",
-			userRole: "User",
-			toolsRole: "Tools",
-			exactPrompt: "完整内容",
-			templatePrompt: "动态模板",
-			dynamicPrompt: "运行时生成",
-			externalPrompt: "Harness 提供",
-			derivedPrompt: "按权限筛选",
-			promptSource: "来源",
-			externalPromptBody: "当前设置上下文无法展开这部分 Harness 内容；实际模型请求仍由 Harness 按运行配置生成。",
-			dynamicPromptBody: "从当前对话的消息与实时资料生成；预览不会读取或展示某次对话的内容。",
-			derivedPromptBody: "只保留这个代理在当前模式下真正可见、可调用的工具说明。",
-			noTools: "不向这个代理提供工具。",
-			promptTools: "可见工具",
-			promptLayerHarness: "Harness 身份",
-			promptLayerHarnessSource: "Harness 源码环境",
-			promptLayerWebSurface: "Web 运行环境",
-			promptLayerParentPersona: "Roleplay 通用规则",
-			promptLayerRuntime: "当前模式工作流",
-			promptLayerToolGuidance: "可用工具规则",
-			promptLayerConversation: "当前对话输入",
-			promptLayerWriterReady: "Roleplay 运行上下文",
-			promptLayerToolSchema: "工具清单",
-			promptLayerWriterPersona: "正文写作规则",
-			promptLayerWriterSlots: "Writer 写作材料",
-			promptLayerTaskPersona: "自定义工作指令",
-			promptLayerTaskCall: "本次独立任务",
-			sourceHarness: "Harness",
-			sourceHarnessBoot: "Harness App Boot",
-			sourceHarnessWeb: "Harness Web",
-			sourceParent: "Roleplay 通用模板",
-			sourceRuntime: "Roleplay 运行时",
-			sourceTools: "当前可用工具",
-			sourceConversation: "当前对话",
-			sourceSubagent: "自定义子代理设置",
-			noteChatRelay: "生成的正文会直接接入当前回复；之后只提交本轮效果。",
-			noteAgentRevision: "生成的正文作为初稿，可在提交前审阅和修改。",
-			noteFreshChild: "每次调用都使用独立上下文。",
-			notePersonaShadowed: "这里只注入本项写作或工作规则，不叠加主对话的 Roleplay 通用规则。",
-			noteRuntimeSkipped: "Chat／Agent 的模式工作流不会注入这里。",
-			noteNoTools: "Writer 不接收任何工具。",
-			noteExplicitInput: "只接收本次任务和明确传入的资料。"
-		};
-		const en = {
-			...zh,
-			nav: "Roleplay",
-			title: "Roleplay",
-			description: "Manage Roleplay features, Skills, and agent prompts.",
-			featuresTab: "Features",
-			skillsTab: "Skills",
-			promptsTab: "System prompts",
-			featuresTitle: "Roleplay features",
-			featuresDescription: "These features are already included. Enabling only controls loading; it never changes the provided code or deletes data.",
-			coreTitle: "Core runtime",
-			coreDescription: "Reply runtime, conversation configuration, name macros, and story setup stay enabled.",
-			alwaysEnabled: "Always enabled",
-			enabled: "Enabled",
-			disabled: "Not enabled",
-			enabling: "Updating…",
-			loading: "Reading Roleplay settings…",
-			loadError: "Roleplay settings are temporarily unavailable.",
-			retry: "Retry",
-			compatible: "Versions compatible",
-			incompatible: "Versions incompatible",
-			versionProblem: "This version set is incompatible. Align Roleplay and DSH versions before changing features or Skills.",
-			roleplayVersion: "Roleplay",
-			dshVersion: "DSH",
-			versionDetails: "View core components",
-			applies: "Material entries update immediately. Runtime changes apply to newly created or reopened conversations.",
-			saveError: "The enabled state was not saved. Try again.",
-			quickRepliesConfigure: "Configure quick replies",
-			quickRepliesEnableFirst: "Enable to configure",
-			skillsTitle: "Roleplay Skills",
-			skillsDescription: "Select the guides Roleplay plugins expose to agents. Disabling a Skill does not disable its plugin or delete data.",
-			skillsScope: "This page only manages Skills contributed by Roleplay plugins. Project and user Skills are unaffected.",
-			visibilityTitle: "Visibility preview",
-			parentAgent: "Agent-mode parent",
-			parentAgentVisibility: "Can see the currently enabled Roleplay Skills.",
-			customSubagents: "Custom subagents",
-			customSubagentsVisibility: "Visible only when Subagents is enabled and that subagent is allowed to use Skills.",
-			writer: "Writer",
-			writerVisibility: "Never visible. Enabling or disabling Subagents does not change Writer.",
-			pluginDisabled: "Plugin not enabled",
-			waitingForPlugin: "Waiting for plugin",
-			sourcePlugin: "From",
-			visibleParent: "Currently visible: Agent-mode parent",
-			visibleSubagents: ", custom subagents allowed to use Skills",
-			subagentsUnavailable: "; Subagents is not enabled",
-			invisibleSkill: "Currently hidden: this Skill is not enabled.",
-			invisiblePlugin: "Currently hidden: enable the matching plugin under Features first.",
-			promptsTitle: "Agent prompts",
-			promptsDescription: "See which instructions reach the main conversation, Writer, and each custom subagent, in model input order.",
-			promptsScope: "Harness identity, source-checkout context, and Web runtime context are read from the running version and shown separately. Roleplay rules share their renderers with the live runtime. Conversation content, materials, Skills, and tool schemas are generated per request, so private conversation content appears only as a labeled source or template.",
-			promptsLoading: "Reading agent prompts…",
-			promptsLoadError: "Agent prompts are temporarily unavailable.",
-			identityTitle: "Shared Roleplay identity",
-			identityDescription: "Overrides harness:identity for Chat, Agent, Writer, and custom subagents in every Roleplay preset. Other agent presets keep the Harness default.",
-			identityDefault: "Using Harness default",
-			identityCustomized: "Customized",
-			identityEdit: "Edit shared identity",
-			identityField: "Shared identity System prompt",
-			identityHelper: "After saving, every Roleplay agent uses it from the next model request. Harness source and Web runtime context are unchanged.",
-			identityCharacters: "characters",
-			identityRequired: "The shared identity cannot be empty.",
-			identityTooLong: "The shared identity exceeds the maximum length.",
-			identityCancel: "Cancel",
-			identitySave: "Save shared identity",
-			identitySaving: "Saving…",
-			identityReset: "Restore Harness default",
-			identitySaved: "The shared Roleplay identity is updated for the next model request.",
-			identityResetDone: "The Harness default identity is restored.",
-			identitySaveError: "The shared identity was not saved. Try again.",
-			promptRoles: "Choose an agent",
-			parentChatPrompt: "Chat parent",
-			parentChatHint: "Writer delivers prose directly",
-			parentAgentPrompt: "Agent parent",
-			parentAgentHint: "Plans and reviews prose",
-			writerPrompt: "Writer",
-			writerPromptHint: "Writes this turn only",
-			customPrompt: "Custom subagent",
-			customPromptHint: "Runs one isolated task",
-			customPromptSelect: "Choose a custom subagent",
-			noCustomPrompts: "No custom subagent is available to preview. Enable Subagents and create one to see its actual work instructions here.",
-			promptOrder: "Model input order",
-			modelRoute: "Model",
-			sessionModel: "Current conversation model",
-			inheritedModel: "Inherit parent model",
-			systemRole: "System",
-			userRole: "User",
-			toolsRole: "Tools",
-			exactPrompt: "Full content",
-			templatePrompt: "Dynamic template",
-			dynamicPrompt: "Generated at runtime",
-			externalPrompt: "Provided by Harness",
-			derivedPrompt: "Permission-filtered",
-			promptSource: "Source",
-			externalPromptBody: "This Harness content cannot be expanded from the current settings context; the actual model request is still generated by Harness.",
-			dynamicPromptBody: "Generated from live conversation messages and materials; this preview does not read or reveal a conversation.",
-			derivedPromptBody: "Only guidance for tools that this agent can actually see and call in the current mode is retained.",
-			noTools: "No tools are exposed to this agent.",
-			promptTools: "Visible tools",
-			promptLayerHarness: "Harness identity",
-			promptLayerHarnessSource: "Harness source context",
-			promptLayerWebSurface: "Web runtime context",
-			promptLayerParentPersona: "Shared Roleplay rules",
-			promptLayerRuntime: "Current mode workflow",
-			promptLayerToolGuidance: "Visible-tool guidance",
-			promptLayerConversation: "Conversation input",
-			promptLayerWriterReady: "Roleplay run context",
-			promptLayerToolSchema: "Tool schemas",
-			promptLayerWriterPersona: "Narrative writing rules",
-			promptLayerWriterSlots: "Writer material",
-			promptLayerTaskPersona: "Custom work instructions",
-			promptLayerTaskCall: "Isolated task input",
-			sourceHarness: "Harness",
-			sourceHarnessBoot: "Harness App Boot",
-			sourceHarnessWeb: "Harness Web",
-			sourceParent: "Shared Roleplay template",
-			sourceRuntime: "Roleplay runtime",
-			sourceTools: "Visible tools",
-			sourceConversation: "Current conversation",
-			sourceSubagent: "Custom subagent settings",
-			noteChatRelay: "Generated prose is inserted into the current reply; only this turn’s effects are committed afterward.",
-			noteAgentRevision: "Generated prose is a draft that can be reviewed and revised before commit.",
-			noteFreshChild: "Every call uses an isolated context.",
-			notePersonaShadowed: "Only these writing or work rules are injected; the main conversation’s shared Roleplay rules are not added.",
-			noteRuntimeSkipped: "Chat and Agent mode workflows are not injected here.",
-			noteNoTools: "Writer receives no tools.",
-			noteExplicitInput: "Only this task and its explicitly supplied material are visible."
+		const motionTransition = {
+			duration: .16,
+			ease: [
+				.2,
+				0,
+				0,
+				1
+			]
 		};
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
-			ctx.effect(() => ctx.locale.register(NS, {
-				zh,
-				en
-			}), "rp-feature-manager: dictionaries");
-			const scope = ctx.settingsScope.bind({ namespace: SETTINGS_NAMESPACE });
-			const t = ctx.locale.bind(NS);
-			ctx.slots.inject("settings.section", () => ctx.slots.register({
-				name: "settings.section",
-				id: "roleplay",
-				order: 25,
-				label: () => t("nav"),
-				locale: NS,
-				inject: () => ({
-					scope,
-					connection: ctx.connection
-				})
-			}, RoleplaySettingsSection));
+			ctx.conversationEvents.register(stateDisplayAnchorNodeDefinition);
+			ctx.conversationEvents.register(stateDisplayRetractionNodeDefinition);
+			ctx.slots.inject("conversation.chat.node", () => ctx.slots.register({
+				name: "conversation.chat.node",
+				key: STATE_DISPLAY_ANCHOR_KIND
+			}, StateDisplayAnchor));
+			ctx.slots.inject("conversation.chat.node", () => ctx.slots.register({
+				name: "conversation.chat.node",
+				key: STATE_DISPLAY_RETRACTION_KIND
+			}, StateDisplayRetraction));
 		}
-		function RoleplaySettingsSection({ scope, connection, t }) {
-			const reduced = useReducedMotion();
-			const settings = (0, react.useSyncExternalStore)((listener) => scope.subscribe(listener), () => scope.getSnapshot());
-			const [status, setStatus] = (0, react.useState)({ phase: "loading" });
-			const [activeTab, setActiveTab] = (0, react.useState)("features");
-			const [pending, setPending] = (0, react.useState)(null);
-			const [notice, setNotice] = (0, react.useState)("");
-			const [request, setRequest] = (0, react.useState)(0);
-			const [promptStatus, setPromptStatus] = (0, react.useState)({ phase: "idle" });
-			const [promptRequest, setPromptRequest] = (0, react.useState)(0);
-			const [quickReplyManagerOpen, setQuickReplyManagerOpen] = (0, react.useState)(false);
-			const quickReplyStore = (0, react.useMemo)(() => createQuickReplyStore(connection), [connection]);
-			(0, react.useEffect)(() => {
-				let live = true;
-				setStatus({ phase: "loading" });
-				featureStatus(connection).then((value) => {
-					if (live) setStatus({
-						phase: "ready",
-						value
-					});
-				}, () => {
-					if (live) setStatus({ phase: "error" });
-				});
-				return () => {
-					live = false;
-				};
-			}, [
-				connection,
-				request,
-				settings.revision
-			]);
-			(0, react.useEffect)(() => {
-				if (activeTab !== "prompts") return void 0;
-				let live = true;
-				setPromptStatus({ phase: "loading" });
-				promptPreview(connection).then((value) => {
-					if (live) setPromptStatus({
-						phase: "ready",
-						value
-					});
-				}, () => {
-					if (live) setPromptStatus({ phase: "error" });
-				});
-				return () => {
-					live = false;
-				};
-			}, [
-				activeTab,
-				connection,
-				promptRequest,
-				settings.revision
-			]);
-			const enabledFeatures = status.phase === "ready" && Array.isArray(status.value.enabledFeatures) ? status.value.enabledFeatures : [];
-			const enabledSkills = status.phase === "ready" && Array.isArray(status.value.enabledSkills) ? status.value.enabledSkills : [];
-			const enabled = (0, react.useMemo)(() => new Set(enabledFeatures), [enabledFeatures]);
-			const selectedSkills = (0, react.useMemo)(() => new Set(enabledSkills), [enabledSkills]);
-			const compatible = status.phase === "ready" && status.value.compatible === true;
-			const settingsRevision = status.phase === "ready" ? status.value.settings?.revision : null;
-			const canWrite = status.phase === "ready" && status.value.settings?.writable === true && Number.isSafeInteger(settingsRevision) && compatible && pending === null;
-			const toggleFeature = async (feature) => {
-				if (!canWrite) return;
-				const nextEnabled = !enabled.has(feature.id);
-				const plan = planFeatureToggle(enabledFeatures, feature.id, nextEnabled);
-				setPending(`feature:${feature.id}`);
-				setNotice("");
-				try {
-					const nextStatus = await setRoleplaySetting(connection, "enabledFeatures", plan.enabledFeatures, settingsRevision);
-					if (!sameSelection(nextStatus.enabledFeatures, plan.enabledFeatures)) throw new Error("Roleplay feature selection was not applied");
-					setStatus({
-						phase: "ready",
-						value: nextStatus
-					});
-					setNotice(toggleAnnouncement(feature, nextEnabled, plan.sideEffects));
-				} catch {
-					setNotice(t("saveError"));
-				} finally {
-					setPending(null);
-					setRequest((value) => value + 1);
-				}
-			};
-			const toggleSkill = async (skill) => {
-				if (!canWrite || !skill.featureEnabled) return;
-				const nextEnabled = !selectedSkills.has(skill.id);
-				const nextSkills = planSkillToggle(enabledSkills, skill.id, nextEnabled);
-				setPending(`skill:${skill.id}`);
-				setNotice("");
-				try {
-					const nextStatus = await setRoleplaySetting(connection, "enabledSkills", nextSkills, settingsRevision);
-					if (!sameSelection(nextStatus.enabledSkills, nextSkills)) throw new Error("Roleplay Skill selection was not applied");
-					setStatus({
-						phase: "ready",
-						value: nextStatus
-					});
-					setNotice(skillToggleAnnouncement(skill, nextEnabled));
-				} catch {
-					setNotice(t("saveError"));
-				} finally {
-					setPending(null);
-					setRequest((value) => value + 1);
-				}
-			};
-			const updateHarnessIdentity = async (value, reset = false) => {
-				if (!canWrite) return false;
-				const normalized = typeof value === "string" ? value.trim() : void 0;
-				setPending("harness-identity");
-				setNotice("");
-				try {
-					const nextStatus = reset ? await unsetRoleplaySetting(connection, "harnessIdentity", settingsRevision) : await setRoleplaySetting(connection, "harnessIdentity", normalized, settingsRevision);
-					setStatus({
-						phase: "ready",
-						value: nextStatus
-					});
-					const nextPreview = await promptPreview(connection);
-					if (reset) {
-						if (nextPreview.harnessIdentity?.customized !== false) throw new Error("Roleplay identity reset was not applied");
-					} else if (nextPreview.harnessIdentity?.value !== normalized || nextPreview.harnessIdentity?.customized !== true) throw new Error("Roleplay identity update was not applied");
-					setPromptStatus({
-						phase: "ready",
-						value: nextPreview
-					});
-					setNotice(t(reset ? "identityResetDone" : "identitySaved"));
-					return true;
-				} catch {
-					setNotice(t("identitySaveError"));
-					return false;
-				} finally {
-					setPending(null);
-				}
-			};
-			if (status.phase === "loading") return h("div", {
-				className: css.state,
-				role: "status"
-			}, t("loading"));
-			if (status.phase === "error") return h("div", { className: css.failure }, h("p", { role: "alert" }, t("loadError")), h("button", {
-				type: "button",
-				onClick: () => setRequest((value) => value + 1)
-			}, t("retry")));
-			const tabLabel = (id) => t({
-				features: "featuresTab",
-				skills: "skillsTab",
-				prompts: "promptsTab"
-			}[id]);
-			return h(MotionConfig, { reducedMotion: "user" }, h(LazyMotion, {
-				features: domAnimation,
-				strict: true
-			}, h("div", { className: css.page }, h("header", { className: css.header }, h("div", null, h("h2", null, t("title")), h("p", null, t("description"))), h(VersionSummary, {
-				status: status.value,
-				t
-			})), h("div", {
-				className: css.tabs,
-				role: "tablist",
-				"aria-label": t("title")
-			}, ...TAB_IDS.map((id) => h("button", {
-				key: id,
-				id: `rp-settings-tab-${id}`,
-				type: "button",
-				role: "tab",
-				"aria-selected": activeTab === id,
-				"aria-controls": `rp-settings-panel-${id}`,
-				tabIndex: activeTab === id ? 0 : -1,
-				onClick: () => setActiveTab(id),
-				onKeyDown: (event) => moveTabFocus(event, id, setActiveTab)
-			}, h("span", null, tabLabel(id)), activeTab === id ? h(m.span, {
-				className: css.tabIndicator,
-				layoutId: "rp-settings-tab-indicator"
-			}) : null))), compatible ? null : h("div", {
-				className: css.versionWarning,
-				role: "alert"
-			}, t("versionProblem")), h(AnimatePresence, {
-				mode: "wait",
-				initial: false
-			}, h(m.div, {
-				key: activeTab,
-				id: `rp-settings-panel-${activeTab}`,
-				className: css.tabPanel,
-				role: "tabpanel",
-				"aria-labelledby": `rp-settings-tab-${activeTab}`,
-				initial: reduced ? false : {
-					opacity: 0,
-					y: 4
-				},
-				animate: {
-					opacity: 1,
-					y: 0
-				},
-				exit: reduced ? { opacity: 1 } : {
-					opacity: 0,
-					y: -4
-				},
-				transition: { duration: reduced ? 0 : .16 }
-			}, activeTab === "features" ? h(FeaturesPanel, {
-				status: status.value,
-				enabled,
-				pending,
-				canWrite,
-				reduced,
-				onToggle: (feature) => {
-					toggleFeature(feature);
-				},
-				onConfigure: (feature) => {
-					if (feature.id === "quick-replies") setQuickReplyManagerOpen(true);
-				},
-				t
-			}) : activeTab === "skills" ? h(SkillsPanel, {
-				skills: status.value.skills,
-				subagentsEnabled: enabled.has("subagent-manager"),
-				pending,
-				canWrite,
-				reduced,
-				onToggle: (skill) => {
-					toggleSkill(skill);
-				},
-				t
-			}) : h(PromptsPanel, {
-				status: promptStatus,
-				reduced,
-				canWrite,
-				identitySaving: pending === "harness-identity",
-				onSaveIdentity: (value) => updateHarnessIdentity(value),
-				onResetIdentity: () => updateHarnessIdentity(void 0, true),
-				onRetry: () => setPromptRequest((value) => value + 1),
-				t
-			}))), h(QuickReplyManager, {
-				open: quickReplyManagerOpen,
-				store: quickReplyStore,
-				onClose: () => setQuickReplyManagerOpen(false)
-			}), h("div", {
-				className: css.liveNotice,
-				"aria-live": "polite"
-			}, notice))));
+		/** Render the live card only at the latest successful assistant reply. */
+		function StateDisplayAnchor({ node, sessionId, useSession, useSessions, useProjection }) {
+			const activeKey = useSession((snapshot) => latestStateDisplayAnchorKey(snapshot.chat));
+			if (!useSessions((state) => state.byId?.[sessionId]?.agentPreset === "roleplay" && state.byId?.[sessionId]?.origin !== "subagent") || activeKey !== node.key) return h(HiddenMarker);
+			return h(StateVariableCard, { useProjection });
 		}
-		function FeaturesPanel({ status, enabled, pending, canWrite, reduced, onToggle, onConfigure, t }) {
-			return h(react.default.Fragment, null, h("div", { className: css.panelIntro }, h("h3", null, t("featuresTitle")), h("p", null, t("featuresDescription"))), h("p", { className: css.applies }, t("applies")), h(CoreSummary, {
-				status,
-				t
-			}), ...groupedFeatures().map((group) => h("section", {
-				className: css.section,
-				key: group.category,
-				"aria-labelledby": `rp-features-${group.category}`
-			}, h("div", { className: css.sectionHeading }, h("h3", { id: `rp-features-${group.category}` }, CATEGORY_COPY[group.category][0]), h("p", null, CATEGORY_COPY[group.category][1])), h("ul", { className: css.featureList }, ...group.features.map((feature) => h(FeatureRow, {
-				key: feature.id,
-				feature,
-				checked: enabled.has(feature.id),
-				pending: pending === `feature:${feature.id}`,
-				disabled: !canWrite,
-				status: status.features.find((item) => item.id === feature.id),
-				reduced,
-				onToggle: () => onToggle(feature),
-				onConfigure: feature.id === "quick-replies" ? () => onConfigure(feature) : void 0,
-				t
-			}))))));
+		function StateDisplayRetraction() {
+			return h(HiddenMarker);
 		}
-		function SkillsPanel({ skills, subagentsEnabled, pending, canWrite, reduced, onToggle, t }) {
-			return h(react.default.Fragment, null, h("div", { className: css.panelIntro }, h("h3", null, t("skillsTitle")), h("p", null, t("skillsDescription"))), h("p", { className: css.skillScope }, t("skillsScope")), h("section", {
-				className: css.visibility,
-				"aria-labelledby": "rp-skills-visibility"
-			}, h("div", { className: css.visibilityIcon }, h(_deepseek_ai_dsh_client_ui_primitives.IconSkillOutline16, {
-				size: 18,
+		function HiddenMarker() {
+			return h("span", {
+				className: css.hiddenMarker,
+				hidden: true,
 				"aria-hidden": true
-			})), h("div", { className: css.visibilityBody }, h("h3", { id: "rp-skills-visibility" }, t("visibilityTitle")), h("dl", null, h("div", null, h("dt", null, t("parentAgent")), h("dd", null, t("parentAgentVisibility"))), h("div", null, h("dt", null, t("customSubagents")), h("dd", null, t("customSubagentsVisibility"))), h("div", null, h("dt", null, t("writer")), h("dd", null, t("writerVisibility")))))), h("ul", { className: css.skillList }, ...skills.map((skill) => h(SkillRow, {
-				key: skill.id,
-				skill,
-				subagentsEnabled,
-				pending: pending === `skill:${skill.id}`,
-				disabled: !canWrite || !skill.featureEnabled,
-				reduced,
-				onToggle: () => onToggle(skill),
-				t
-			}))));
+			});
 		}
-		function PromptsPanel({ status, reduced, canWrite, identitySaving, onSaveIdentity, onResetIdentity, onRetry, t }) {
-			const [selectedKind, setSelectedKind] = (0, react.useState)("parent-chat");
-			const [selectedTaskId, setSelectedTaskId] = (0, react.useState)("");
-			const preview = status.phase === "ready" ? status.value : void 0;
-			const taskProfiles = Array.isArray(preview?.taskSubagents) ? preview.taskSubagents : [];
-			(0, react.useEffect)(() => {
-				if (taskProfiles.length === 0) {
-					setSelectedTaskId("");
-					return;
-				}
-				if (!taskProfiles.some((profile) => profile.taskId === selectedTaskId)) setSelectedTaskId(taskProfiles[0].taskId);
-			}, [selectedTaskId, taskProfiles]);
-			const roles = [
-				{
-					id: "parent-chat",
-					label: t("parentChatPrompt"),
-					hint: t("parentChatHint")
-				},
-				{
-					id: "parent-agent",
-					label: t("parentAgentPrompt"),
-					hint: t("parentAgentHint")
-				},
-				{
-					id: "writer",
-					label: t("writerPrompt"),
-					hint: t("writerPromptHint")
-				},
-				{
-					id: "task-subagent",
-					label: t("customPrompt"),
-					hint: t("customPromptHint")
-				}
-			];
-			const selectedProfile = selectedKind === "task-subagent" ? taskProfiles.find((profile) => profile.taskId === selectedTaskId) : preview?.profiles?.find((profile) => profile.kind === selectedKind);
-			return h(react.default.Fragment, null, h("div", { className: css.panelIntro }, h("h3", null, t("promptsTitle")), h("p", null, t("promptsDescription"))), h("div", { className: css.promptScope }, h("div", { className: css.promptScopeIcon }, h(_deepseek_ai_dsh_client_ui_primitives.IconCodeOutline16, {
-				size: 18,
-				"aria-hidden": true
-			})), h("p", null, t("promptsScope"))), status.phase === "loading" || status.phase === "idle" ? h("div", {
-				className: css.state,
-				role: "status"
-			}, t("promptsLoading")) : status.phase === "error" ? h("div", { className: css.failure }, h("p", { role: "alert" }, t("promptsLoadError")), h("button", {
-				type: "button",
-				onClick: onRetry
-			}, t("retry"))) : h(react.default.Fragment, null, h(HarnessIdentitySetting, {
-				setting: preview.harnessIdentity,
-				canWrite,
-				saving: identitySaving,
-				reduced,
-				onSave: onSaveIdentity,
-				onReset: onResetIdentity,
-				t
-			}), h("div", { className: css.promptWorkspace }, h("nav", {
-				className: css.promptRoleNav,
-				"aria-label": t("promptRoles")
-			}, ...roles.map((role) => h("button", {
-				key: role.id,
-				type: "button",
-				className: css.promptRoleButton,
-				"data-selected": selectedKind === role.id ? "true" : "false",
-				"aria-pressed": selectedKind === role.id,
-				onClick: () => setSelectedKind(role.id)
-			}, h("strong", null, role.label), h("span", null, role.hint)))), h("section", {
-				className: css.promptDetail,
-				"aria-live": "polite"
-			}, selectedKind === "task-subagent" && taskProfiles.length === 0 ? h("div", { className: css.promptEmpty }, t("noCustomPrompts")) : h(react.default.Fragment, null, selectedKind === "task-subagent" ? h("label", { className: css.promptSelect }, h("span", null, t("customPromptSelect")), h("select", {
-				value: selectedTaskId,
-				onChange: (event) => setSelectedTaskId(event.target.value)
-			}, ...taskProfiles.map((profile) => h("option", {
-				key: profile.taskId,
-				value: profile.taskId
-			}, profile.label)))) : null, selectedProfile === void 0 ? null : h(PromptProfile, {
-				key: selectedProfile.id,
-				profile: selectedProfile,
-				reduced,
-				t
-			}))))));
-		}
-		function HarnessIdentitySetting({ setting, canWrite, saving, reduced, onSave, onReset, t }) {
-			const [editing, setEditing] = (0, react.useState)(false);
-			const [draft, setDraft] = (0, react.useState)(setting?.value ?? "");
-			const value = setting?.value ?? "";
-			const maximum = setting?.maxCharacters ?? 4e3;
-			const normalized = draft.trim();
-			const characters = [...normalized].length;
-			const invalid = normalized.length === 0 ? t("identityRequired") : characters > maximum ? t("identityTooLong") : "";
-			const changed = normalized !== value;
-			(0, react.useEffect)(() => {
-				if (!editing) setDraft(value);
-			}, [editing, value]);
-			const cancel = () => {
-				setDraft(value);
-				setEditing(false);
-			};
-			const save = async (event) => {
-				event.preventDefault();
-				if (!canWrite || saving || invalid.length > 0 || !changed) return;
-				if (await onSave(normalized)) setEditing(false);
-			};
-			const reset = async () => {
-				if (!canWrite || saving) return;
-				if (await onReset()) setEditing(false);
-			};
-			return h("section", {
-				className: css.identityPanel,
-				"aria-labelledby": "rp-prompts-identity-title"
-			}, h("header", { className: css.identityHeader }, h("div", { className: css.identityTitle }, h("div", null, h("h4", { id: "rp-prompts-identity-title" }, t("identityTitle")), h("code", null, setting?.sectionName ?? "harness:identity")), h("span", { "data-customized": setting?.customized === true ? "true" : "false" }, t(setting?.customized === true ? "identityCustomized" : "identityDefault"))), editing ? null : h("button", {
-				type: "button",
-				className: css.identityEdit,
-				disabled: !canWrite,
-				onClick: () => setEditing(true)
-			}, h(_deepseek_ai_dsh_client_ui_primitives.IconEditOutline16, {
-				size: 14,
-				"aria-hidden": true
-			}), t("identityEdit"))), h("p", { className: css.identityDescription }, t("identityDescription")), h(AnimatePresence, {
-				mode: "wait",
-				initial: false
-			}, editing ? h(m.form, {
-				key: "identity-editor",
-				className: css.identityEditor,
-				onSubmit: (event) => {
-					save(event);
-				},
-				initial: reduced ? false : {
-					opacity: 0,
-					y: 4
-				},
-				animate: {
-					opacity: 1,
-					y: 0
-				},
-				exit: reduced ? { opacity: 1 } : {
-					opacity: 0,
-					y: -4
-				},
-				transition: { duration: reduced ? 0 : .14 }
-			}, h("label", { className: css.identityField }, h("span", null, t("identityField")), h("textarea", {
-				value: draft,
-				autoFocus: true,
-				rows: 5,
-				disabled: saving,
-				"aria-invalid": invalid.length > 0,
-				"aria-describedby": "rp-prompts-identity-help rp-prompts-identity-error",
-				onChange: (event) => setDraft(event.target.value)
-			})), h("div", { className: css.identityMeta }, h("span", { id: "rp-prompts-identity-help" }, t("identityHelper")), h("span", { "data-invalid": characters > maximum ? "true" : "false" }, `${characters} / ${maximum} ${t("identityCharacters")}`)), h("div", {
-				id: "rp-prompts-identity-error",
-				className: css.identityError,
-				role: invalid.length > 0 ? "alert" : void 0
-			}, invalid), h("div", { className: css.identityEditorActions }, setting?.customized === true ? h("button", {
-				type: "button",
-				className: css.identityReset,
-				disabled: !canWrite || saving,
-				onClick: () => {
-					reset();
-				}
-			}, h(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline16, {
-				size: 14,
-				"aria-hidden": true
-			}), t("identityReset")) : h("span", null), h("span", null, h("button", {
-				type: "button",
-				className: css.identityCancel,
-				disabled: saving,
-				onClick: cancel
-			}, t("identityCancel")), h("button", {
-				type: "submit",
-				className: css.identitySave,
-				disabled: !canWrite || saving || invalid.length > 0 || !changed
-			}, saving ? t("identitySaving") : t("identitySave"))))) : h(m.div, {
-				key: "identity-preview",
-				className: css.identityPreview,
-				initial: reduced ? false : { opacity: 0 },
-				animate: { opacity: 1 },
-				exit: { opacity: 0 },
-				transition: { duration: reduced ? 0 : .12 }
-			}, h("pre", null, h("code", null, value)))));
-		}
-		function PromptProfile({ profile, reduced, t }) {
-			const title = promptProfileTitle(profile, t);
-			return h(AnimatePresence, {
-				mode: "wait",
-				initial: false
-			}, h(m.div, {
-				key: profile.id,
-				className: css.promptProfile,
-				initial: reduced ? false : {
-					opacity: 0,
-					x: 5
-				},
-				animate: {
-					opacity: 1,
-					x: 0
-				},
-				exit: reduced ? { opacity: 1 } : {
-					opacity: 0,
-					x: -5
-				},
-				transition: { duration: reduced ? 0 : .14 }
-			}, h("header", { className: css.promptProfileHeader }, h("div", null, h("h4", null, title), profile.description === void 0 ? null : h("p", null, profile.description)), h("div", { className: css.promptRoute }, h("span", null, t("modelRoute")), h("strong", null, routeLabel(profile.route, t)))), h("ul", { className: css.promptNotes }, ...profile.notes.map((note) => h("li", { key: note }, promptNote(note, t)))), h("div", { className: css.promptOrderHeading }, t("promptOrder")), h("ol", { className: css.promptLayerList }, ...profile.layers.map((layer, index) => h(PromptLayer, {
-				key: layer.id,
-				layer,
-				index,
-				t
-			})))));
-		}
-		function PromptLayer({ layer, index, t }) {
-			const hasText = typeof layer.text === "string" && layer.text.length > 0;
-			const tools = Array.isArray(layer.tools) ? layer.tools : [];
-			return h("li", null, h("details", { className: css.promptLayer }, h("summary", null, h("span", { className: css.promptLayerIndex }, index + 1), h("span", { className: css.promptLayerTitle }, h("strong", null, promptLayerLabel(layer.id, t)), h("small", null, h("span", null, `${t("promptSource")}：${promptSourceLabel(layer.source, t)}`), layer.sectionName === void 0 ? null : h("code", null, layer.sectionName))), h("span", {
-				className: css.promptRole,
-				"data-role": layer.role
-			}, t(`${layer.role}Role`)), h("span", { className: css.promptKind }, t(`${layer.contentKind}Prompt`)), h(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, {
-				size: 12,
-				"aria-hidden": true
-			})), h("div", { className: css.promptLayerBody }, hasText ? h("pre", null, h("code", null, layer.text)) : layer.role === "tools" ? null : h("p", null, promptLayerPlaceholder(layer.contentKind, t)), tools.length > 0 ? h("div", { className: css.promptToolBlock }, h("span", null, t("promptTools")), h("div", { className: css.promptTools }, ...tools.map((tool) => h("code", { key: tool }, tool)))) : layer.role === "tools" ? h("p", { className: css.promptNoTools }, t("noTools")) : null)));
-		}
-		function promptProfileTitle(profile, t) {
-			if (profile.kind === "parent-chat") return t("parentChatPrompt");
-			if (profile.kind === "parent-agent") return t("parentAgentPrompt");
-			if (profile.kind === "writer") return t("writerPrompt");
-			return profile.label ?? t("customPrompt");
-		}
-		function routeLabel(route, t) {
-			if (route?.kind === "session") return t("sessionModel");
-			if (route?.kind === "fixed") return `${route.provider} / ${route.model}`;
-			return t("inheritedModel");
-		}
-		function promptLayerLabel(id, t) {
-			return t({
-				"harness-identity": "promptLayerHarness",
-				"harness-source": "promptLayerHarnessSource",
-				"app-web-surface": "promptLayerWebSurface",
-				"roleplay-rules": "promptLayerParentPersona",
-				"runtime-contract": "promptLayerRuntime",
-				"tool-guidance": "promptLayerToolGuidance",
-				"conversation-input": "promptLayerConversation",
-				"writer-ready": "promptLayerWriterReady",
-				"tool-schema": "promptLayerToolSchema",
-				"writer-persona": "promptLayerWriterPersona",
-				"writer-slot-prompt": "promptLayerWriterSlots",
-				"task-persona": "promptLayerTaskPersona",
-				"task-call-prompt": "promptLayerTaskCall"
-			}[id] ?? id);
-		}
-		function promptSourceLabel(source, t) {
-			return t({
-				"dsh-system-prompt": "sourceHarness",
-				"dsh-app-boot": "sourceHarnessBoot",
-				"dsh-web-app": "sourceHarnessWeb",
-				"rp-standard": "sourceParent",
-				"rp-core": "sourceRuntime",
-				"visible tool plugins": "sourceTools",
-				"Harness Session Log": "sourceConversation",
-				"dsh-tools": "sourceTools",
-				"rp-subagent-manager": "sourceSubagent"
-			}[source] ?? "sourceHarness");
-		}
-		function promptLayerPlaceholder(kind, t) {
-			if (kind === "external") return t("externalPromptBody");
-			if (kind === "derived") return t("derivedPromptBody");
-			return t("dynamicPromptBody");
-		}
-		function promptNote(note, t) {
-			return t({
-				"chat-direct-delivery": "noteChatRelay",
-				"agent-editable-draft": "noteAgentRevision",
-				"isolated-context": "noteFreshChild",
-				"shared-rules-omitted": "notePersonaShadowed",
-				"mode-workflow-omitted": "noteRuntimeSkipped",
-				"no-tools": "noteNoTools",
-				"explicit-task-input": "noteExplicitInput"
-			}[note] ?? note);
-		}
-		function moveTabFocus(event, currentId, setActiveTab) {
-			const current = TAB_IDS.indexOf(currentId);
-			let next;
-			if (event.key === "ArrowRight") next = (current + 1) % TAB_IDS.length;
-			else if (event.key === "ArrowLeft") next = (current - 1 + TAB_IDS.length) % TAB_IDS.length;
-			else if (event.key === "Home") next = 0;
-			else if (event.key === "End") next = TAB_IDS.length - 1;
-			else return;
-			event.preventDefault();
-			const id = TAB_IDS[next];
-			setActiveTab(id);
-			queueMicrotask(() => document.getElementById(`rp-settings-tab-${id}`)?.focus());
-		}
-		function sameSelection(left, right) {
-			return Array.isArray(left) && left.length === right.length && left.every((value, index) => value === right[index]);
-		}
-		function VersionSummary({ status, t }) {
-			return h("div", {
-				className: css.versionSummary,
-				"data-compatible": status.compatible ? "true" : "false"
-			}, h("span", { className: css.versionState }, status.compatible ? t("compatible") : t("incompatible")), h("span", null, `${t("roleplayVersion")} ${status.roleplay.version}`), h("span", null, `${t("dshVersion")} ${status.dsh.version ?? "—"}`));
-		}
-		function CoreSummary({ status, t }) {
-			return h("section", {
-				className: css.core,
-				"aria-labelledby": "rp-features-core"
-			}, h("div", { className: css.coreIcon }, h(_deepseek_ai_dsh_client_ui_primitives.IconDataOutline16, {
-				size: 18,
-				"aria-hidden": true
-			})), h("div", { className: css.coreCopy }, h("div", { className: css.coreTitle }, h("h3", { id: "rp-features-core" }, t("coreTitle")), h("span", null, h(_deepseek_ai_dsh_client_ui_primitives.IconCheckOutline16, { size: 13 }), t("alwaysEnabled"))), h("p", null, t("coreDescription")), h("details", { className: css.coreVersions }, h("summary", null, t("versionDetails"), h(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, {
-				size: 12,
-				"aria-hidden": true
-			})), h("ul", null, ...status.core.map((item) => h("li", { key: item.label }, h("div", { className: css.corePluginHeader }, h("strong", null, item.label), h("code", null, `v${item.packageVersion ?? "—"}`)), h("p", { className: css.corePluginDescription }, item.description)))))));
-		}
-		function FeatureRow({ feature, checked, pending, disabled, status, reduced, onToggle, onConfigure, t }) {
-			const requires = dependencyLabels(feature);
-			const recommends = dependencyLabels(feature, "recommends");
-			const configureReady = checked && status?.active === true && !pending;
-			const configureLabel = t(configureReady ? "quickRepliesConfigure" : "quickRepliesEnableFirst");
-			return h(m.li, {
-				className: css.feature,
-				layout: !reduced
-			}, h("div", { className: css.featureCopy }, h("div", { className: css.featureTitle }, h("strong", null, feature.label), h("span", { "data-enabled": checked ? "true" : "false" }, pending ? t("enabling") : checked ? t("enabled") : t("disabled"))), h("p", null, feature.description), requires.length === 0 && recommends.length === 0 ? null : h("div", { className: css.dependencies }, requires.length === 0 ? null : h("span", null, `需要：${requires.join("、")}`), recommends.length === 0 ? null : h("span", null, `建议搭配：${recommends.join("、")}`)), h("div", { className: css.featureMeta }, h("code", { className: css.featureVersion }, `v${status?.packageVersion ?? "—"}`), onConfigure === void 0 ? null : h(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
-				label: configureLabel,
-				side: "top",
-				delayMs: 400
+		/** Projection-only, read-only presentation of every current variable. */
+		function StateVariableCard({ useProjection }) {
+			const state = useProjection("rp/state");
+			const activity = useProjection(STATE_ACTIVITY_PROJECTION_KEY);
+			const namespaces = Object.entries(state?.namespaces ?? {});
+			const [expanded, setExpanded] = (0, react.useState)(false);
+			const bodyId = (0, react.useId)();
+			if (namespaces.length === 0) return h(HiddenMarker);
+			const variableCount = namespaces.reduce((total, [, snapshot]) => total + countStateLeaves(snapshot.value), 0);
+			const activityCount = countStateActivity(activity);
+			return h(MotionConfig, { reducedMotion: "user" }, h(LazyMotion, { features: domAnimation }, h("article", {
+				className: css.card,
+				"data-rp-state-display-card": "true",
+				"aria-label": "当前会话变量"
 			}, h("button", {
 				type: "button",
-				className: css.featureSettings,
-				disabled: !configureReady,
-				"aria-label": configureLabel,
-				onClick: onConfigure
-			}, h(_deepseek_ai_dsh_client_ui_primitives.IconSettingsOutline14, {
-				size: 14,
+				className: css.cardHeader,
+				"aria-expanded": expanded,
+				"aria-controls": bodyId,
+				"aria-label": expanded ? "折叠会话变量" : "展开会话变量",
+				onClick: () => setExpanded((value) => !value)
+			}, h("span", {
+				className: css.headerIcon,
 				"aria-hidden": true
-			}))))), h(Switch, {
-				checked,
-				disabled,
-				reduced,
-				label: `${checked ? "停用" : "启用"}${feature.label}`,
-				onClick: onToggle
-			}));
-		}
-		function SkillRow({ skill, subagentsEnabled, pending, disabled, reduced, onToggle, t }) {
-			const selected = skill.selected === true;
-			const status = pending ? t("enabling") : !skill.featureEnabled ? selected ? t("waitingForPlugin") : t("pluginDisabled") : selected ? t("enabled") : t("disabled");
-			const visibility = !skill.featureEnabled ? t("invisiblePlugin") : !selected ? t("invisibleSkill") : `${t("visibleParent")}${subagentsEnabled ? t("visibleSubagents") : t("subagentsUnavailable")}。`;
-			return h(m.li, {
-				className: css.skill,
-				layout: !reduced,
-				"data-available": skill.featureEnabled ? "true" : "false"
-			}, h("div", { className: css.skillMark }, h(_deepseek_ai_dsh_client_ui_primitives.IconSkillOutline16, {
-				size: 16,
+			}, h(_deepseek_ai_dsh_client_ui_primitives.IconDataOutline16, { size: 16 })), h("span", { className: css.headerTitle }, h("strong", null, "会话变量"), h("small", null, `${namespaces.length} 组 · ${variableCount} 项`)), h("span", {
+				className: css.headerMeta,
 				"aria-hidden": true
-			})), h("div", { className: css.skillCopy }, h("div", { className: css.featureTitle }, h("strong", null, skill.label), h("span", { "data-enabled": skill.enabled ? "true" : "false" }, status)), h("p", null, skill.description), h("div", { className: css.skillMeta }, h("span", null, `${t("sourcePlugin")}：${skill.featureLabel}`), h("code", null, skill.id)), h("p", { className: css.skillVisibility }, visibility)), h(Switch, {
-				checked: selected,
-				disabled,
-				reduced,
-				label: `${selected ? "停用" : "启用"}${skill.label} Skill`,
-				onClick: onToggle
-			}));
+			}, activityCount > 0 ? h("span", { className: css.changedSummary }, `本轮更新 ${activityCount}`) : null), h("span", {
+				className: css.chevron,
+				"data-expanded": expanded ? "true" : "false",
+				"aria-hidden": true
+			}, h(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 }))), h(AnimatePresence, { initial: false }, expanded ? h(m.div, {
+				key: "state-body",
+				id: bodyId,
+				className: css.bodyMotion,
+				initial: {
+					height: 0,
+					opacity: 0
+				},
+				animate: {
+					height: "auto",
+					opacity: 1
+				},
+				exit: {
+					height: 0,
+					opacity: 0
+				},
+				transition: motionTransition
+			}, h("div", { className: css.cardBody }, ...namespaces.map(([id, snapshot]) => h(NamespaceView, {
+				key: id,
+				id,
+				snapshot,
+				activity
+			})))) : null))));
 		}
-		function Switch({ checked, disabled, reduced, label, onClick }) {
-			return h("button", {
-				type: "button",
-				className: css.switch,
-				role: "switch",
-				"aria-checked": checked,
-				"aria-label": label,
-				disabled,
-				onClick
-			}, h(m.span, {
-				animate: { x: checked ? 18 : 2 },
-				transition: reduced ? { duration: 0 } : {
-					type: "spring",
-					stiffness: 560,
-					damping: 38,
-					mass: .6
+		function NamespaceView({ id, snapshot, activity }) {
+			const title = stateNamespaceTitle(id, snapshot);
+			const value = snapshot?.value;
+			const schema = snapshot?.definition?.schema;
+			const description = typeof snapshot?.definition?.description === "string" ? snapshot.definition.description.trim() : "";
+			return h("section", {
+				className: css.namespace,
+				"aria-label": title,
+				"aria-description": description || void 0
+			}, h("header", { className: css.namespaceHeader }, h("span", {
+				className: css.namespaceTitle,
+				title: description || void 0
+			}, h("strong", null, title))), isComplexStateValue(value) ? h("div", {
+				className: css.variableTree,
+				role: "list"
+			}, ...renderChildren({
+				value,
+				schema,
+				namespace: id,
+				activity,
+				path: "",
+				trail: []
+			})) : h("div", {
+				className: css.variableTree,
+				role: "list"
+			}, h(VariableValue, {
+				label: schema?.title ?? "当前值",
+				value,
+				schema,
+				namespace: id,
+				activity,
+				path: ""
+			})));
+		}
+		function renderChildren({ value, schema, namespace, activity, path, trail = [] }) {
+			const array = Array.isArray(value);
+			const entries = orderedStateEntries(value, schema);
+			if (entries.length === 0) {
+				const empty = h("div", {
+					key: `${path}:empty`,
+					className: css.emptyGroup,
+					role: "listitem"
+				}, "暂无内容");
+				return trail.length === 0 ? [empty] : [h(VariableGroup, {
+					key: `${path}:empty-group`,
+					segments: trail,
+					description: trail.at(-1)?.description
+				}, empty)];
+			}
+			const rendered = [];
+			let valueRun = [];
+			let valueRunKey;
+			const flushValueRun = () => {
+				if (valueRun.length === 0) return;
+				if (trail.length === 0) rendered.push(...valueRun);
+				else rendered.push(h(VariableGroup, {
+					key: `${valueRunKey}:values`,
+					segments: trail,
+					description: trail.at(-1)?.description
+				}, ...valueRun));
+				valueRun = [];
+				valueRunKey = void 0;
+			};
+			entries.forEach(([key, child]) => {
+				const childSchema = stateFieldSchema(schema, key, array);
+				const childPath = `${path}/${escapeStatePointer(key)}`;
+				const label = stateFieldLabel(key, childSchema, array);
+				if (isComplexStateValue(child)) {
+					flushValueRun();
+					const description = typeof childSchema?.description === "string" ? childSchema.description.trim() : "";
+					rendered.push(...renderChildren({
+						value: child,
+						schema: childSchema,
+						namespace,
+						activity,
+						path: childPath,
+						trail: [...trail, {
+							label,
+							description
+						}]
+					}));
+					return;
 				}
+				valueRunKey ??= childPath;
+				valueRun.push(h(VariableValue, {
+					key: childPath,
+					label,
+					value: child,
+					schema: childSchema,
+					namespace,
+					activity,
+					path: childPath
+				}));
+			});
+			flushValueRun();
+			return rendered;
+		}
+		function VariableGroup({ segments, description, children }) {
+			const pathLabel = segments.map((segment) => segment.label).join(" › ");
+			return h("section", {
+				className: css.variableGroup,
+				role: "listitem",
+				"aria-label": pathLabel,
+				"aria-description": description || void 0
+			}, h("header", { className: css.groupHeader }, h(BreadcrumbTrail, { segments })), h("div", {
+				className: css.groupChildren,
+				role: "list"
+			}, ...react.default.Children.toArray(children)));
+		}
+		function BreadcrumbTrail({ segments }) {
+			const pathLabel = segments.map((segment) => segment.label).join(" › ");
+			const children = [];
+			segments.forEach((segment, index) => {
+				if (index > 0) children.push(h("span", {
+					key: `separator:${index}`,
+					className: css.breadcrumbSeparator,
+					"aria-hidden": true
+				}, "›"));
+				children.push(h("span", {
+					key: `segment:${index}:${segment.label}`,
+					className: index === segments.length - 1 ? css.breadcrumbCurrent : css.breadcrumbSegment,
+					title: segment.description || void 0
+				}, segment.label));
+			});
+			return h("span", {
+				className: css.breadcrumb,
+				title: pathLabel,
+				"data-rp-state-display-breadcrumb": pathLabel
+			}, ...children);
+		}
+		function VariableValue({ label, value, schema, namespace, activity, path }) {
+			const transition = stateActivityTransition(activity, namespace, path);
+			const changed = transition !== void 0;
+			const description = typeof schema?.description === "string" ? schema.description.trim() : "";
+			return h("div", {
+				className: css.variableRow,
+				role: "listitem",
+				"data-updated": changed ? "true" : void 0
+			}, h("div", {
+				className: css.variableName,
+				title: description || void 0,
+				"aria-description": description || void 0
+			}, h("span", { className: css.variableNameLine }, changed ? h("span", {
+				className: css.updatedDot,
+				"aria-hidden": true
+			}) : null, h("strong", null, label), changed ? h("span", { className: css.srOnly }, "本轮更新") : null)), h(PrimitiveValue, {
+				value,
+				transition
 			}));
+		}
+		function PrimitiveValue({ value, transition }) {
+			const presented = presentStatePrimitive(value);
+			const previous = transition === void 0 ? void 0 : presentStatePrimitive(transition.before.exists ? transition.before.value : void 0);
+			const long = presented.long || previous?.long === true;
+			const [expanded, setExpanded] = (0, react.useState)(false);
+			return h("div", { className: css.valueColumn }, transition === void 0 ? h(PrimitiveText, {
+				presented,
+				expanded
+			}) : h("span", {
+				className: css.transitionValue,
+				"data-rp-state-display-transition": "true"
+			}, h(PrimitiveText, {
+				presented: previous,
+				expanded,
+				className: css.transitionBefore,
+				label: "之前值："
+			}), h("span", {
+				className: css.transitionArrow,
+				"aria-hidden": true
+			}, "→"), h(PrimitiveText, {
+				presented,
+				expanded,
+				className: css.transitionCurrent,
+				label: "当前值："
+			})), long ? h("button", {
+				type: "button",
+				className: css.valueToggle,
+				"aria-expanded": expanded,
+				"aria-label": expanded ? "收起内容" : "展开完整内容",
+				onClick: () => setExpanded((value) => !value)
+			}, expanded ? "收起" : "展开") : null);
+		}
+		function PrimitiveText({ presented, expanded, className = "", label }) {
+			return h("span", {
+				className: `${css.variableValue} ${className} ${presented.long && !expanded ? css.valueClamped : ""}`,
+				"data-kind": presented.kind,
+				"data-empty": presented.empty ? "true" : void 0,
+				title: presented.long && !expanded ? presented.text : void 0
+			}, label === void 0 ? null : h("span", { className: css.srOnly }, label), presented.text);
 		}
 		//#endregion
-		exports.RoleplaySettingsSection = RoleplaySettingsSection;
+		exports.StateDisplayAnchor = StateDisplayAnchor;
+		exports.StateVariableCard = StateVariableCard;
 		exports.apply = apply;
 		exports.inject = inject;
 		return module.exports;

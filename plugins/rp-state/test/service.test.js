@@ -55,16 +55,28 @@ test('registers State v2 context, semantic effect, diagnostics, and Chat-readabl
   assert.equal(mutationSchema.properties.definition.properties.rules.type, 'array')
   const prepared = harness.contextSource.prepare({ agent })
   const visible = JSON.parse(prepared.text)
-  assert.equal(visible.protocolVersion, 2)
+  assert.deepEqual(Object.keys(visible), ['namespaces'])
   assert.equal(visible.namespaces[0].namespace, 'story')
-  assert.equal(visible.namespaces[0].expectedRevision, 1)
+  assert.equal(visible.namespaces[0].title, '故事状态')
   assert.deepEqual(visible.namespaces[0].value, { hp: 10 })
-  assert.equal(Object.hasOwn(visible.namespaces[0], 'initialValue'), false)
-  assert.equal(visible.updateProtocol.kind, 'state.update')
-  assert.deepEqual(visible.updateProtocol.operations.increment.required, ['op', 'path', 'by', 'reason'])
-  assert.deepEqual(visible.updateProtocol.operations.increment.forbidden, ['value'])
-  assert.match(visible.updateProtocol.constraints.join('\n'), /increment uses by and never value/)
-  assert.match(visible.updateProtocol.modes['rules-required'], /ruleId/)
+  for (const field of ['initialValue', 'expectedRevision', 'updateMode', 'schema', 'rules', 'diagnostics']) {
+    assert.equal(Object.hasOwn(visible.namespaces[0], field), false)
+  }
+  assert.equal(Object.hasOwn(visible, 'protocolVersion'), false)
+  assert.equal(Object.hasOwn(visible, 'updateProtocol'), false)
+
+  const commitVisible = JSON.parse(prepared.parentText)
+  assert.equal(commitVisible.protocolVersion, 2)
+  assert.equal(commitVisible.namespaces[0].namespace, 'story')
+  assert.equal(commitVisible.namespaces[0].expectedRevision, 1)
+  assert.deepEqual(commitVisible.namespaces[0].value, { hp: 10 })
+  assert.equal(Object.hasOwn(commitVisible.namespaces[0], 'initialValue'), false)
+  assert.equal(commitVisible.updateProtocol.kind, 'state.update')
+  assert.deepEqual(commitVisible.updateProtocol.operations.increment.required, ['op', 'path', 'by', 'reason'])
+  assert.deepEqual(commitVisible.updateProtocol.operations.increment.forbidden, ['value'])
+  assert.match(commitVisible.updateProtocol.constraints.join('\n'), /increment uses by and never value/)
+  assert.match(commitVisible.updateProtocol.modes['rules-required'], /ruleId/)
+  assert.ok([...prepared.text].length < [...prepared.parentText].length)
   assert.deepEqual(harness.effectType.diagnoseArguments({
     kind: 'state.update', namespace: 'story', expectedRevision: 1,
     payload: { changes: [{ op: 'increment', path: '/hp', value: -2, reason: '生命值下降' }] },

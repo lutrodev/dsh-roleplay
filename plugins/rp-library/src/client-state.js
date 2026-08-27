@@ -153,6 +153,12 @@ export function stateActivityTotalCount(activity) {
   return Object.values(activity.namespaces).reduce((total, changes) => total + (Array.isArray(changes) ? changes.length : 0), 0)
 }
 
+/** Count terminal State values rendered as rows; objects and arrays are groups. */
+export function countStateItems(value) {
+  if (value === null || typeof value !== 'object') return 1
+  return Object.values(value).reduce((total, child) => total + countStateItems(child), 0)
+}
+
 /** Prefer the transient activity view only when the selected namespace changed. */
 export function preferredStateDetailView(activity, namespace) {
   return stateActivityChanges(activity, namespace).length > 0 ? 'changes' : 'current'

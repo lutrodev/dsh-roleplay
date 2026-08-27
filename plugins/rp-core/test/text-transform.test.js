@@ -48,17 +48,24 @@ test('transforms input before adapters and context before character budgets', as
       return adapterText
     },
   })
-  runtime.registerContextSource({ id: 'macro-context', prepare: () => ({ text: '你好，{{user}}' }) })
+  runtime.registerContextSource({
+    id: 'macro-context',
+    parentDelivery: 'commit',
+    prepare: () => ({ text: '你好，{{user}}', parentText: '为{{user}}提交状态' }),
+  })
   const message = { role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '{{user}}来了' }] }
   const run = await runtime.prepareRun(agent, 1, [message])
 
   assert.equal(adapterText, '林澈来了')
   assert.equal(run.fragments.find(item => item.id === 'macro-context').text, '你好，林澈')
+  assert.equal(run.fragments.find(item => item.id === 'macro-context').parentText, '为林澈提交状态')
   assert.equal(run.fragments.find(item => item.id === 'macro-context').characters, 5)
   assert.deepEqual(runtime.inspectRun(agent).textTransforms, [{ id: 'test.user', revision: 1, userName: '林澈' }])
 
   const preview = await runtime.previewContextBuild(agent, [message])
   assert.equal(preview.contexts.find(item => item.id === 'macro-context').text, '你好，林澈')
+  assert.equal(Object.hasOwn(preview.contexts.find(item => item.id === 'macro-context'), 'parentText'), false)
+  assert.match(runtime.writerReadyMessage(run).content[0].text, /为林澈提交状态/)
 
   const artifact = await runtime.validateDraft({
     runSummary: '{{user}}抵达门前', effects: [], references: [], extensions: {},

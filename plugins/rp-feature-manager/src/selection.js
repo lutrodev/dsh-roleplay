@@ -1,15 +1,18 @@
 import {
-  DEFAULT_ENABLED_FEATURES,
   FEATURE_CATALOG,
+  FEATURE_IDS,
   ROLEPLAY_SKILL_CATALOG,
   SKILL_IDS,
   featureById,
 } from './catalog.js'
 
-const KNOWN_IDS = new Set(DEFAULT_ENABLED_FEATURES)
+const KNOWN_IDS = new Set(FEATURE_IDS)
 const KNOWN_SKILL_IDS = new Set(SKILL_IDS)
-const PRE_COMPACT_ACCESS_MODE_DEFAULTS = Object.freeze(
-  DEFAULT_ENABLED_FEATURES.filter(id => id !== 'compact-access-mode'),
+const LEGACY_DEFAULTS_BEFORE_COMPACT_ACCESS_MODE = Object.freeze(
+  FEATURE_IDS.filter(id => id !== 'state-display' && id !== 'compact-access-mode'),
+)
+const LEGACY_DEFAULTS_BEFORE_STATE_DISPLAY_DEFAULT_ON = Object.freeze(
+  FEATURE_IDS.filter(id => id !== 'state-display'),
 )
 
 /** Normalize, close over hard prerequisites, and return catalog order. */
@@ -57,7 +60,9 @@ export function assertFeatureSelection(value) {
 export function migrateLegacyFeatureSelection(value) {
   const normalized = normalizeFeatureSelection(value)
   if (new Set(value).size !== value.length) throw new TypeError('enabledFeatures must not contain duplicates')
-  if (sameSelection(normalized, PRE_COMPACT_ACCESS_MODE_DEFAULTS)) return DEFAULT_ENABLED_FEATURES
+  if (sameSelection(normalized, LEGACY_DEFAULTS_BEFORE_COMPACT_ACCESS_MODE)) {
+    return LEGACY_DEFAULTS_BEFORE_STATE_DISPLAY_DEFAULT_ON
+  }
   const actual = new Set(value)
   const missing = normalized.filter(id => !actual.has(id))
   if (missing.length === 1

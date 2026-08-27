@@ -93,6 +93,13 @@ export const FEATURE_CATALOG = Object.freeze([
     hostEntryIds: ['rp-message-actions'],
   }),
   feature({
+    id: 'state-display', category: 'conversation', label: '会话变量卡片',
+    description: '在最新助手回复下方，以易读结构展示当前会话变量。',
+    packageName: 'dsh-roleplay-rp-state-display',
+    hostEntryIds: ['rp-state-display'],
+    requires: ['state'],
+  }),
+  feature({
     id: 'message-avatar', category: 'conversation', label: '消息头像',
     description: '在用户、开场和最终回复旁显示相应角色头像。',
     packageName: 'dsh-roleplay-rp-message-avatar',

@@ -51,6 +51,7 @@
     "dsh-roleplay-rp-library": "workspace:^",
     "dsh-roleplay-rp-quick-replies": "workspace:^",
     "dsh-roleplay-rp-message-actions": "workspace:^",
+    "dsh-roleplay-rp-state-display": "workspace:^",
     "dsh-roleplay-rp-message-avatar": "workspace:^",
     "dsh-roleplay-rp-dialogue-highlight": "workspace:^"
   },

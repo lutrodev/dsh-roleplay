@@ -13,7 +13,7 @@
 - **写作协作**：使用独立 Writer 生成正文，并可配置规划、润色等任务子代理。
 - **长对话续写**：达到模型上下文压力后并发生成 Roleplay 专用前文总结，下一轮通过原生 checkpoint 与独立“会话总结” Slot 接续近期原文。
 - **Agent 工作区工具**：Agent 模式提供持久终端和 `str_replace_editor`，Chat 模式不开放工作区命令与文件编辑能力。
-- **对话体验**：支持可自定义快捷回复、消息编辑、删除、重新生成、分支、角色头像、对白高亮，以及所有输入栏宽度下只显示图标的访问模式按钮。
+- **对话体验**：支持可自定义快捷回复、消息编辑、删除、重新生成、分支、角色头像、对白高亮、可选的回复下方会话变量卡片，以及所有输入栏宽度下只显示图标的访问模式按钮。
 
 ## 安装
 
@@ -36,8 +36,6 @@ GitHub 仓库用于查看源码、调试和参与开发；普通使用请安装 
 各能力均位于 [`plugins/`](plugins/)，共享的浏览器工具位于 [`packages/`](packages/)。详细协议见 [Roleplay 架构](docs/rp-architecture.md)。
 
 ## 开发与调试
-
-仓库包含构建、测试和真实 Harness Web 联调所需的公开入口，不需要复制作者的本机目录结构，也不需要另外 clone Harness 源码。开发用 Harness CLI 固定为插件套件声明的兼容版本。
 
 ### 环境准备
 
@@ -80,8 +78,6 @@ pnpm dev -- --skip-build
 pnpm dev -- --no-watch
 ```
 
-默认地址是 `http://127.0.0.1:3080`。启动器监听 `plugins/` 与 `packages/` 中会影响运行结果的源码和配置；保存后重新构建客户端并重启这个隔离 Host。调试模型调用前，请在该 Web 界面中自行配置模型提供方和凭据。
-
 开发 Profile 与 Roleplay 数据默认分别写入仓库内的 `.dsh-dev/harness` 和 `.dsh-dev/data`。整个 `.dsh-dev/` 已被 Git 忽略，只是 clone 后运行调试命令产生的本地内容，不属于插件源码。需要复用其他位置时可以用绝对路径覆盖：
 
 ```bash
@@ -89,10 +85,6 @@ DSH_ROLEPLAY_DEV_HOME=/path/to/dev-profile \
 DSH_ROLEPLAY_DEV_DATA_DIR=/path/to/dev-data \
 pnpm dev
 ```
-
-源码包之间使用 `workspace:` 依赖，不能把 `rp-feature-manager` 当作一个孤立目录直接执行 `dsh plugin add file:...`。`pnpm dev` 会把组合插件、全部依赖插件和共享 UI package 一次性链接到隔离 Profile，是 clone 后的源码联调入口。
-
-按 `Ctrl+C` 会同时结束启动器和它启动的隔离 Harness 进程；`.dsh-dev/` 中的开发数据会保留，供下次调试继续使用。
 
 ## 许可
 

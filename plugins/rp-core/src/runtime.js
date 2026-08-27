@@ -307,7 +307,21 @@ export class RpRuntime extends Service {
     return this.applyTextTransforms(text, { ...context, profile, prepared })
   }
 
-  /** @param {{ id: string, order?: number, dependsOn?: string[], legacySlotIds?: string[], legacySourceIds?: string[], prepare(context: object): unknown | Promise<unknown> }} definition */
+  /**
+   * A prepared source may return Writer-facing `text` and, when
+   * `parentDelivery` is `commit`, separate parent-only `parentText`.
+   * Expanded sources use the same candidate fields.
+   *
+   * @param {{
+   *   id: string,
+   *   order?: number,
+   *   dependsOn?: string[],
+   *   legacySlotIds?: string[],
+   *   legacySourceIds?: string[],
+   *   parentDelivery?: 'none' | 'commit',
+   *   prepare(context: object): unknown | Promise<unknown>,
+   * }} definition
+   */
   registerContextSource(definition) {
     const normalized = normalizeContextSource(definition)
     return this.register(this.contextSources, normalized, 'context source')
@@ -966,7 +980,8 @@ export class RpRuntime extends Service {
           continue
         }
         for (const expanded of candidate.sources) {
-          if (!isRecord(expanded) || typeof expanded.text !== 'string') {
+          if (!isRecord(expanded) || typeof expanded.text !== 'string'
+            || (expanded.parentText !== undefined && typeof expanded.parentText !== 'string')) {
             throw new RpRuntimeError('RP_INVALID_CONTEXT', `context source "${definition.id}" returned an invalid expanded source`)
           }
           const expandedDefinition = normalizeContextSource({
@@ -975,22 +990,39 @@ export class RpRuntime extends Service {
             prepare: definition.prepare,
             dependsOn: definition.dependsOn,
           })
+          if (expanded.parentText !== undefined && expandedDefinition.parentDelivery === 'none') {
+            throw new RpRuntimeError('RP_INVALID_CONTEXT', `context source "${expandedDefinition.id}" returned parentText without parent delivery`)
+          }
           addResolvedDefinition(resolvedDefinitions, resolvedIds, expandedDefinition)
           const text = expandedDefinition.delivery === 'native-history' || expandedDefinition.pretransformed
             ? expanded.text
             : await this.applyTextTransforms(expanded.text, { ...base, prepared: base.textTransforms ?? [], phase: 'context', sourceId: expandedDefinition.id })
-          candidates.push(contextCandidate(expandedDefinition, { ...expanded, text, characters: [...text].length }))
+          const parentText = expanded.parentText === undefined
+            ? undefined
+            : expandedDefinition.delivery === 'native-history' || expandedDefinition.pretransformed
+              ? expanded.parentText
+              : await this.applyTextTransforms(expanded.parentText, { ...base, prepared: base.textTransforms ?? [], phase: 'context', sourceId: expandedDefinition.id })
+          candidates.push(contextCandidate(expandedDefinition, { ...expanded, text, parentText, characters: [...text].length }))
         }
         continue
       }
-      if (!isRecord(candidate) || typeof candidate.text !== 'string') {
+      if (!isRecord(candidate) || typeof candidate.text !== 'string'
+        || (candidate.parentText !== undefined && typeof candidate.parentText !== 'string')) {
         throw new RpRuntimeError('RP_INVALID_CONTEXT', `context source "${definition.id}" returned no text`)
+      }
+      if (candidate.parentText !== undefined && definition.parentDelivery === 'none') {
+        throw new RpRuntimeError('RP_INVALID_CONTEXT', `context source "${definition.id}" returned parentText without parent delivery`)
       }
       addResolvedDefinition(resolvedDefinitions, resolvedIds, definition)
       const text = definition.delivery === 'native-history' || definition.pretransformed
         ? candidate.text
         : await this.applyTextTransforms(candidate.text, { ...base, prepared: base.textTransforms ?? [], phase: 'context', sourceId: definition.id })
-      candidates.push(contextCandidate(definition, { ...candidate, text, characters: [...text].length }))
+      const parentText = candidate.parentText === undefined
+        ? undefined
+        : definition.delivery === 'native-history' || definition.pretransformed
+          ? candidate.parentText
+          : await this.applyTextTransforms(candidate.parentText, { ...base, prepared: base.textTransforms ?? [], phase: 'context', sourceId: definition.id })
+      candidates.push(contextCandidate(definition, { ...candidate, text, parentText, characters: [...text].length }))
     }
     const customContents = new Map((base.profile?.contextBuild?.customSources ?? []).map(source => [source.slotId, source.content]))
     for (const definition of contextBuildCustomDefinitions(base.profile?.contextBuild)) {
@@ -1038,12 +1070,10 @@ export class RpRuntime extends Service {
   writerReadyMessage(run) {
     const preparedAt = Date.now()
     const availableSubagents = run.executionMode === 'agent' ? taskSubagentCatalog(run.taskSubagents) : []
-    const parentCommitFragments = run.executionMode === 'chat'
-      ? run.fragments.filter(fragment => fragment.parentDelivery === 'commit')
-      : []
+    const parentCommitFragments = run.fragments.filter(fragment => fragment.parentDelivery === 'commit')
     const commitContext = parentCommitFragments.length === 0
       ? ''
-      : parentCommitFragments.map(fragment => `<item source="${escapeAttribute(fragment.id)}">\n${fragment.text}\n</item>`).join('\n')
+      : parentCommitFragments.map(fragment => `<item source="${escapeAttribute(fragment.id)}">\n${fragment.parentText ?? fragment.text}\n</item>`).join('\n')
     const text = renderRoleplayRequest({
       executionMode: run.executionMode,
       assetBindings: rpCurrentAssetBindingManifest(run.profile),
@@ -2162,6 +2192,7 @@ function contextCandidate(definition, candidate) {
   return {
     ...contextDefinitionMetadata(definition),
     text: candidate.text,
+    ...(candidate.parentText === undefined ? {} : { parentText: candidate.parentText }),
     revision: candidate.revision ?? null,
     characters,
     diagnostics: candidate.diagnostics ?? null,

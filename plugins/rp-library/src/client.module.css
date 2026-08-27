@@ -20,7 +20,6 @@
 .workbenchDock:hover { border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 32%, var(--dsw-alias-border-l2)); }
 .workbenchDock > svg { flex: none; color: var(--dsw-alias-brand-primary); }
 .workbenchDock > strong { white-space: nowrap; font-weight: 560; }
-.workbenchDock > span:not(.dockArrow) { max-width: 86px; overflow: hidden; color: var(--dsw-alias-label-tertiary); text-overflow: ellipsis; white-space: nowrap; }
 .workbenchDock[data-kind="prompt"] > svg { color: #8b5cf6; }
 .workbenchDock[data-kind="wiki"] > svg { color: var(--dsw-alias-brand-primary); }
 .dockArrow { color: var(--dsw-alias-label-tertiary); }
@@ -604,7 +603,6 @@ button.slotPlaceholder:hover { border-color: color-mix(in srgb, var(--dsw-alias-
   .workbenchMobileControls .modeSwitchWrap { justify-self: end; }
   .mobileWorkbenchDock { display: grid; width: 44px; height: 44px; box-sizing: border-box; place-items: center; padding: 0; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); box-shadow: var(--dsw-shadow-lv1); cursor: pointer; }
   .mobileWorkbenchDock > svg { color: var(--dsw-alias-brand-primary); }
-  .mobileWorkbenchDock > i,
   .mobileWorkbenchDock > strong,
   .mobileWorkbenchDock > span { display: none; }
 }

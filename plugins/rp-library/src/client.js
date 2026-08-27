@@ -12,7 +12,7 @@ import {
   Modal,
   Pill,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { assetKindLabel, domainValue, isRoleplaySummary, moveItem, openingModeFromProfile, openingText, preferredStateDetailView, resetBlankRoleplaySession, selectCharacterLore, sessionBlockReason, sessionSectionCapability, sessionSurfaceState, shouldShowSkippedOpeningNotice, stateActivityChanges, stateActivityTotalCount, userErrorMessage } from './client-state.js'
+import { assetKindLabel, countStateItems, domainValue, isRoleplaySummary, moveItem, openingModeFromProfile, openingText, preferredStateDetailView, resetBlankRoleplaySession, selectCharacterLore, sessionBlockReason, sessionSectionCapability, sessionSurfaceState, shouldShowSkippedOpeningNotice, stateActivityChanges, stateActivityTotalCount, userErrorMessage } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 import { PromptWorkbench } from './context-canvas.js'
 import { AssetEditorRegistry } from './asset-editor-registry.js'
@@ -261,14 +261,10 @@ function RpStoryLibraryControl(props) {
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   if (surface !== 'active') return null
-  const lorebookCount = profile?.resources?.lorebooks?.length ?? 0
-  const namespaceCount = Object.keys(state?.namespaces ?? {}).length
-  const boundReferenceCount = (profile?.resources?.card ? 1 : 0) + lorebookCount + (profile?.resources?.persona ? 1 : 0) + (profile?.resources?.preset ? 1 : 0) + (profile?.resources?.writingStyles?.length ?? 0)
-  const detail = `${boundReferenceCount} 项资料${namespaceCount > 0 ? ` · ${namespaceCount} 组状态` : ''}`
   return h(RpMotionProvider, null,
     h('div', { className: css.headerContextControls },
-      h(PromptTrigger, { profile, onClick: () => setPromptOpen(true) }),
-      h(SessionWikiTrigger, { detail, onClick: () => setLibraryOpen(true) })),
+      h(PromptTrigger, { onClick: () => setPromptOpen(true) }),
+      h(SessionWikiTrigger, { onClick: () => setLibraryOpen(true) })),
     h(PromptModal, {
       open: promptOpen,
       onClose: () => setPromptOpen(false),
@@ -288,15 +284,11 @@ function RpMobileWorkbenchControl(props) {
   const [promptOpen, setPromptOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   if (surface !== 'active') return null
-  const lorebookCount = profile?.resources?.lorebooks?.length ?? 0
-  const namespaceCount = Object.keys(state?.namespaces ?? {}).length
-  const boundReferenceCount = (profile?.resources?.card ? 1 : 0) + lorebookCount + (profile?.resources?.persona ? 1 : 0) + (profile?.resources?.preset ? 1 : 0) + (profile?.resources?.writingStyles?.length ?? 0)
-  const detail = `${boundReferenceCount} 项资料${namespaceCount > 0 ? ` · ${namespaceCount} 组状态` : ''}`
   return h(RpMotionProvider, null,
     h('div', { className: css.workbenchMobileControls },
       h(ExecutionModeSwitch, { connection, sessionId, session, profile, compact: true }),
-      h(PromptTrigger, { profile, mobile: true, onClick: () => setPromptOpen(true) }),
-      h(SessionWikiTrigger, { detail, mobile: true, onClick: () => setLibraryOpen(true) })),
+      h(PromptTrigger, { mobile: true, onClick: () => setPromptOpen(true) }),
+      h(SessionWikiTrigger, { mobile: true, onClick: () => setLibraryOpen(true) })),
     h(PromptModal, {
       open: promptOpen,
       onClose: () => setPromptOpen(false),
@@ -1079,11 +1071,6 @@ function formatStateValue(value) {
   return String(value)
 }
 
-function countStateItems(value) {
-  if (!isComplex(value)) return 1
-  return Array.isArray(value) ? value.length : Object.keys(value).length
-}
-
 function ContextEmpty({ icon: Icon, title, description, quiet = false }) {
   return h('div', { className: quiet ? `${css.contextEmpty} ${css.contextEmptyQuiet}` : css.contextEmpty },
     h('span', null, h(Icon, { size: 22 })),
@@ -1382,37 +1369,33 @@ function CharacterDetail({ detail }) {
     detail.quarantinedPrompts?.length ? h('section', { className: css.quarantine }, h('h4', null, `未启用的提示内容 · ${detail.quarantinedPrompts.length}`), h('p', null, '为了安全，这些内容不会用于生成回复。'), ...detail.quarantinedPrompts.map(item => h('details', { key: item.path }, h('summary', null, '查看原文'), h('pre', null, String(item.value))))) : null)
 }
 
-function PromptTrigger({ profile, onClick, mobile = false }) {
-  const slots = profile?.contextBuild?.slots
-  const status = Array.isArray(slots) ? `${slots.length} 个分组` : '默认顺序'
+function PromptTrigger({ onClick, mobile = false }) {
   return h(m.button, {
     ...gestures,
     type: 'button',
     className: mobile ? css.mobileWorkbenchDock : css.workbenchDock,
     'data-kind': 'prompt',
     onClick,
-    'aria-label': `打开写作 prompt，${status}`,
+    'aria-label': '打开写作 prompt',
     title: '调整下次回复会参考的资料并查看预览',
   },
   h(IconListPenOutline16, { size: 16 }),
   h('strong', null, '写作 prompt'),
-  h('span', null, status),
   h('span', { className: css.dockArrow, 'aria-hidden': true }, '↗'))
 }
 
-function SessionWikiTrigger({ detail, onClick, mobile = false }) {
+function SessionWikiTrigger({ onClick, mobile = false }) {
   return h(m.button, {
     ...gestures,
     type: 'button',
     className: mobile ? css.mobileWorkbenchDock : css.workbenchDock,
     'data-kind': 'wiki',
     onClick,
-    'aria-label': `打开会话 Wiki，${detail}`,
+    'aria-label': '打开会话 Wiki',
     title: '查看当前对话的角色卡、世界书、我的人设、预设、文风与状态',
   },
   h(IconDataOutline16, { size: 16 }),
   h('strong', null, '会话 Wiki'),
-  h('span', null, detail),
   h('span', { className: css.dockArrow, 'aria-hidden': true }, '↗'))
 }
 

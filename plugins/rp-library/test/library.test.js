@@ -7,7 +7,7 @@ import * as Library from '../src/index.js'
 import { normalizeProfile } from 'dsh-roleplay-rp-session'
 import { encodeSessionCommand } from 'dsh-roleplay-rp-session/protocol'
 import { createRoleplaySession, prepareRoleplaySeed, RpSessionBootstrap } from '../src/session-bootstrap.js'
-import { assetKindLabel, createdAssetBindingMessage, domainValue, isRoleplaySummary, moveItem, openingModeFromProfile, openingText, preferredStateDetailView, resetBlankRoleplaySession, selectCharacterLore, sessionBlockReason, sessionSectionCapability, sessionSurfaceState, shouldShowSkippedOpeningNotice, stateActivityChanges, stateActivityTotalCount, userErrorMessage } from '../src/client-state.js'
+import { assetKindLabel, countStateItems, createdAssetBindingMessage, domainValue, isRoleplaySummary, moveItem, openingModeFromProfile, openingText, preferredStateDetailView, resetBlankRoleplaySession, selectCharacterLore, sessionBlockReason, sessionSectionCapability, sessionSurfaceState, shouldShowSkippedOpeningNotice, stateActivityChanges, stateActivityTotalCount, userErrorMessage } from '../src/client-state.js'
 
 const { dispatch } = Library
 
@@ -552,6 +552,15 @@ test('状态详情优先展示有内容的本轮变化并按分组准确计数',
   assert.equal(stateActivityTotalCount({ namespaces: null }), 0)
 })
 
+test('当前状态按实际展示的末级变量计数', () => {
+  assert.equal(countStateItems({
+    world: { date: '8月15日', location: '港口' },
+    character: { hp: 80, conditions: ['紧张', '疲惫'] },
+  }), 5)
+  assert.equal(countStateItems({ emptyObject: {}, emptyList: [] }), 0)
+  assert.equal(countStateItems(null), 1)
+})
+
 test('会话界面只要求会话设置存在，不要求绑定任一共享资料', () => {
   const blank = { blank: true, composerPhase: 'blank' }
   const active = { blank: false, composerPhase: 'active' }
@@ -841,9 +850,13 @@ test('资料导航、会话 Wiki 与 Prompt 入口清晰分工且不泄漏内部
   assert.match(client, /closeLabel: creating \? '关闭故事创建' : recovery \? '关闭恢复设置'/)
   assert.match(client, /'data-selection-only': 'true'/)
   assert.match(client, /function PromptModal/)
-  assert.match(client, /打开写作 prompt/)
+  assert.match(client, /'aria-label': '打开写作 prompt'/)
   assert.doesNotMatch(client, /自动选择/)
-  assert.match(client, /打开会话 Wiki/)
+  assert.match(client, /'aria-label': '打开会话 Wiki'/)
+  assert.equal(client.match(/className: css\.dockArrow, 'aria-hidden': true/g)?.length, 2)
+  assert.doesNotMatch(client, /h\('span', null, status\)|h\('span', null, detail\)/)
+  assert.match(styles, /\.dockArrow \{ color: var\(--dsw-alias-label-tertiary\); \}/)
+  assert.doesNotMatch(styles, /\.workbenchDock > span:not/)
   assert.doesNotMatch(contextCanvas, /下次回复会参考什么/)
   assert.match(contextCanvas, /回复资料顺序/)
   assert.doesNotMatch(contextCanvas, /资料设置|更新预览|更新中…/)
