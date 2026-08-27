@@ -10407,6 +10407,60 @@ get: (_target, key) => {
 		//#endregion
 		//#region ../../packages/rp-ui/src/index.js
 		const h$1 = react.default.createElement;
+		Object.freeze({
+			fill: "none",
+			stroke: "currentColor",
+			strokeWidth: 1.25,
+			strokeLinecap: "round",
+			strokeLinejoin: "round"
+		});
+		Object.freeze({
+			conversation: [["path", { d: "M2 2.75h12v8.5H7.1l-3.35 2.5v-2.5H2z" }], ["path", { d: "M5 6h6M5 8.5h4" }]],
+			state: [["ellipse", {
+				cx: 8,
+				cy: 3.5,
+				rx: 5.25,
+				ry: 1.75
+			}], ["path", { d: "M2.75 3.5v4c0 .97 2.35 1.75 5.25 1.75s5.25-.78 5.25-1.75v-4M2.75 7.5v4c0 .97 2.35 1.75 5.25 1.75s5.25-.78 5.25-1.75v-4" }]],
+			lore: [["circle", {
+				cx: 8,
+				cy: 8,
+				r: 5.75
+			}], ["path", { d: "M2.5 8h11M8 2.25c1.65 1.55 2.5 3.47 2.5 5.75S9.65 12.2 8 13.75C6.35 12.2 5.5 10.28 5.5 8S6.35 3.8 8 2.25z" }]],
+			persona: [["circle", {
+				cx: 8,
+				cy: 5.15,
+				r: 2.6
+			}], ["path", { d: "M2.75 13.25c.7-2.65 2.45-4 5.25-4s4.55 1.35 5.25 4" }]],
+			preset: [["rect", {
+				x: 2.5,
+				y: 2.25,
+				width: 11,
+				height: 11.5,
+				rx: 1.6
+			}], ["path", { d: "m4.5 6 .8.8 1.45-1.65M8.5 6h2.75M4.5 10l.8.8 1.45-1.65M8.5 10h2.75" }]],
+			"writing-style": [["path", { d: "M3 2.25h8.5v5.5M3 5h5M3 7.5h3.75M3 10h2" }], ["path", { d: "m7 12.75.45-2.15 4.85-4.85 1.95 1.95-4.85 4.85z" }]],
+			session: [
+				["path", { d: "M2.5 4h3M8.5 4h5M2.5 8h6M11.5 8h2M2.5 12h2M7.5 12h6" }],
+				["circle", {
+					cx: 7,
+					cy: 4,
+					r: 1.5
+				}],
+				["circle", {
+					cx: 10,
+					cy: 8,
+					r: 1.5
+				}],
+				["circle", {
+					cx: 6,
+					cy: 12,
+					r: 1.5
+				}]
+			],
+			mixed: [["path", { d: "m8 2 5.5 3L8 8 2.5 5z" }], ["path", { d: "m2.5 8 5.5 3 5.5-3M2.5 11l5.5 3 5.5-3" }]],
+			attachment: [["path", { d: "m6 8.75 4.35-4.35a2.2 2.2 0 0 1 3.1 3.1L8 12.95a3.25 3.25 0 0 1-4.6-4.6l5.1-5.1M5.75 10.5l4.9-4.9" }]]
+		});
 		const workbenchTransition = {
 			duration: .16,
 			ease: [
