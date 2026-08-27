@@ -17,7 +17,7 @@ test('collects ordered context, validates effects and produces the sole commit m
     if (tool.name === 'rp_commit_turn') commitTool = tool
   } })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 2, maxArtifactBytes: 4096 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 2, maxArtifactBytes: 4096 })
   assert.equal(Object.hasOwn(commitTool.parameters.properties, 'narrative'), false)
   assert.equal(commitTool.parameters.additionalProperties, false)
   assert.equal(commitTool.parameters.properties.effects.items, undefined)
@@ -84,7 +84,7 @@ test('commit exposes registered effect schemas and returns structured correction
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 5, agentMaxStepsPerRun: 8, maxContextCharacters: 1000,
+    chatMaxStepsPerRun: 5, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 2, maxArtifactBytes: 4096,
   })
   assert.throws(() => runtime.registerEffectType({
@@ -148,7 +148,7 @@ test('Chat parent receives only commit-delivery context while Agent keeps the co
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxContextCharacters: 2000,
+    chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 2, maxArtifactBytes: 4096,
   })
   runtime.registerContextSource({
@@ -194,7 +194,7 @@ test('rejects unknown effects without creating a commit', async () => {
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register(tool) { commitTool = tool } })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   const events = []
   const agent = { session: { events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
@@ -211,7 +211,7 @@ test('rejects missing prose, oversized prose, mismatched calls, duplicate commit
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000,
+    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 4,
   })
   const commit = tools.get('rp_commit_turn')
@@ -241,7 +241,7 @@ test('accepts harmless content blocks, blank text, and a commit block before lat
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000,
+    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 20,
   })
   const events = []
@@ -284,7 +284,7 @@ test('tool-only retry reuses prose from the latest failed commit in the same tur
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000,
+    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 20,
   })
   const events = []
@@ -335,7 +335,7 @@ test('accepts the native thinking-model reasoning, prose, and final commit shape
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000,
+    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 4,
   })
   const events = []
@@ -376,7 +376,7 @@ test('allows an ordinary completed assistant response without forcing a commit',
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get(id) { return id === 'bounded' ? liveAgent : undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   runtime.registerSessionProfileProvider(() => ({
     runtime: { executionMode: 'chat' },
     resources: {
@@ -424,7 +424,7 @@ test('chat refresh keeps full material hidden from the parent and returns a comp
   ctx.provide('agents', { get() { return undefined } })
   const profile = { runtime: { executionMode: 'chat' } }
   ctx.provide('rpSessions', { get: () => profile })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   let facts = { revision: 1, text: '旧资料。' }
   runtime.registerContextSource({ id: 'facts', label: '资料', defaultSlot: { id: 'facts', label: '资料' }, prepare: () => facts })
   const input = currentInput()
@@ -456,7 +456,7 @@ test('a failed configuration refresh gates Writer and commit until the same refr
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   let fail = false
   runtime.registerContextSource({
     id: 'facts', label: '资料', defaultSlot: { id: 'facts', label: '资料' },
@@ -502,7 +502,7 @@ test('failed asset phases gate commit until a later mutation succeeds', async ()
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   const events = []
   const input = currentInput()
   const agent = { session: { events, deriveMessages: () => [input], append() {} } }
@@ -541,7 +541,7 @@ test('commit rejects a selected live source whose revision changed after context
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   let revision = 1
   runtime.registerContextSource({
     id: 'facts', label: '资料', kind: 'shared-reference', defaultSlot: { id: 'facts', label: '资料' },
@@ -570,7 +570,7 @@ test('commit revalidates live context after asynchronous effect and guard valida
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxContextCharacters: 1000,
+    chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 1, maxArtifactBytes: 1024,
   })
   let revision = 1
@@ -618,7 +618,7 @@ test('commit reports an unavailable live source as stale context', async () => {
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   let available = true
   runtime.registerContextSource({
     id: 'facts', label: '资料', kind: 'shared-reference', defaultSlot: { id: 'facts', label: '资料' },
@@ -650,7 +650,7 @@ test('references require one active source and its exact assembled revision', as
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   runtime.registerContextSource({
     id: 'facts', label: '资料', kind: 'shared-reference', defaultSlot: { id: 'facts', label: '资料' },
     prepare: () => ({ revision: 'asset:4', text: 'facts' }),
@@ -677,7 +677,7 @@ test('derives the step budget from the persisted execution mode and session cap'
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   const agent = { session: { events: [], append() {} } }
   ctx.provide('rpSessions', { get: () => ({ runtime: { executionMode: 'agent', maxSteps: 5 } }) })
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
@@ -691,7 +691,7 @@ test('reads Session settings through the registered profile provider across Cord
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   runtime.registerSessionProfileProvider(() => ({ mode: 'adaptive', runtime: { executionMode: 'agent', maxSteps: 6 } }))
   const agent = { session: { events: [], append() {} } }
 
@@ -708,7 +708,7 @@ test('previews only settled visible dialogue bodies without changing native mode
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 10000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   runtime.registerSessionProfileProvider(() => ({
     runtime: { executionMode: 'chat' },
     contextBuild: { version: 1, slots: [{ id: 'prompt-top', label: '顶部', sourceIds: ['rp.preset:one', 'rp.preset:two'] }] },
@@ -812,7 +812,7 @@ test('previews only settled visible dialogue bodies without changing native mode
   assert.equal(preview.sources.find(source => source.id === 'rp.conversation').idleAllowed, false)
   assert.equal(preview.sources.find(source => source.id === 'rp.current-input').idleAllowed, false)
   assert.equal(history.diagnostics.messages, 3)
-  assert.equal(history.text, '回复：开场正文\n\n用户：继续故事\n\n回复：最终正文第一段\n最终正文第二段')
+  assert.equal(history.text, '[Context note: Original dialogue text, including the latest events and wording. It takes precedence over Conversation Summary.]\n\n回复：开场正文\n\n用户：继续故事\n\n回复：最终正文第一段\n最终正文第二段')
   assert.doesNotMatch(history.text, /中间上下文|中间文字|invalid arguments|rp_runtime_context|推理|Committed/)
   assert.deepEqual(session.deriveMessages(), nativeHistory)
   assert.match(preview.contextText, /开场正文|继续故事|最终正文/)
@@ -871,7 +871,7 @@ test('previews only settled visible dialogue bodies without changing native mode
   const deleted = await runtime.previewContextBuild(agent)
   const remainingHistory = deleted.contexts.find(source => source.id === 'rp.conversation')
   assert.equal(remainingHistory.diagnostics.messages, 1)
-  assert.equal(remainingHistory.text, '回复：开场正文')
+  assert.equal(remainingHistory.text, '[Context note: Original dialogue text, including the latest events and wording. It takes precedence over Conversation Summary.]\n\n回复：开场正文')
 
   const saved = await runtime.resolveContextBuild({ version: 1, slots: preview.slots }, agent)
   assert.deepEqual(saved.slots.map(slot => slot.sourceIds), [
@@ -885,7 +885,7 @@ test('previews Session custom Prompt content and preserves it while resolving th
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   const contextBuild = {
     version: 1,
     slots: [{ id: 'custom-2', label: '叙事约束', sourceIds: ['rp.custom:custom-2'] }],
@@ -911,7 +911,7 @@ test('keeps idle Session slots editable without exposing them to the effective P
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   const contextBuild = {
     version: 1,
     slots: [{ id: 'custom-3', label: '暂时不用', sourceIds: ['rp.custom:custom-3'], idle: true }],
@@ -942,7 +942,7 @@ test('chat mode masks optional tools and agent mode lifts the mask', async () =>
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return undefined } })
   ctx.provide('rpSessions', { get: () => ({ runtime: { executionMode } }) })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   const agent = { ctx: { tools: {
     register(tool) {
       assert.equal(tool.name, 'rp_write_turn')
@@ -1005,7 +1005,7 @@ test('isolated task subagents bypass RP context assembly, tool masking and commi
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return undefined } })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 100, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   const steering = []
   const agent = {
     ctx: { tools: { restrict() { restrictions += 1; return () => {} } } },
@@ -1047,7 +1047,7 @@ test('agent mode preassembles the saved Session slots and exposes no context-bui
       persona: undefined, preset: { id: 'agent-preset' }, writingStyles: [],
     },
   }) })
-  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 1000, maxEffectsPerCommit: 1, maxArtifactBytes: 4096 })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 4096 })
   let facts = { revision: 2, text: 'The gate is sealed.' }
   runtime.registerContextSource({ id: 'facts', label: '引用事实', kind: 'shared-reference', promptCategory: 'factual', defaultSlot: { id: 'facts', label: '事实' }, prepare: () => facts })
   runtime.registerContextSource({
@@ -1137,7 +1137,7 @@ test('Chat Writer receives one flat Prompt and its prose replaces the parent str
     },
   })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxContextCharacters: 2000,
+    chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 1000,
   })
   runtime.registerSessionProfileProvider(() => ({
@@ -1248,7 +1248,7 @@ test('Agent Writer uses the preassembled Slot context, accepts a bounded brief, 
     },
   })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 2000,
+    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 1000,
     maxWriterBriefCharacters: 8,
   })
@@ -1391,7 +1391,7 @@ test('global Writer and managed task subagents are shared by Chat and Agent, the
     },
   })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 2000,
+    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 1000,
   })
   runtime.registerSessionProfileProvider(agent => ({ runtime: { executionMode: agent.mode } }))
@@ -1467,7 +1467,7 @@ test('inherit routes resolve from the first logged parent request before child e
     },
   })
   const runtime = new RpRuntime(ctx, {
-    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxContextCharacters: 2000,
+    chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8,
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 1000,
   })
   runtime.registerSessionProfileProvider(() => ({ runtime: { executionMode: 'agent' } }))

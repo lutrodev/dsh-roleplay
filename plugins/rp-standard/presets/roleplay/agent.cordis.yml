@@ -105,8 +105,12 @@
     compaction: true
     toolResultPruner: true
   config:
-    - id: compaction-basic
-      name: __COMPACTION_BASIC_MODULE__
+    - id: rp-conversation-summary
+      name: __RP_CONVERSATION_SUMMARY_MODULE__
+      config: {}
+
+    - id: command-compact
+      name: __COMMAND_COMPACT_MODULE__
 
     - id: tool-result-pruner
       name: __TOOL_RESULT_PRUNER_MODULE__
@@ -136,12 +140,15 @@
       config:
         chatMaxStepsPerRun: __CHAT_MAX_STEPS__
         agentMaxStepsPerRun: __AGENT_MAX_STEPS__
-        maxContextCharacters: __MAX_CONTEXT_CHARACTERS__
         maxEffectsPerCommit: __MAX_EFFECTS__
         maxArtifactBytes: __MAX_ARTIFACT_BYTES__
         maxNarrativeCharacters: __MAX_NARRATIVE_CHARACTERS__
         maxWriterBriefCharacters: __MAX_WRITER_BRIEF_CHARACTERS__
         maxSubagentPromptCharacters: __MAX_SUBAGENT_PROMPT_CHARACTERS__
+
+    - id: rp-conversation-summary-bridge
+      name: __RP_CONVERSATION_SUMMARY_BRIDGE_MODULE__
+      config: {}
 
     - id: rp-subagent-manager
       name: __RP_SUBAGENT_MANAGER_MODULE__

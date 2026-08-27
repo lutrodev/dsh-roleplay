@@ -17,6 +17,15 @@ test('角色卡使用独立的资料卡图标语义', async () => {
   assert.match(source, /h\('circle'.*cx: 5\.1.*cy: 5\.7/)
 })
 
+test('Prompt 资料图标覆盖各资料类型并保持统一描边', async () => {
+  const source = await readFile(new URL('../src/index.js', import.meta.url), 'utf8')
+  assert.match(source, /function IconPromptSourceOutline16/)
+  for (const type of ['conversation', 'state', 'lore', 'persona', 'preset', 'writing-style', 'session', 'mixed', 'attachment']) {
+    assert.match(source, new RegExp(`['"]?${type}['"]?: \\[`))
+  }
+  assert.match(source, /strokeWidth: 1\.25/)
+})
+
 test('共享加载指示使用 Motion 并尊重减少动态效果偏好', async () => {
   const source = await readFile(new URL('../src/index.js', import.meta.url), 'utf8')
   assert.match(source, /function LoadingSpinner/)

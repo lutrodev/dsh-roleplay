@@ -96,8 +96,14 @@ test('Roleplay preset composes every standard Roleplay capability once', async (
   assert.equal(patch.match(/id: skill-filesystem/g)?.length, 1)
   assert.match(patch, /customSkillDirs:\s+- __ROLEPLAY_SKILL_DIR__/)
   assert.equal(patch.match(/id: tool-skill/g)?.length, 1)
-  assert.equal(patch.match(/id: compaction-basic/g)?.length, 1)
+  assert.equal(patch.match(/^\s*- id: rp-conversation-summary$/gm)?.length, 1)
+  assert.equal(patch.match(/^\s*- id: rp-conversation-summary-bridge$/gm)?.length, 1)
+  assert.equal(patch.match(/^\s*- id: command-compact$/gm)?.length, 1)
+  assert.equal(patch.match(/id: compaction-basic/g)?.length ?? 0, 0)
   assert.equal(patch.match(/id: tool-result-pruner/g)?.length, 1)
+  assert.match(patch, /id: rp-conversation-summary[\s\S]*?name: __RP_CONVERSATION_SUMMARY_MODULE__/)
+  assert.match(patch, /id: rp-conversation-summary[\s\S]*?id: command-compact[\s\S]*?name: __COMMAND_COMPACT_MODULE__/)
+  assert.match(patch, /id: rp-core[\s\S]*?id: rp-conversation-summary-bridge[\s\S]*?name: __RP_CONVERSATION_SUMMARY_BRIDGE_MODULE__/)
   assert.equal(patch.match(/id: tool-subagent/g)?.length ?? 0, 0)
   for (const id of ['persistent-shell', 'pty', 'terminal-bash', 'persistent-bash', 'terminal-pwsh', 'persistent-pwsh', 'str-replace-editor']) {
     assert.equal(patch.match(new RegExp(`id: ${id}(?:\\n|$)`, 'g'))?.length, 1)
@@ -124,6 +130,7 @@ test('Roleplay preset package declares every minimal workspace-tool module it co
     '@deepseek-ai/dsh-tool-bash-persistent',
     '@deepseek-ai/dsh-tool-pwsh-persistent',
     '@deepseek-ai/dsh-tool-str-replace-editor',
+    '@deepseek-ai/dsh-command-compact',
   ]) {
     assert.equal(typeof manifest.dependencies?.[packageName], 'string')
     assert.match(require.resolve(`${packageName}/package.json`), /package\.json$/)

@@ -227,6 +227,58 @@ test('browser RPC registration is disposed with the plugin fiber', async () => {
   }
 })
 
+test('initialization can be disposed without registering effects on an inactive context', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-persona-lifecycle-'))
+  const ctx = new Context()
+  const gate = Promise.withResolvers()
+  const started = Promise.withResolvers()
+  const registered = Promise.withResolvers()
+  const originalEnsureDefault = RpPersonas.prototype.ensureDefault
+  let handler
+  let disposed = false
+  let fiber
+  RpPersonas.prototype.ensureDefault = async function () {
+    started.resolve()
+    await gate.promise
+    return originalEnsureDefault.call(this)
+  }
+  ctx.provide('connection', {
+    rpc: {
+      handle(path, next) {
+        assert.equal(path, '/rp-personas')
+        handler = next
+        registered.resolve()
+        return () => { disposed = true }
+      },
+    },
+  })
+  try {
+    fiber = ctx.plugin({ name: 'rp-persona-lifecycle-test', apply }, configFor(root, { exposeBrowser: true }))
+    await Promise.all([started.promise, registered.promise])
+    let requestSettled = false
+    const request = handler('list', { limit: 10 }).then(value => {
+      requestSettled = true
+      return value
+    })
+    await Promise.resolve()
+    assert.equal(requestSettled, false, 'RPC must wait for persona initialization')
+
+    const disposal = fiber.dispose()
+    gate.resolve()
+    const response = await request
+    assert.equal(response.value.value.total, 1)
+    await disposal
+    await fiber.await()
+    assert.equal(disposed, true)
+  } finally {
+    RpPersonas.prototype.ensureDefault = originalEnsureDefault
+    gate.resolve()
+    if (fiber?.uid !== null) await fiber.dispose()
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('two service instances serialize concurrent creation and choose one valid default', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-persona-shared-'))
   const firstCtx = new Context()

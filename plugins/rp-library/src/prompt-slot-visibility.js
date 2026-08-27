@@ -42,7 +42,9 @@ export function selectPreviewSlots(slots, includedSourceIds) {
 }
 
 /**
- * Keep effective Prompt sources plus required generation-time placeholders.
+ * Keep effective Prompt sources plus the current-input generation placeholder.
+ * Other unavailable required sources, such as a conversation summary before
+ * any checkpoint exists, must not appear in the effective Prompt preview.
  *
  * @param {Iterable<Record<string, unknown>>} sources Registered Prompt sources.
  * @param {readonly Record<string, unknown>[]} contexts Sources materialized for this preview.
@@ -51,7 +53,7 @@ export function selectPreviewSlots(slots, includedSourceIds) {
 export function previewIncludedSourceIds(sources, contexts) {
   const ids = new Set(contexts.map(source => source.id))
   for (const source of sources) {
-    if (source.required === true) ids.add(source.id)
+    if (source.id === 'rp.current-input' && source.required === true) ids.add(source.id)
   }
   return ids
 }

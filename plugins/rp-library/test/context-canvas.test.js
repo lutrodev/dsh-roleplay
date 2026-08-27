@@ -5,6 +5,7 @@ import {
   movePromptSource,
   promptDragScrollDelta,
   promptSourceTone,
+  promptToneIconName,
   promptSlotCanIdle,
   renderPlainPromptPreview,
   renderPromptSlotPreview,
@@ -13,6 +14,23 @@ import {
 
 test('独立文风来源沿用文风颜色分类', () => {
   assert.equal(promptSourceTone({ id: 'rp.writing-style:8aa0f7fd-38cc-4a37-aee5-c7ec33b8b12d' }), 'writing-style')
+})
+
+test('世界书和我的人设使用不同的颜色分类与语义图标', () => {
+  const loreTone = promptSourceTone({ id: 'rp.lore.world-description' })
+  const personaTone = promptSourceTone({ id: 'rp.persona' })
+  assert.equal(loreTone, 'lore')
+  assert.equal(personaTone, 'persona')
+  assert.notEqual(loreTone, personaTone)
+  assert.equal(promptToneIconName(loreTone), 'lore')
+  assert.equal(promptToneIconName(personaTone), 'persona')
+})
+
+test('回复资料类型使用互不重复的图标', () => {
+  const tones = ['character', 'conversation', 'state', 'lore', 'persona', 'preset', 'writing-style', 'session']
+  const icons = tones.map(promptToneIconName)
+  assert.equal(new Set(icons).size, tones.length)
+  assert.equal(promptToneIconName('other'), 'attachment')
 })
 
 test('纯文本预览按当前分组顺序生成文档并保留资料原文', () => {
@@ -104,6 +122,22 @@ test('资料移动不会把闲置分组当作目标', () => {
 
   assert.equal(movePromptSource(slots, 'source', 'idle', sources), slots)
   assert.deepEqual(movePromptSource(slots, 'source', 'active', sources), slots)
+})
+
+test('会话总结可以更换分组但不能放入闲置区', () => {
+  const sources = new Map([
+    ['rp.conversation-summary', { id: 'rp.conversation-summary', label: '会话总结', idleAllowed: false, defaultSlot: { id: 'summary', label: '会话总结' } }],
+    ['rp.conversation', { id: 'rp.conversation', label: '对话历史', idleAllowed: false, defaultSlot: { id: 'history', label: '对话历史' } }],
+  ])
+  const slots = [
+    { id: 'summary', label: '会话总结', sourceIds: ['rp.conversation-summary'] },
+    { id: 'history', label: '对话历史', sourceIds: ['rp.conversation'] },
+  ]
+
+  const moved = movePromptSource(slots, 'rp.conversation-summary', 'history', sources)
+  assert.deepEqual(moved.map(slot => slot.sourceIds), [[], ['rp.conversation', 'rp.conversation-summary']])
+  assert.equal(promptSlotCanIdle(moved[1], sources), false)
+  assert.equal(setPromptSlotIdle(moved, 'history', true, sources), moved)
 })
 
 test('跨区域拖放按释放位置插入，并支持调整闲置区内顺序', () => {

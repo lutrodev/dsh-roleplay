@@ -6,19 +6,29 @@ import { RpRuntime } from '../src/runtime.js'
 function runtimeHarness(profile = {}) {
   const ctx = new Context()
   let agent
+  ctx.provide('llm', {
+    async resolveModelInfo(provider, id) {
+      return { provider, id, name: id, context: { contextWindow: 64000 }, defaultMaxTokens: 4096 }
+    },
+  })
+  ctx.provide('tokenMeter', {
+    estimateMessage(message) {
+      const text = message.content?.filter(block => block.type === 'text').map(block => block.text).join('') ?? ''
+      return Math.ceil(text.length / 4) + 8
+    },
+  })
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return agent } })
   const runtime = new RpRuntime(ctx, {
     chatMaxStepsPerRun: 2,
     agentMaxStepsPerRun: 8,
-    maxContextCharacters: 1000,
     maxEffectsPerCommit: 2,
     maxArtifactBytes: 4096,
     maxNarrativeCharacters: 1000,
   })
   runtime.registerSessionProfileProvider(() => profile)
-  agent = { id: 'session-1', session: { id: 'session-1', events: [], deriveMessages: () => [] } }
+  agent = { id: 'session-1', options: { provider: 'mock', model: 'mock' }, session: { id: 'session-1', events: [], deriveMessages: () => [] } }
   return { ctx, runtime, agent }
 }
 

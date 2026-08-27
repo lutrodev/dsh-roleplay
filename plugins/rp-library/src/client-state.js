@@ -87,11 +87,15 @@ export function userErrorMessage(error, intent = 'load') {
   if (code === 'PROFILE_TOO_LARGE') return '当前对话的资料内容过多，请精简后重试。'
   if (code === 'WORKSPACE_ATTACH_FAILED') return '对话已创建，但未能加入当前工作区。请在“未分组”中打开它。'
   if (code === 'LIMIT_EXCEEDED' || code === 'CARD_TEXT_LIMIT_EXCEEDED') return '文件内容过大，请精简后重试。'
+  if (intent === 'context-preview') {
+    if (code === 'ASSET_CORRUPT') return '当前回复资料无法完整读取，请检查会话资料后重试。'
+    return '暂时无法准备回复资料，请检查会话设置后重试。'
+  }
   if (code === 'ASSET_CORRUPT') return '这份资料内容不完整，请重新导入。'
   if (code === 'ASSET_NOT_FOUND') return intent === 'save' ? '所选资料已经不存在，请重新选择。' : '这份资料已经不可用。'
   if (code === 'REVISION_CONFLICT') return '故事资料刚刚发生了变化，请重新确认后再保存。'
   if (code === 'SESSION_RUNNING') return '故事正在生成回复，请结束后再调整。'
-  if (code === 'RP_CONTEXT_SOURCE_REQUIRED') return '对话历史和当前输入必须参与回复，不能放入闲置区。'
+  if (code === 'RP_CONTEXT_SOURCE_REQUIRED') return '这个分组必须参与回复，不能放入闲置区。'
   if (code === 'OPENING_LOCKED') return '故事开始后不能更换开场白。角色卡关联仍可继续调整。'
   if (code === 'OPENING_REQUIRES_SEEDED_CREATE') return '开场白只能在创建故事时选择。请新建对话，再通过“开始一段故事”完成设置。'
   if (intent === 'import') return '导入没有完成，请检查文件后重试。'

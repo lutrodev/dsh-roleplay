@@ -35,7 +35,7 @@ test('normalizes actor profiles with one user-controlled character', () => {
     cast: [{ characterId: 'hero', name: '林默', controller: 'user' }, { characterId: 'npc', controller: 'agent' }],
     resources: { card: { id: 'card-info' }, lorebooks: [{ id: 'world' }], persona: { id: 'persona-info' }, preset: { id: 'preset-info' }, writingStyles: [{ id: 'style-a' }, { id: 'style-b' }] },
     runtime: {
-      executionMode: 'agent', provider: 'deepseek-official', model: 'deepseek-chat', maxSteps: 6, maxContextCharacters: 30000,
+      executionMode: 'agent', provider: 'deepseek-official', model: 'deepseek-chat', maxSteps: 6,
       writer: { provider: 'writer-provider', model: 'writer-model', maxTokens: 8192 },
     },
   }, 0)

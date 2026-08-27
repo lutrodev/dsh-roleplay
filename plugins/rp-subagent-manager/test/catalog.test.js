@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
-import { RpSubagentManager } from '../src/index.js'
+import { apply, RpSubagentManager } from '../src/index.js'
 
 const CONFIG = {
   maxSubagents: 3,
@@ -38,6 +38,81 @@ const role = (name, extra = {}) => ({
   route: { kind: 'inherit' },
   tools: [],
   ...extra,
+})
+
+test('initialization can be disposed while runtime and browser consumers wait for readiness', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-subagents-lifecycle-'))
+  const ctx = new Context()
+  const gate = Promise.withResolvers()
+  const started = Promise.withResolvers()
+  const browserRegistered = Promise.withResolvers()
+  const providerRegistered = Promise.withResolvers()
+  const originalInitialize = RpSubagentManager.prototype.initialize
+  let handler
+  let provider
+  let browserDisposed = false
+  let providerDisposed = false
+  let fiber
+  RpSubagentManager.prototype.initialize = async function () {
+    started.resolve()
+    await gate.promise
+    return originalInitialize.call(this)
+  }
+  ctx.provide('connection', {
+    rpc: {
+      handle(path, next) {
+        assert.equal(path, '/rp-subagents')
+        handler = next
+        browserRegistered.resolve()
+        return () => { browserDisposed = true }
+      },
+    },
+  })
+  ctx.provide('rpRuntime', {
+    registerSubagentProfileProvider(value) {
+      provider = value
+      providerRegistered.resolve()
+      return () => { providerDisposed = true }
+    },
+  })
+  try {
+    fiber = ctx.plugin({ name: 'rp-subagent-manager-lifecycle-test', apply }, {
+      ...CONFIG,
+      catalogDir: join(root, 'subagents'),
+      exposeBrowser: true,
+      initialSubagents: [],
+    })
+    await Promise.all([started.promise, browserRegistered.promise, providerRegistered.promise])
+    let browserSettled = false
+    let providerSettled = false
+    const request = handler('list', {}).then(value => {
+      browserSettled = true
+      return value
+    })
+    const prepared = provider.prepare().then(value => {
+      providerSettled = true
+      return value
+    })
+    await Promise.resolve()
+    assert.equal(browserSettled, false, 'RPC must wait for catalog initialization')
+    assert.equal(providerSettled, false, 'runtime provider must wait for catalog initialization')
+
+    const disposal = fiber.dispose()
+    gate.resolve()
+    const [response, profile] = await Promise.all([request, prepared])
+    assert.equal(response.value.value.writer.id, 'writer')
+    assert.deepEqual(profile.subagents, [])
+    await disposal
+    await fiber.await()
+    assert.equal(browserDisposed, true)
+    assert.equal(providerDisposed, true)
+  } finally {
+    RpSubagentManager.prototype.initialize = originalInitialize
+    gate.resolve()
+    if (fiber?.uid !== null) await fiber.dispose()
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test('first initialization creates fixed Writer with an empty task-subagent catalog', async () => {

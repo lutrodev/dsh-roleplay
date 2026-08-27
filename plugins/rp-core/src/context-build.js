@@ -298,35 +298,17 @@ export function defaultContextBuild(definitions) {
 }
 
 /**
- * Select candidates by an independent budget priority, then serialize them in Slot order.
+ * Serialize every available source in the active Slot layout. Model providers
+ * remain the authority for the final context-window validation.
  *
- * @param {{ layout: { slots: Array<Record<string, unknown>> }, candidates: readonly Record<string, unknown>[], unavailable?: readonly Record<string, unknown>[], maxCharacters: number }} input Build inputs.
+ * @param {{ layout: { slots: Array<Record<string, unknown>> }, candidates: readonly Record<string, unknown>[], unavailable?: readonly Record<string, unknown>[] }} input Build inputs.
  * @returns {{ slots: Array<Record<string, unknown>>, fragments: Array<Record<string, unknown>>, excluded: Array<Record<string, unknown>>, contextText: string, usedCharacters: number }} Compiled build.
  */
-export function compileContextBuild({ layout, candidates, unavailable = [], maxCharacters }) {
+export function compileContextBuild({ layout, candidates, unavailable = [] }) {
   const activeSlots = layout.slots.filter(slot => slot.idle !== true)
   const selectedIds = activeSlots.flatMap(slot => slot.sourceIds)
   const candidateById = new Map(candidates.map(candidate => [candidate.id, candidate]))
-  const selected = selectedIds.map(id => candidateById.get(id)).filter(Boolean)
-  const admitted = new Set()
-  const budgetExcluded = []
-  for (const candidate of selected.filter(item => item.required || item.promptCategory === 'factual')) admitted.add(candidate.id)
-  let contextText = renderContextText(activeSlots, candidateById, admitted)
-  if ([...contextText].length > maxCharacters) {
-    throw coded('RP_REQUIRED_CONTEXT_LIMIT', `required factual context exceeds ${maxCharacters} characters`)
-  }
-  for (const candidate of [...selected]
-    .filter(item => !item.required && item.promptCategory !== 'factual')
-    .sort((left, right) => left.budgetPriority - right.budgetPriority || left.id.localeCompare(right.id))) {
-    admitted.add(candidate.id)
-    const nextText = renderContextText(activeSlots, candidateById, admitted)
-    if ([...nextText].length > maxCharacters) {
-      admitted.delete(candidate.id)
-      budgetExcluded.push({ ...metadata(candidate), reason: 'context-budget' })
-      continue
-    }
-    contextText = nextText
-  }
+  const admitted = new Set(selectedIds.filter(id => candidateById.has(id)))
   const fragments = []
   const slots = activeSlots.map((slot, slotIndex) => {
     const sourceIds = []
@@ -339,12 +321,12 @@ export function compileContextBuild({ layout, candidates, unavailable = [], maxC
     return { ...slot, sourceIds }
   })
   const unavailableSelected = unavailable.filter(item => selectedIds.includes(item.id))
-  contextText = renderContextText(slots, candidateById, admitted)
+  const contextText = renderContextText(slots, candidateById, admitted)
   return {
     slots,
     customSources: layout.customSources ?? [],
     fragments,
-    excluded: [...unavailableSelected, ...budgetExcluded],
+    excluded: unavailableSelected,
     contextText,
     usedCharacters: [...contextText].length,
   }
@@ -482,24 +464,6 @@ function renderContextText(slots, candidateById, admitted) {
     return `<section name="${escapeAttribute(slot.label)}">\n${body}\n</section>`
   })
   return renderedSlots.join('\n')
-}
-
-function metadata(candidate) {
-  return {
-    id: candidate.id,
-    label: candidate.label,
-    kind: candidate.kind,
-    promptCategory: candidate.promptCategory,
-    delivery: candidate.delivery,
-    parentDelivery: candidate.parentDelivery,
-    revision: candidate.revision,
-    characters: candidate.characters,
-    diagnostics: candidate.diagnostics,
-    dependsOn: candidate.dependsOn,
-    order: candidate.order,
-    budgetPriority: candidate.budgetPriority,
-    required: candidate.required,
-  }
 }
 
 function stringIds(value, field) {

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
-import { PRESET_TEMPLATES, RpPresets, dispatchBrowser } from '../src/index.js'
+import { apply, PRESET_TEMPLATES, RpPresets, dispatchBrowser } from '../src/index.js'
 
 const configFor = libraryDir => ({ libraryDir, maxTextCharacters: 100000, maxFields: 32, exposeBrowser: false })
 
@@ -190,6 +190,58 @@ test('enforces complete preset field and text limits', async () => {
     await assert.rejects(presets.create({ name: '甲', fields: [{ name: '一', position: 'top' }, { name: '二', position: 'top' }, { name: '三', position: 'bottom' }] }), error => error.code === 'INVALID_REQUEST')
     await assert.rejects(presets.create({ name: '甲', fields: [{ name: '乙', position: 'middle' }] }), error => error.code === 'INVALID_REQUEST')
   } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('initialization can be disposed without registering effects on an inactive context', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-preset-lifecycle-'))
+  const ctx = new Context()
+  const gate = Promise.withResolvers()
+  const started = Promise.withResolvers()
+  const registered = Promise.withResolvers()
+  const originalEnsureDefault = RpPresets.prototype.ensureDefault
+  let handler
+  let disposed = false
+  let fiber
+  RpPresets.prototype.ensureDefault = async function () {
+    started.resolve()
+    await gate.promise
+    return originalEnsureDefault.call(this)
+  }
+  ctx.provide('connection', {
+    rpc: {
+      handle(path, next) {
+        assert.equal(path, '/rp-presets')
+        handler = next
+        registered.resolve()
+        return () => { disposed = true }
+      },
+    },
+  })
+  try {
+    fiber = ctx.plugin({ name: 'rp-preset-lifecycle-test', apply }, { ...configFor(root), exposeBrowser: true })
+    await Promise.all([started.promise, registered.promise])
+    let requestSettled = false
+    const request = handler('templates', {}).then(value => {
+      requestSettled = true
+      return value
+    })
+    await Promise.resolve()
+    assert.equal(requestSettled, false, 'RPC must wait for preset initialization')
+
+    const disposal = fiber.dispose()
+    gate.resolve()
+    const response = await request
+    assert.equal(response.value.value.items.length, PRESET_TEMPLATES.length)
+    await disposal
+    await fiber.await()
+    assert.equal(disposed, true)
+  } finally {
+    RpPresets.prototype.ensureDefault = originalEnsureDefault
+    gate.resolve()
+    if (fiber?.uid !== null) await fiber.dispose()
     await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })
   }

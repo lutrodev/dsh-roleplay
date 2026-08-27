@@ -60,7 +60,7 @@ const copy = {
   coreTitle: '核心运行时', coreDescription: '核心能力', alwaysEnabled: '始终启用',
   enabled: '已启用', disabled: '未启用', enabling: '正在更新…', loading: '正在读取 Roleplay 设置…',
   loadError: '暂时无法读取 Roleplay 设置。', retry: '重试', compatible: '版本兼容', incompatible: '版本不兼容',
-  versionProblem: '版本不兼容', roleplayVersion: 'Roleplay', dshVersion: 'DSH', versionDetails: '查看核心组件版本',
+  versionProblem: '版本不兼容', roleplayVersion: 'Roleplay', dshVersion: 'DSH', versionDetails: '查看核心组件',
   applies: '下一次对话生效。', saveError: '启用状态没有保存，请稍后重试。',
   quickRepliesConfigure: '设置快捷回复', quickRepliesEnableFirst: '启用后设置',
   skillsTitle: 'Roleplay Skills', skillsDescription: '逐项选择 Roleplay 插件向 Agent 提供的工作指南。',
@@ -112,7 +112,10 @@ function statusView(enabledFeatures, enabledSkills, revision = 0) {
     enabledFeatures: [...enabledFeatures],
     enabledSkills: [...enabledSkills],
     settings: { writable: true, revision },
-    core: [{ label: '回复运行时', packageVersion: '0.1.0', versionCompatible: true }],
+    core: [
+      { label: '回复运行时', description: '协调父代理、Writer、上下文与每轮写作流程。', packageVersion: '0.1.0', versionCompatible: true },
+      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.4', versionCompatible: true },
+    ],
     features: FEATURE_CATALOG.map(item => ({
       ...item,
       enabled: enabledFeatures.includes(item.id),
@@ -275,6 +278,17 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     expect(inject).toHaveBeenCalledWith('settings.section', expect.any(Function))
     expect(registration).toMatchObject({ name: 'settings.section', id: 'roleplay', order: 25 })
     expect(registration.label()).toBe('Roleplay')
+  })
+
+  it('用插件卡片展示核心组件的名称、版本和简介', async () => {
+    const { scope, connection } = harness()
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+
+    fireEvent.click(await screen.findByText('查看核心组件'))
+    const card = screen.getByText('会话总结').closest('li')
+    expect(card).toBeTruthy()
+    expect(card.textContent).toContain('v0.1.4')
+    expect(card.textContent).toContain('压缩较早的对话，并向 Writer 提供独立的会话总结。')
   })
 
   it('在快捷回复功能卡中提供设置入口，并保存完整的自定义列表', async () => {

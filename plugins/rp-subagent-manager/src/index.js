@@ -215,20 +215,30 @@ function renderTaskPersona(subagent) {
 export async function apply(ctx, config) {
   validateConfig(config)
   const manager = new RpSubagentManager(ctx, config)
-  await manager.initialize()
+  const ready = manager.initialize()
   ctx.inject(['rpRuntime'], runtimeCtx => runtimeCtx.rpRuntime.registerSubagentProfileProvider({
     id: 'rp-subagent-manager',
-    prepare: () => manager.prepareRuntimeProfile(),
+    prepare: async () => {
+      await ready
+      return manager.prepareRuntimeProfile()
+    },
   }))
-  if (config.exposeBrowser !== false) ctx.inject(['connection'], browserCtx => registerBrowser(browserCtx, manager))
+  if (config.exposeBrowser !== false) {
+    ctx.inject(['connection'], browserCtx => registerBrowser(browserCtx, manager, ready))
+  }
+  await ready
 }
 
-function registerBrowser(ctx, manager) {
+function registerBrowser(ctx, manager, ready) {
   const endpoints = new Set(['list', 'get', 'create', 'update', 'delete', 'set-enabled', 'writer/update'])
   const dispose = ctx.connection.rpc.handle('/rp-subagents', async (endpoint, payload, signal) => {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown subagent endpoint: ${endpoint}`))
-    try { return transportSuccess(success(await dispatchBrowser(manager, endpoint, payload, signal))) }
-    catch (error) { return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error))) }
+    try {
+      await ready
+      return transportSuccess(success(await dispatchBrowser(manager, endpoint, payload, signal)))
+    } catch (error) {
+      return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error)))
+    }
   }, { authority: 'trusted-host' })
   ctx.effect(() => dispose, 'rp-subagent-manager: /rp-subagents RPC')
 }

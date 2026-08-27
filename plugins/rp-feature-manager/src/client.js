@@ -60,7 +60,7 @@ const zh = {
   versionProblem: '当前版本组合不兼容。请先对齐 Roleplay 与 DSH 版本，再调整功能或 Skills。',
   roleplayVersion: 'Roleplay',
   dshVersion: 'DSH',
-  versionDetails: '查看核心组件版本',
+  versionDetails: '查看核心组件',
   applies: '资料入口会立即调整；Roleplay 运行能力从下一次新建或重新打开对话开始生效。',
   saveError: '启用状态没有保存，请稍后重试。',
   quickRepliesConfigure: '设置快捷回复',
@@ -174,7 +174,7 @@ const en = {
   loading: 'Reading Roleplay settings…', loadError: 'Roleplay settings are temporarily unavailable.', retry: 'Retry',
   compatible: 'Versions compatible', incompatible: 'Versions incompatible',
   versionProblem: 'This version set is incompatible. Align Roleplay and DSH versions before changing features or Skills.',
-  roleplayVersion: 'Roleplay', dshVersion: 'DSH', versionDetails: 'View core component versions',
+  roleplayVersion: 'Roleplay', dshVersion: 'DSH', versionDetails: 'View core components',
   applies: 'Material entries update immediately. Runtime changes apply to newly created or reopened conversations.',
   saveError: 'The enabled state was not saved. Try again.',
   quickRepliesConfigure: 'Configure quick replies', quickRepliesEnableFirst: 'Enable to configure',
@@ -816,7 +816,11 @@ function CoreSummary({ status, t }) {
       h('p', null, t('coreDescription')),
       h('details', { className: css.coreVersions },
         h('summary', null, t('versionDetails'), h(IconChevronDownOutline14, { size: 12, 'aria-hidden': true })),
-        h('ul', null, ...status.core.map(item => h('li', { key: item.label }, h('span', null, item.label), h('code', null, item.packageVersion ?? '—')))))))
+        h('ul', null, ...status.core.map(item => h('li', { key: item.label },
+          h('div', { className: css.corePluginHeader },
+            h('strong', null, item.label),
+            h('code', null, `v${item.packageVersion ?? '—'}`)),
+          h('p', { className: css.corePluginDescription }, item.description)))))))
 }
 
 function FeatureRow({ feature, checked, pending, disabled, status, reduced, onToggle, onConfigure, t }) {

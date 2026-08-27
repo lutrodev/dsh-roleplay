@@ -20,7 +20,6 @@ test('the standard runtime expands both identities across every model text surfa
   const runtime = new Core.RpRuntime(ctx, {
     chatMaxStepsPerRun: 2,
     agentMaxStepsPerRun: 8,
-    maxContextCharacters: 1000,
     maxEffectsPerCommit: 2,
     maxArtifactBytes: 4096,
     maxNarrativeCharacters: 1000,

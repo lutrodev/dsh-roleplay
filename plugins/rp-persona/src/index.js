@@ -245,17 +245,23 @@ export class RpPersonas extends Service {
 export async function apply(ctx, config) {
   validateConfig(config)
   const personas = new RpPersonas(ctx, config)
-  await personas.ensureDefault()
-  if (config.exposeBrowser === false) return
-  ctx.inject(['connection'], browserCtx => registerBrowser(browserCtx, personas))
+  const ready = personas.ensureDefault()
+  if (config.exposeBrowser !== false) {
+    ctx.inject(['connection'], browserCtx => registerBrowser(browserCtx, personas, ready))
+  }
+  await ready
 }
 
-function registerBrowser(ctx, personas) {
+function registerBrowser(ctx, personas, ready) {
   const endpoints = new Set(['list', 'get', 'create', 'update', 'delete', 'avatar', 'set-default'])
   const dispose = ctx.connection.rpc.handle('/rp-personas', async (endpoint, payload) => {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown persona endpoint: ${endpoint}`))
-    try { return transportSuccess(success(await dispatchBrowser(personas, endpoint, payload))) }
-    catch (error) { return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error))) }
+    try {
+      await ready
+      return transportSuccess(success(await dispatchBrowser(personas, endpoint, payload)))
+    } catch (error) {
+      return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error)))
+    }
   }, { authority: 'trusted-host' })
   ctx.effect(() => dispose, 'rp-persona: /rp-personas RPC')
 }

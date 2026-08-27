@@ -184,7 +184,7 @@
   white-space: nowrap;
 }
 
-.core p {
+.coreCopy > p {
   margin-top: 3px;
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
@@ -204,6 +204,12 @@
   cursor: pointer;
 }
 
+.coreVersions summary:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
 .coreVersions[open] summary svg {
   transform: rotate(180deg);
 }
@@ -211,16 +217,45 @@
 .coreVersions ul {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 16px;
-  margin: 8px 0 0;
+  gap: 8px;
+  margin: 10px 0 0;
   padding: 0;
   list-style: none;
 }
 
 .coreVersions li {
   display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.corePluginHeader {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
+}
+
+.corePluginHeader strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.corePluginDescription {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 17px;
 }
 
 .coreVersions code,
@@ -228,6 +263,13 @@
 .skillMeta code {
   color: var(--dsw-alias-label-tertiary);
   font-family: var(--ds-font-family-code);
+}
+
+.coreVersions code {
+  flex: none;
+  font-size: 10px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
 }
 
 .skillScope {

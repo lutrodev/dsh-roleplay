@@ -4,14 +4,17 @@ export const ROLEPLAY_SUITE_VERSION = '0.1.4'
 export const SUPPORTED_DSH_RANGE = '^0.1.1-rc.2'
 export const SETTINGS_NAMESPACE = 'roleplay-features'
 
+// Every always-on core package must also remain a direct dependency of
+// rp-feature-manager so runtime compatibility inspection can resolve it.
 export const CORE_PACKAGES = Object.freeze([
-  Object.freeze({ packageName: 'dsh-roleplay-rp-feature-manager', label: '功能管理' }),
-  Object.freeze({ packageName: 'dsh-roleplay-rp-standard', label: 'Roleplay 模式' }),
-  Object.freeze({ packageName: 'dsh-roleplay-rp-core', label: '回复运行时' }),
-  Object.freeze({ packageName: 'dsh-roleplay-rp-session', label: '对话配置' }),
-  Object.freeze({ packageName: 'dsh-roleplay-rp-macro', label: '名称宏' }),
-  Object.freeze({ packageName: 'dsh-roleplay-rp-asset-tools', label: '资料工具' }),
-  Object.freeze({ packageName: 'dsh-roleplay-rp-library', label: '故事设置' }),
+  Object.freeze({ packageName: 'dsh-roleplay-rp-feature-manager', label: '功能管理', description: '管理 Roleplay 功能、Skills、版本兼容状态和设置入口。' }),
+  Object.freeze({ packageName: 'dsh-roleplay-rp-standard', label: 'Roleplay 模式', description: '组合 Roleplay 核心运行时、工具与默认工作流。' }),
+  Object.freeze({ packageName: 'dsh-roleplay-rp-core', label: '回复运行时', description: '协调父代理、Writer、上下文与每轮写作流程。' }),
+  Object.freeze({ packageName: 'dsh-roleplay-rp-conversation-summary', label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。' }),
+  Object.freeze({ packageName: 'dsh-roleplay-rp-session', label: '对话配置', description: '保存当前会话的模式、资料绑定与故事设置。' }),
+  Object.freeze({ packageName: 'dsh-roleplay-rp-macro', label: '名称宏', description: '在提示词中展开当前角色与用户的名称。' }),
+  Object.freeze({ packageName: 'dsh-roleplay-rp-asset-tools', label: '资料工具', description: '为 Agent 提供统一、精简的共享资料操作入口。' }),
+  Object.freeze({ packageName: 'dsh-roleplay-rp-library', label: '故事设置', description: '提供资料导航、会话绑定与 Prompt 编辑界面。' }),
 ])
 
 export const FEATURE_CATALOG = Object.freeze([

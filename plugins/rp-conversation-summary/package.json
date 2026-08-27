@@ -1,0 +1,58 @@
+{
+  "name": "dsh-roleplay-rp-conversation-summary",
+  "version": "0.1.4",
+  "description": "Deferred narrative-history compaction and active summary context for Roleplay",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./bridge": "./src/bridge.js",
+    "./summary-source": "./src/summary-source.js",
+    "./summarizer": "./src/summarizer.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/**/*.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/engine.js && node --check src/summarizer.js && node --check src/summary-source.js && node --check src/token-meter.js && node --check src/bridge.js",
+    "test": "node --test",
+    "verify": "pnpm run check && pnpm test"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-agent": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-compaction": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-compaction-basic": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-llm": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-session": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-token-meter": "^0.1.1-rc.2",
+    "dsh-roleplay-rp-core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-agent": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-compaction": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-compaction-basic": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-llm": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-session": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-token-meter": "0.1.1-rc.2",
+    "dsh-roleplay-rp-core": "workspace:^"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@11.23.0"
+}

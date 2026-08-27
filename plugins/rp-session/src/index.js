@@ -672,12 +672,10 @@ function normalizeRuntime(value, defaultExecutionMode) {
   const model = optionalString(value.model)
   if ((provider === undefined) !== (model === undefined)) throw new Error('runtime.provider and runtime.model must be configured together')
   const maxSteps = optionalPositiveInteger(value.maxSteps, 'runtime.maxSteps')
-  const maxContextCharacters = optionalPositiveInteger(value.maxContextCharacters, 'runtime.maxContextCharacters')
   return {
     executionMode,
     ...(model === undefined ? {} : { provider, model }),
     ...(maxSteps === undefined ? {} : { maxSteps }),
-    ...(maxContextCharacters === undefined ? {} : { maxContextCharacters }),
   }
 }
 

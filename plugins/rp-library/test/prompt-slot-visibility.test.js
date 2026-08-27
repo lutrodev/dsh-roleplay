@@ -48,6 +48,13 @@ test('Prompt preview adds required generation-time placeholders to the effective
   assert.deepEqual(selectPreviewSlots(restored, included).map(slot => slot.id), ['conversation', 'current-input'])
 })
 
+test('Prompt preview does not invent a summary placeholder before a checkpoint exists', () => {
+  const summary = { id: 'rp.conversation-summary', required: true, available: false, defaultSlot: { id: 'conversation-summary' } }
+  const restored = [...slots, { id: 'conversation-summary', label: '会话总结', sourceIds: [summary.id], locked: true }]
+  const included = previewIncludedSourceIds([...sources, summary], [sources[2]])
+  assert.deepEqual(selectPreviewSlots(restored, included).map(slot => slot.id), ['conversation'])
+})
+
 test('Prompt preview excludes idle slots even when their sources have content', () => {
   const parked = [
     ...slots,

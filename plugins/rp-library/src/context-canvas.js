@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Reorder, m, useDragControls, useReducedMotion } from 'motion/react'
+import { IconPromptSourceOutline16 } from 'dsh-roleplay-rp-ui'
 import { domainValue, userErrorMessage } from './client-state.js'
 import { css } from './client-styles.generated.js'
 import {
@@ -25,6 +26,17 @@ const PROMPT_TONES = [
   ['state', '会话变量'], ['lore', '世界书'], ['persona', '我的人设'],
   ['preset', '创作预设'], ['writing-style', '文风'], ['session', '故事设置'],
 ]
+const PROMPT_TONE_ICONS = Object.freeze({
+  character: 'character-card',
+  conversation: 'conversation',
+  state: 'state',
+  lore: 'lore',
+  persona: 'persona',
+  preset: 'preset',
+  'writing-style': 'writing-style',
+  session: 'session',
+  mixed: 'mixed',
+})
 
 function usePromptDragAutoScroll(containerRef, orientation = 'vertical') {
   const reducedMotion = useReducedMotion()
@@ -94,7 +106,7 @@ export function PromptWorkbench({ open, profile, session, sessionId, connection 
       setPreviewState('ready')
     } catch (error) {
       setPreviewState('error')
-      setPreviewError(userErrorMessage(error, 'preview'))
+      setPreviewError(userErrorMessage(error, 'context-preview'))
     }
   }
   useEffect(() => { if (open) void refresh() }, [open, profile?.revision, profile?.runtime?.executionMode])
@@ -291,7 +303,7 @@ function ChatBuilder({ preview, profile, session, sessionId, connection }) {
   },
       h('div', { className: css.builderIntro },
         h('div', { className: css.buildSectionHeader }, h('div', null, h('span', { className: css.eyebrow }, '调整顺序'), h('h3', null, '回复资料顺序')), h('button', { type: 'button', onClick: addSlot, disabled: session?.running }, '+ 添加分组')),
-        h('p', { className: css.buildExplainer }, '拖动左侧手柄排序，拖动分组名称可移入闲置区；拖动资料可更换分组。对话历史和当前输入始终启用。'),
+        h('p', { className: css.buildExplainer }, '拖动左侧手柄排序，拖动分组名称可移入闲置区；拖动资料可更换分组。会话总结、对话历史和当前输入始终启用。'),
         h(PromptLegend)),
       restoringIdleSlot
         ? h(m.div, { className: css.restoreDropHint, initial: { opacity: 0, y: -4 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -4 } }, '松开放回回复资料')
@@ -307,7 +319,7 @@ function ChatBuilder({ preview, profile, session, sessionId, connection }) {
       }, ...slotItems),
       error ? h('p', { className: css.builderError, role: 'alert' }, error) : null,
       h('footer', { className: css.builderFooter },
-        h('span', null, `已使用 ${preview.usedCharacters ?? 0} / ${preview.maxContextCharacters ?? 0} 字`, invalidCustomName ? ' · 请填写分组名称' : dirty ? ' · 修改尚未保存' : ' · 已保存'),
+        h('span', null, `回复资料 ${preview.usedCharacters ?? 0} 字`, invalidCustomName ? ' · 请填写分组名称' : dirty ? ' · 修改尚未保存' : ' · 已保存'),
         h(m.button, { ...buttonMotion, type: 'button', onClick: () => void save(), disabled: !dirty || invalidCustomName || session?.running || saveState === 'saving' }, session?.running ? '回复生成中' : saveState === 'saving' ? '保存中…' : '保存更改')))
   const selectedCustomSlot = slots.find(slot => slot.id === selectedCustomSlotId)
   return h('div', { className: css.contextBuildGrid }, workbench, idleArea,
@@ -363,7 +375,7 @@ function PromptSlot({ slot, slotIndex, sources, dragging, dropTarget, previousSl
           else if (event.key === 'ArrowDown') { event.preventDefault(); onReorderSlot(1) }
         },
       }, '⠿')
-  const idleAction = canIdle ? null : h('span', { className: css.slotRequiredBadge, title: '对话历史和当前输入必须参与回复' }, '始终使用')
+  const idleAction = canIdle ? null : h('span', { className: css.slotRequiredBadge, title: '这个分组必须参与回复' }, '始终使用')
   if (displaySourceIds.length === 1) {
     const sourceId = displaySourceIds[0]
     const source = sources.get(sourceId) ?? { id: sourceId, label: sourceId }
@@ -381,8 +393,8 @@ function PromptSlot({ slot, slotIndex, sources, dragging, dropTarget, previousSl
             else if (event.key === 'ArrowDown' && nextSlotId !== undefined) { event.preventDefault(); onMoveSource(sourceId, nextSlotId) }
           },
           title: `拖动${source.label ?? source.id}`, 'aria-label': `拖动${source.label ?? source.id}到其他分组；也可用上下方向键移动`,
-        }, h(SourceKindIcon, { kind: source.kind, tone }), h('i', null, '⠿'))
-      : h('span', { className: css.sourceDragHandle, 'aria-hidden': true }, h(SourceKindIcon, { kind: source.kind, tone }))
+        }, h(SourceTypeIcon, { tone }), h('i', null, '⠿'))
+      : h('span', { className: css.sourceDragHandle, 'aria-hidden': true }, h(SourceTypeIcon, { tone }))
     return h(Reorder.Item, {
       value: slot, layout: true, transition: layoutTransition, dragListener: false, dragControls: controls,
       className: css.slotCard, 'data-tone': slotTone(slot, sources), 'data-single': 'true', 'data-selected': selected ? 'true' : 'false',
@@ -516,7 +528,7 @@ function IdleSlotArea({ slots, sources, listRef, dropLocation, draggingSlotId, c
   slots.length === 0
     ? h('div', { ref: listRef, className: css.idleSlotEmpty },
         h('strong', null, draggingSlotId === null ? '暂无闲置分组' : canDrop ? '松开放入闲置区' : '这个分组不能闲置'),
-        h('span', null, draggingSlotId === null ? '拖动分组名称到这里' : canDrop ? '分组会保留，可拖回中间恢复' : '对话历史和当前输入始终启用'))
+        h('span', null, draggingSlotId === null ? '拖动分组名称到这里' : canDrop ? '分组会保留，可拖回中间恢复' : '这个分组始终启用'))
     : h('div', {
         ref: listRef,
         className: css.idleSlotList,
@@ -547,13 +559,12 @@ function PromptPreview({ preview, slots, disabled, mode, onModeChange, onSlotSec
       : h('div', { className: css.promptDocument },
         ...visibleSlots.map(slot => {
           const text = renderPromptSlotPreview(slot, sources)
-          const firstSource = sources.get(slot.sourceIds[0])
           const tone = slotTone(slot, sources)
           const sectionTag = slot.sectionTag !== false
           return h('section', { key: slot.id, 'data-tone': tone },
             h('details', null,
               h('summary', null,
-                h(SourceKindIcon, { kind: firstSource?.kind, tone }),
+                h(SourceTypeIcon, { tone }),
                 h('strong', null, slot.label),
                 h('span', null, `${slot.sourceIds.length} 份 · ${formatNumber([...text].length)} 字`)),
               h('div', { className: css.promptSlotPreviewBody },
@@ -636,7 +647,7 @@ function CustomPromptEditor({ slot, disabled, onClose, onChangeName, onChangeCon
 }
 
 function PromptLegend() {
-  return h('div', { className: css.promptLegend, 'aria-label': '回复资料颜色说明' }, ...PROMPT_TONES.map(([tone, label]) => h('span', { key: tone, 'data-tone': tone }, h('i', { 'aria-hidden': true }), label)))
+  return h('div', { className: css.promptLegend, 'aria-label': '回复资料类型说明' }, ...PROMPT_TONES.map(([tone, label]) => h('span', { key: tone, 'data-tone': tone }, h(SourceTypeIcon, { tone }), label)))
 }
 
 function SourceCard({ source, onDragStart, onDragEnd, onHandleKeyDown, actions, readonly = false, dragging = false }) {
@@ -651,15 +662,16 @@ function SourceCard({ source, onDragStart, onDragEnd, onHandleKeyDown, actions, 
     ? h('button', {
         type: 'button', className: css.sourceDragHandle, draggable: true, onDragStart, onDragEnd, onKeyDown: onHandleKeyDown,
         title: `拖动${source.label ?? source.id}`, 'aria-label': `拖动${source.label ?? source.id}；也可用上下方向键移动`,
-      }, h(SourceKindIcon, { kind: source.kind, tone }), h('i', null, '⠿'))
-    : h('span', { className: css.sourceDragHandle, 'aria-hidden': true }, h(SourceKindIcon, { kind: source.kind, tone })),
+      }, h(SourceTypeIcon, { tone }), h('i', null, '⠿'))
+    : h('span', { className: css.sourceDragHandle, 'aria-hidden': true }, h(SourceTypeIcon, { tone })),
   h('span', null, h('strong', null, source.label ?? source.id), h('small', null, source.id === 'rp.card' ? '包含角色设定、场景与对话示例' : source.description ?? source.id)),
   h('span', { className: css.sourceMeta }, unavailable ? unavailableSourceLabel(source) : sourceMetaLabel(source)),
   actions)
 }
 
-function SourceKindIcon({ kind, tone }) {
-  return h('i', { className: css.sourceKindIcon, 'data-kind': kind ?? 'runtime', 'data-tone': tone, 'aria-label': sourceKindLabel(kind) })
+function SourceTypeIcon({ tone }) {
+  const iconName = promptToneIconName(tone)
+  return h('i', { className: css.sourceTypeIcon, 'data-icon': iconName, 'data-tone': tone, 'aria-hidden': true }, h(IconPromptSourceOutline16, { type: iconName, size: 14 }))
 }
 
 function CanvasEmpty({ title, detail, error = false }) {
@@ -762,6 +774,10 @@ export function promptSourceTone(source) {
   if (id.startsWith('rp.lore')) return 'lore'
   if (id === 'rp.current-input' || source?.kind === 'conversation' || /conversation|history|message/i.test(id)) return 'conversation'
   return 'other'
+}
+/** Return the stable icon key for one prompt visual category. */
+export function promptToneIconName(tone) {
+  return Object.hasOwn(PROMPT_TONE_ICONS, tone) ? PROMPT_TONE_ICONS[tone] : 'attachment'
 }
 /** Return one visual preview block for a prompt source. */
 export function splitPromptPreview(source) {

@@ -9,7 +9,7 @@ import { normalizeInitialSubagents } from 'dsh-roleplay-rp-subagent-manager'
 const PRESET_ID = 'roleplay'
 const PRESET_OWNER = 'dsh-roleplay-rp-standard'
 // Bump whenever managed composition or bundled guidance Skill files change.
-const PRESET_VERSION = 34
+const PRESET_VERSION = 35
 const MARKER_FILE = '.rp-standard.json'
 const COMPOSITION_FILE = 'agent.cordis.yml'
 const METADATA_FILE = 'preset.yml'
@@ -31,7 +31,9 @@ const INITIAL_SUBAGENT_CONFIG = Schema.object({
 })
 
 const MODULES = {
-  '__COMPACTION_BASIC_MODULE__': '@deepseek-ai/dsh-compaction-basic',
+  '__RP_CONVERSATION_SUMMARY_MODULE__': 'dsh-roleplay-rp-conversation-summary',
+  '__RP_CONVERSATION_SUMMARY_BRIDGE_MODULE__': 'dsh-roleplay-rp-conversation-summary/bridge',
+  '__COMMAND_COMPACT_MODULE__': '@deepseek-ai/dsh-command-compact',
   '__SKILL_FILESYSTEM_MODULE__': '@deepseek-ai/dsh-skill-filesystem',
   '__TERMINAL_MODULE__': '@deepseek-ai/dsh-terminal',
   '__TERMINAL_BASH_MODULE__': '@deepseek-ai/dsh-terminal-bash',
@@ -66,7 +68,6 @@ export const Config = Schema.object({
   defaultExecutionMode: Schema.union(['chat', 'agent']).default('chat'),
   chatMaxStepsPerRun: Schema.number().default(5),
   agentMaxStepsPerRun: Schema.number().default(20),
-  maxContextCharacters: Schema.number().default(60000),
   maxEffectsPerCommit: Schema.number().default(64),
   maxArtifactBytes: Schema.number().default(262144),
   maxNarrativeCharacters: Schema.number().default(200000),
@@ -109,18 +110,18 @@ export async function apply(ctx, config) {
   const features = ctx.get('rpFeatures')
   if (features === undefined) throw new Error('rp-standard: Roleplay feature manager is unavailable')
   const presetDirectory = dshHomePath('.agent-presets', PRESET_ID)
-  let update = Promise.resolve()
   const install = async () => {
     features.assertCompatible()
     const files = await buildPresetFiles(config, presetDirectory, features)
     await installManagedPreset(presetDirectory, files)
   }
-  await install()
+  let update = install()
   const dispose = features.subscribe(() => {
     update = update.then(install).catch(error => { ctx.logger.warn(error) })
     return update
   })
   ctx.effect(() => dispose, 'rp-standard: feature selection subscription')
+  await update
 }
 
 /** @param {Record<string, unknown>} config */
@@ -129,7 +130,7 @@ function validateConfig(config) {
     throw new Error('rp-standard: dataDir must be a non-empty path')
   }
   const positive = [
-    'chatMaxStepsPerRun', 'agentMaxStepsPerRun', 'maxContextCharacters', 'maxEffectsPerCommit', 'maxArtifactBytes', 'maxNarrativeCharacters', 'maxWriterBriefCharacters', 'maxSubagentPromptCharacters', 'maxSessionProfileBytes',
+    'chatMaxStepsPerRun', 'agentMaxStepsPerRun', 'maxEffectsPerCommit', 'maxArtifactBytes', 'maxNarrativeCharacters', 'maxWriterBriefCharacters', 'maxSubagentPromptCharacters', 'maxSessionProfileBytes',
     'maxCardInputBytes', 'maxCardTextCharacters', 'maxStateNamespacesInContext',
     'maxLoreInputBytes', 'maxLoreTokens', 'maxLoreEntries',
     'maxPersonaTextCharacters', 'maxPresetTextCharacters', 'maxPresetFields', 'maxWritingStyleTextCharacters', 'maxWritingStylesPerSession',
@@ -181,7 +182,6 @@ async function buildPresetFiles(config, presetDirectory, features) {
     '__ROLEPLAY_SKILL_DIR__': resolve(presetDirectory, 'skills'),
     '__CHAT_MAX_STEPS__': config.chatMaxStepsPerRun,
     '__AGENT_MAX_STEPS__': config.agentMaxStepsPerRun,
-    '__MAX_CONTEXT_CHARACTERS__': config.maxContextCharacters,
     '__MAX_EFFECTS__': config.maxEffectsPerCommit,
     '__MAX_ARTIFACT_BYTES__': config.maxArtifactBytes,
     '__MAX_NARRATIVE_CHARACTERS__': config.maxNarrativeCharacters,

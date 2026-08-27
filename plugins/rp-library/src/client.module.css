@@ -420,8 +420,8 @@ button.slotPlaceholder:hover { border-color: color-mix(in srgb, var(--dsw-alias-
 .sourceIngredient strong { font-size: 11px; line-height: 16px; font-weight: 560; }
 .sourceIngredient small { color: var(--dsw-alias-label-tertiary); font-size: 10px; line-height: 15px; }
 .slotWorkbench .sourceIngredient small { display: none; }
-.sourceKindIcon { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 6px; background: color-mix(in srgb, var(--prompt-tone) 12%, transparent); }
-.sourceKindIcon::before { width: 8px; height: 8px; border-radius: 3px; background: var(--prompt-tone); content: ''; }
+.sourceTypeIcon { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 6px; color: var(--prompt-tone); background: color-mix(in srgb, var(--prompt-tone) 12%, transparent); }
+.sourceTypeIcon > svg { display: block; width: 14px; height: 14px; }
 .sourceDragHandle { position: relative; display: grid; width: 24px; height: 24px; padding: 0; place-items: center; border: 0; border-radius: 7px; color: inherit; background: transparent; }
 .sourceDragHandle:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
 .sourceDragHandle[draggable="true"] { cursor: grab; }
@@ -466,15 +466,16 @@ button.slotPlaceholder:hover { border-color: color-mix(in srgb, var(--dsw-alias-
 .promptLegend { display: flex; flex: none; flex-wrap: nowrap; gap: 7px 11px; margin: -1px 0 10px; padding-bottom: 1px; overflow-x: auto; color: var(--dsw-alias-label-tertiary); font-size: 9px; scrollbar-width: none; }
 .promptLegend::-webkit-scrollbar { display: none; }
 .promptLegend span { --prompt-tone: var(--dsw-alias-label-tertiary); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.promptLegend i { width: 7px; height: 7px; border-radius: 2px; background: var(--prompt-tone); }
-.slotCard[data-tone="character"], .idleSlotCard[data-tone="character"], .sourceIngredient[data-tone="character"], .sourceKindIcon[data-tone="character"], .promptDocument [data-tone="character"], .promptLegend [data-tone="character"] { --prompt-tone: #c026d3; }
-.slotCard[data-tone="conversation"], .idleSlotCard[data-tone="conversation"], .sourceIngredient[data-tone="conversation"], .sourceKindIcon[data-tone="conversation"], .promptDocument [data-tone="conversation"], .promptLegend [data-tone="conversation"] { --prompt-tone: #2563eb; }
-.slotCard[data-tone="lore"], .idleSlotCard[data-tone="lore"], .sourceIngredient[data-tone="lore"], .sourceKindIcon[data-tone="lore"], .promptDocument [data-tone="lore"], .promptLegend [data-tone="lore"] { --prompt-tone: #047857; }
-.slotCard[data-tone="persona"], .idleSlotCard[data-tone="persona"], .sourceIngredient[data-tone="persona"], .sourceKindIcon[data-tone="persona"], .promptDocument [data-tone="persona"], .promptLegend [data-tone="persona"] { --prompt-tone: #0f766e; }
-.slotCard[data-tone="preset"], .idleSlotCard[data-tone="preset"], .sourceIngredient[data-tone="preset"], .sourceKindIcon[data-tone="preset"], .promptDocument [data-tone="preset"], .promptLegend [data-tone="preset"] { --prompt-tone: #be123c; }
-.slotCard[data-tone="writing-style"], .idleSlotCard[data-tone="writing-style"], .sourceIngredient[data-tone="writing-style"], .sourceKindIcon[data-tone="writing-style"], .promptDocument [data-tone="writing-style"], .promptLegend [data-tone="writing-style"] { --prompt-tone: #4f46e5; }
-.slotCard[data-tone="session"], .idleSlotCard[data-tone="session"], .sourceIngredient[data-tone="session"], .sourceKindIcon[data-tone="session"], .promptDocument [data-tone="session"], .promptLegend [data-tone="session"] { --prompt-tone: #475569; }
-.slotCard[data-tone="state"], .idleSlotCard[data-tone="state"], .sourceIngredient[data-tone="state"], .sourceKindIcon[data-tone="state"], .promptDocument [data-tone="state"] { --prompt-tone: #0e7490; }
+.promptLegend .sourceTypeIcon { width: 16px; height: 16px; border-radius: 5px; }
+.promptLegend .sourceTypeIcon > svg { width: 11px; height: 11px; }
+.slotCard[data-tone="character"], .idleSlotCard[data-tone="character"], .sourceIngredient[data-tone="character"], .sourceTypeIcon[data-tone="character"], .promptDocument [data-tone="character"], .promptLegend [data-tone="character"] { --prompt-tone: #c026d3; }
+.slotCard[data-tone="conversation"], .idleSlotCard[data-tone="conversation"], .sourceIngredient[data-tone="conversation"], .sourceTypeIcon[data-tone="conversation"], .promptDocument [data-tone="conversation"], .promptLegend [data-tone="conversation"] { --prompt-tone: #2563eb; }
+.slotCard[data-tone="lore"], .idleSlotCard[data-tone="lore"], .sourceIngredient[data-tone="lore"], .sourceTypeIcon[data-tone="lore"], .promptDocument [data-tone="lore"], .promptLegend [data-tone="lore"] { --prompt-tone: #047857; }
+.slotCard[data-tone="persona"], .idleSlotCard[data-tone="persona"], .sourceIngredient[data-tone="persona"], .sourceTypeIcon[data-tone="persona"], .promptDocument [data-tone="persona"], .promptLegend [data-tone="persona"] { --prompt-tone: #c2410c; }
+.slotCard[data-tone="preset"], .idleSlotCard[data-tone="preset"], .sourceIngredient[data-tone="preset"], .sourceTypeIcon[data-tone="preset"], .promptDocument [data-tone="preset"], .promptLegend [data-tone="preset"] { --prompt-tone: #be123c; }
+.slotCard[data-tone="writing-style"], .idleSlotCard[data-tone="writing-style"], .sourceIngredient[data-tone="writing-style"], .sourceTypeIcon[data-tone="writing-style"], .promptDocument [data-tone="writing-style"], .promptLegend [data-tone="writing-style"] { --prompt-tone: #4f46e5; }
+.slotCard[data-tone="session"], .idleSlotCard[data-tone="session"], .sourceIngredient[data-tone="session"], .sourceTypeIcon[data-tone="session"], .promptDocument [data-tone="session"], .promptLegend [data-tone="session"] { --prompt-tone: #475569; }
+.slotCard[data-tone="state"], .idleSlotCard[data-tone="state"], .sourceIngredient[data-tone="state"], .sourceTypeIcon[data-tone="state"], .promptDocument [data-tone="state"], .promptLegend [data-tone="state"] { --prompt-tone: #0e7490; }
 .slotCard[data-tone="mixed"], .idleSlotCard[data-tone="mixed"], .promptDocument [data-tone="mixed"] { --prompt-tone: #4338ca; }
 .promptPreview { grid-area: preview; display: flex; flex-direction: column; overflow: hidden; background-color: var(--dsw-alias-bg-layer-1); background-image: radial-gradient(circle, color-mix(in srgb, var(--dsw-alias-label-dimmed) 38%, transparent) 1px, transparent 1px); background-size: 20px 20px; }
 .promptDocument { display: flex; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; flex-direction: column; gap: 8px; padding: 13px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 94%, transparent); box-shadow: var(--dsw-shadow-lv1); }

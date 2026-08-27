@@ -14,6 +14,7 @@ import {
   SessionId,
 } from '@deepseek-ai/dsh-session'
 import * as Core from 'dsh-roleplay-rp-core'
+import * as ConversationSummaryBridge from 'dsh-roleplay-rp-conversation-summary/bridge'
 import * as SubagentManager from 'dsh-roleplay-rp-subagent-manager'
 import * as Session from 'dsh-roleplay-rp-session'
 import * as Character from 'dsh-roleplay-rp-character-card'
@@ -117,7 +118,8 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
   new RpSessionBootstrap(ctx)
 
   try {
-    await ctx.plugin(Core, { chatMaxStepsPerRun: 5, agentMaxStepsPerRun: 8, maxContextCharacters: 60000, maxEffectsPerCommit: 64, maxArtifactBytes: 262144, maxNarrativeCharacters: 200000 })
+    await ctx.plugin(Core, { chatMaxStepsPerRun: 5, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 64, maxArtifactBytes: 262144, maxNarrativeCharacters: 200000 })
+    await ctx.plugin(ConversationSummaryBridge)
     await ctx.plugin(SubagentManager, {
       catalogDir: join(root, 'subagents'),
       maxSubagents: 32,
@@ -231,7 +233,7 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     const semanticOrder = defaultLayout.slots.map(slot => slot.label)
     assert.deepEqual(semanticOrder, [
       '声明', '任务描述', '写作指导', '角色卡信息', '人设信息', '世界设定',
-      '扮演指导', '对话历史', '会话变量', '冷峻电影感', '测试文风', '重要规则', '当前输入', '思维链指导', '格式要求',
+      '扮演指导', '会话总结', '对话历史', '会话变量', '冷峻电影感', '测试文风', '重要规则', '当前输入', '思维链指导', '格式要求',
     ])
     const topPresetIds = presetFields.fields.slice(0, 3).map(field => `rp.preset:${field.id}`)
     const bottomPresetIds = presetFields.fields.slice(3).map(field => `rp.preset:${field.id}`)
@@ -270,7 +272,10 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     assert.deepEqual(customPreview.customSources, [{ slotId: 'custom-1', content: '雾气让所有远处灯火都显得模糊。' }])
     assert.equal(customPreview.sources.find(source => source.id === customSourceId).label, '港口气氛')
     const categories = new Map(customPreview.sources.map(source => [source.id, source.promptCategory]))
-    for (const id of ['rp.card', 'rp.persona', 'rp.state', 'rp.conversation', 'rp.current-input']) assert.equal(categories.get(id), 'factual')
+    for (const id of ['rp.card', 'rp.persona', 'rp.state', 'rp.conversation-summary', 'rp.conversation', 'rp.current-input']) assert.equal(categories.get(id), 'factual')
+    assert.equal(customPreview.sources.find(source => source.id === 'rp.conversation-summary').available, false)
+    assert.equal(customPreview.contexts.some(source => source.id === 'rp.conversation-summary'), false)
+    assert.doesNotMatch(customPreview.contextText, /会话总结/)
     assert.ok(customPreview.sources.filter(source => source.id.startsWith('rp.lore.')).every(source => source.promptCategory === 'factual'))
     assert.ok(customPreview.sources.filter(source => source.id.startsWith('rp.preset:')).every(source => source.promptCategory === 'instructional'))
     assert.ok(writingStyleSourceIds.every(id => categories.get(id) === 'instructional'))

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
-import { DEFAULT_WRITING_STYLE, dispatchBrowser, RpWritingStyles } from '../src/index.js'
+import { apply, DEFAULT_WRITING_STYLE, dispatchBrowser, RpWritingStyles } from '../src/index.js'
 
 const configFor = libraryDir => ({ libraryDir, maxTextCharacters: 30000, maxStylesPerSession: 3, exposeBrowser: false })
 
@@ -218,6 +218,58 @@ test('enforces complete text and per-session selection limits', async () => {
     await assert.rejects(styles.create({ name: '甲', content: '12345678' }), error => error.code === 'LIMIT_EXCEEDED')
     await assert.rejects(styles.resolveBindings([exact.id, '00000000-0000-0000-0000-000000000001']), error => error.code === 'LIMIT_EXCEEDED')
   } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('initialization can be disposed without registering effects on an inactive context', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-lifecycle-'))
+  const ctx = new Context()
+  const gate = Promise.withResolvers()
+  const started = Promise.withResolvers()
+  const registered = Promise.withResolvers()
+  const originalEnsureDefault = RpWritingStyles.prototype.ensureDefault
+  let handler
+  let disposed = false
+  let fiber
+  RpWritingStyles.prototype.ensureDefault = async function () {
+    started.resolve()
+    await gate.promise
+    return originalEnsureDefault.call(this)
+  }
+  ctx.provide('connection', {
+    rpc: {
+      handle(path, next) {
+        assert.equal(path, '/rp-writing-styles')
+        handler = next
+        registered.resolve()
+        return () => { disposed = true }
+      },
+    },
+  })
+  try {
+    fiber = ctx.plugin({ name: 'rp-writing-style-lifecycle-test', apply }, { ...configFor(root), exposeBrowser: true })
+    await Promise.all([started.promise, registered.promise])
+    let requestSettled = false
+    const request = handler('list', { limit: 10 }).then(value => {
+      requestSettled = true
+      return value
+    })
+    await Promise.resolve()
+    assert.equal(requestSettled, false, 'RPC must wait for writing-style initialization')
+
+    const disposal = fiber.dispose()
+    gate.resolve()
+    const response = await request
+    assert.equal(response.value.value.total, 1)
+    await disposal
+    await fiber.await()
+    assert.equal(disposed, true)
+  } finally {
+    RpWritingStyles.prototype.ensureDefault = originalEnsureDefault
+    gate.resolve()
+    if (fiber?.uid !== null) await fiber.dispose()
     await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })
   }

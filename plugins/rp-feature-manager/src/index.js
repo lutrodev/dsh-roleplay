@@ -371,6 +371,7 @@ function inspectEnvironment() {
     dsh: { version: dshVersion ?? null, supportedRange: SUPPORTED_DSH_RANGE, compatible: dshCompatible },
     core: CORE_PACKAGES.map(row => ({
       label: row.label,
+      description: row.description,
       packageVersion: packages[row.packageName]?.version ?? null,
       versionCompatible: packages[row.packageName]?.compatible === true,
     })),

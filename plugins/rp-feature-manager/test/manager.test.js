@@ -69,6 +69,10 @@ test('manager reconciles independently selectable Host entries from one validate
     assert.equal(manager.status().compatible, true)
     assert.deepEqual(manager.status().settings, { writable: false, revision: null })
     assert.deepEqual(manager.guidanceSkills().map(item => item.skillName), ['rp-guide-lorebook'])
+    assert.deepEqual(
+      manager.status().core.find(item => item.label === '会话总结'),
+      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.4', versionCompatible: true },
+    )
     assert.equal(manager.status().core.some(item => item.label === '会话变量'), false)
     assert.equal(manager.status().features.find(item => item.id === 'state').active, false)
     assert.equal(manager.status().skills.find(item => item.id === 'rp-guide-lorebook').enabled, true)

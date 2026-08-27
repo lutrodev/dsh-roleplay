@@ -1,0 +1,5 @@
+- insert:
+    - id: rp-conversation-summary
+      name: dsh-roleplay-rp-conversation-summary
+      config: {}
+

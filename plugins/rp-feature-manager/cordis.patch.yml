@@ -34,7 +34,6 @@
         defaultExecutionMode: chat
         chatMaxStepsPerRun: 5
         agentMaxStepsPerRun: 20
-        maxContextCharacters: 60000
         maxEffectsPerCommit: 64
         maxArtifactBytes: 262144
         maxNarrativeCharacters: 200000

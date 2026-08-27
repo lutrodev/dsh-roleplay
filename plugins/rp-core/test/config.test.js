@@ -9,7 +9,6 @@ test('Chat reserves recovery steps for both Writer and commit failures', async (
     assert.throws(() => apply(ctx, {
       chatMaxStepsPerRun: 4,
       agentMaxStepsPerRun: 8,
-      maxContextCharacters: 60000,
       maxEffectsPerCommit: 64,
       maxArtifactBytes: 262144,
       maxNarrativeCharacters: 200000,
@@ -36,7 +35,6 @@ test('Roleplay shadows harness:identity from the shared live identity provider',
     apply(ctx, {
       chatMaxStepsPerRun: 5,
       agentMaxStepsPerRun: 8,
-      maxContextCharacters: 60000,
       maxEffectsPerCommit: 64,
       maxArtifactBytes: 262144,
       maxNarrativeCharacters: 200000,

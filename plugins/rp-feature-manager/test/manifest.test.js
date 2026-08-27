@@ -28,6 +28,10 @@ test('feature manager is the suite bundle and carries every managed Roleplay pac
   for (const packageName of managedPackages) {
     assert.equal(typeof manifest.dependencies[packageName], 'string', `${packageName} must ship with the suite bundle`)
   }
+  assert.deepEqual(
+    CORE_PACKAGES.find(item => item.packageName === 'dsh-roleplay-rp-conversation-summary'),
+    { packageName: 'dsh-roleplay-rp-conversation-summary', label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。' },
+  )
 })
 
 test('all Roleplay packages stay on the declared suite version', async () => {

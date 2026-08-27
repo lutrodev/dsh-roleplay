@@ -262,7 +262,6 @@ test('Roleplay pre-step context survives consecutive rerolls in the same Agent',
   await ctx.plugin(RpCore, {
     chatMaxStepsPerRun: 5,
     agentMaxStepsPerRun: 8,
-    maxContextCharacters: 60000,
     maxEffectsPerCommit: 64,
     maxArtifactBytes: 262144,
     maxNarrativeCharacters: 200000,
@@ -471,7 +470,13 @@ class ScriptedAdapter extends LlmAdapter {
   }
 
   resolveModel(provider, model) {
-    return Promise.resolve({ provider, id: model, name: model })
+    return Promise.resolve({
+      provider,
+      id: model,
+      name: model,
+      context: { contextWindow: 64000 },
+      defaultMaxTokens: 4096,
+    })
   }
 
   async * stream(options) {
@@ -492,6 +497,12 @@ class ScriptedAdapter extends LlmAdapter {
 
 async function loopContext(adapter) {
   const ctx = new Context()
+  ctx.provide('tokenMeter', {
+    estimateMessage(message) {
+      const text = message.content?.filter(block => block.type === 'text').map(block => block.text).join('') ?? ''
+      return Math.ceil(text.length / 4) + 8
+    },
+  })
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt, { includeHarnessIdentity: false })

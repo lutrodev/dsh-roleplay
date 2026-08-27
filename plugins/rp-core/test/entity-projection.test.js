@@ -85,13 +85,14 @@ test('exposes a reusable commit-backed extension projection lifecycle', () => {
 
   const compacted = foldCommitBackedEntities(pruned.entities, {
     seq: 12,
-    type: 'assistant/message',
+    type: 'user/message',
     surfaceOp: { op: 'replace', start: 10, end: 11 },
     sourceEventSeqs: [10, 11],
     data: {
-      turn: 1,
-      step: 2,
-      message: { id: 'summary', source: { kind: 'model' }, content: [{ type: 'text', text: 'summary' }] },
+      role: 'user',
+      id: 'compaction-checkpoint',
+      source: { kind: 'plugin', plugin: 'compact', compactionId: 'compact-1' },
+      content: [{ type: 'text', text: 'summary' }],
     },
   }, testExtension)
   assert.equal(compacted.valueChanged, false)

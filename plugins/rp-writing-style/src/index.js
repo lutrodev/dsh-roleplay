@@ -284,16 +284,23 @@ export class RpWritingStyles extends Service {
 export async function apply(ctx, config) {
   validateConfig(config)
   const styles = new RpWritingStyles(ctx, config)
-  await styles.ensureDefault()
-  if (config.exposeBrowser !== false) ctx.inject(['connection'], browserCtx => registerBrowser(browserCtx, styles))
+  const ready = styles.ensureDefault()
+  if (config.exposeBrowser !== false) {
+    ctx.inject(['connection'], browserCtx => registerBrowser(browserCtx, styles, ready))
+  }
+  await ready
 }
 
-function registerBrowser(ctx, styles) {
+function registerBrowser(ctx, styles, ready) {
   const endpoints = new Set(['list', 'get', 'create', 'update', 'delete'])
   const dispose = ctx.connection.rpc.handle('/rp-writing-styles', async (endpoint, payload) => {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown writing style endpoint: ${endpoint}`))
-    try { return transportSuccess(success(await dispatchBrowser(styles, endpoint, payload))) }
-    catch (error) { return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error))) }
+    try {
+      await ready
+      return transportSuccess(success(await dispatchBrowser(styles, endpoint, payload)))
+    } catch (error) {
+      return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error)))
+    }
   }, { authority: 'trusted-host' })
   ctx.effect(() => dispose, 'rp-writing-style: /rp-writing-styles RPC')
 }

@@ -396,8 +396,12 @@ test('compaction checkpoints do not impersonate the messages they replaced', asy
     sourceEventSeqs: shadowed,
   })
 
-  await assert.rejects(get(harness, userTarget(first)), hasCode('MESSAGE_NOT_FOUND'))
-  await assert.rejects(get(harness, assistantTarget(first)), hasCode('MESSAGE_NOT_FOUND'))
+  for (const target of [userTarget(first), assistantTarget(first)]) {
+    await assert.rejects(get(harness, target), hasCode('MESSAGE_NOT_FOUND'))
+    await assert.rejects(action(harness, 'edit', target, { content: '不得复活' }), hasCode('MESSAGE_NOT_FOUND'))
+    await assert.rejects(action(harness, 'delete', target), hasCode('MESSAGE_NOT_FOUND'))
+    await assert.rejects(action(harness, 'reroll', target), hasCode('MESSAGE_NOT_FOUND'))
+  }
   assert.equal((await get(harness, assistantTarget(second))).content, '第二层正文')
   assert.deepEqual(transcriptText(harness.session), ['第二个选择', '第二层正文'])
 })

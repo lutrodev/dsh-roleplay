@@ -4,6 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import LlmRuntime, { CallId, LlmAdapter, createUserMessage } from '@deepseek-ai/dsh-llm'
+import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
@@ -59,6 +60,7 @@ test('real Agent Loop streams Writer unchanged in Chat and keeps parent revision
 async function loopContext(adapter, writerOutputs) {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
+  await ctx.plugin(TokenMeter)
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt, { includeHarnessIdentity: false })
   await ctx.plugin(ToolRuntime)
@@ -80,7 +82,6 @@ async function loopContext(adapter, writerOutputs) {
   await ctx.plugin(RpCore, {
     chatMaxStepsPerRun: 5,
     agentMaxStepsPerRun: 8,
-    maxContextCharacters: 4000,
     maxEffectsPerCommit: 4,
     maxArtifactBytes: 8192,
     maxNarrativeCharacters: 2000,
@@ -136,7 +137,13 @@ class ScriptedAdapter extends LlmAdapter {
   }
 
   resolveModel(provider, model) {
-    return Promise.resolve({ provider, id: model, name: model })
+    return Promise.resolve({
+      provider,
+      id: model,
+      name: model,
+      context: { contextWindow: 64000 },
+      defaultMaxTokens: 4096,
+    })
   }
 
   async * stream() {

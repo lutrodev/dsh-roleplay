@@ -54,7 +54,7 @@ test('idle slots remain in the Session layout but do not participate in assembly
   ] }, [active, parked])
   assert.equal(layout.slots[1].idle, true)
   const candidates = [active, parked].map(definition => ({ ...definition, text: `${definition.id} text`, characters: 10, revision: 1, diagnostics: null }))
-  const build = compileContextBuild({ layout, candidates, maxCharacters: 1000 })
+  const build = compileContextBuild({ layout, candidates })
   assert.deepEqual(build.slots.map(slot => slot.id), ['active'])
   assert.deepEqual(build.fragments.map(fragment => fragment.id), ['active'])
   assert.doesNotMatch(build.contextText, /parked text|暂时不用/)
@@ -81,26 +81,26 @@ test('sources marked as always active reject idle Session layouts', () => {
   )
 })
 
-test('budget admission is independent from rendered slot order', () => {
+test('all available sources are emitted in rendered Slot order', () => {
   const layout = resolveChatContextBuild({ version: 1, slots: [
     { id: 'focus', label: '重点', sourceIds: ['facts', 'journal'] },
     { id: 'frame', label: '基础资料', sourceIds: ['session'] },
   ] }, definitions)
   const candidates = definitions.map(definition => ({ ...definition, text: definition.id.repeat(3), characters: definition.id.length * 3, revision: 1, diagnostics: null }))
-  const build = compileContextBuild({ layout, candidates, maxCharacters: 170 })
-  assert.deepEqual(build.fragments.map(item => item.id), ['journal', 'session'])
-  assert.equal(build.excluded[0].id, 'facts')
+  const build = compileContextBuild({ layout, candidates })
+  assert.deepEqual(build.fragments.map(item => item.id), ['facts', 'journal', 'session'])
+  assert.deepEqual(build.excluded, [])
+  assert.ok(build.contextText.indexOf('facts') < build.contextText.indexOf('journal'))
   assert.ok(build.contextText.indexOf('journal') < build.contextText.indexOf('session'))
 })
 
-test('factual sources are protected from budget exclusion', () => {
+test('large factual sources are assembled without a local capacity limit', () => {
   const factual = normalizeContextSource({ id: 'required-fact', label: '必要事实', promptCategory: 'factual', defaultSlot: { id: 'required-fact', label: '必要事实' }, prepare() {} })
   const layout = resolveChatContextBuild(undefined, [factual])
   const candidates = [{ ...factual, text: '事实'.repeat(100), characters: 200, revision: 1, diagnostics: null }]
-  assert.throws(
-    () => compileContextBuild({ layout, candidates, maxCharacters: 80 }),
-    error => error.code === 'RP_REQUIRED_CONTEXT_LIMIT' && /factual context/.test(error.message),
-  )
+  const build = compileContextBuild({ layout, candidates })
+  assert.deepEqual(build.fragments.map(item => item.id), ['required-fact'])
+  assert.match(build.contextText, /事实事实/)
 })
 
 test('Writer context omits source identity and revision while metadata keeps them', () => {
@@ -109,7 +109,6 @@ test('Writer context omits source identity and revision while metadata keeps the
   const build = compileContextBuild({
     layout,
     candidates: [{ ...definition, revision: 'asset:2:hash', text: '当前事实', characters: 4, diagnostics: null }],
-    maxCharacters: 1000,
   })
   assert.match(build.contextText, /<section name="事实">\n当前事实\n<\/section>/)
   assert.doesNotMatch(build.contextText, /roleplay_context/)
@@ -175,7 +174,7 @@ test('Session custom content becomes a stable runtime source in its named slot',
     slots: [{ ...stored.slots[0], locked: false, sectionTag: true }],
   })
   const candidate = { ...customDefinitions[0], text: stored.customSources[0].content, characters: 10, revision: 2, diagnostics: null }
-  const build = compileContextBuild({ layout, candidates: [candidate], maxCharacters: 1000 })
+  const build = compileContextBuild({ layout, candidates: [candidate] })
   assert.equal(build.fragments[0].id, sourceId)
   assert.match(build.contextText, /使用克制的近景描写。/)
   assert.deepEqual(build.customSources, stored.customSources)
@@ -241,7 +240,7 @@ test('flattens legacy preset position groups without losing their sources', () =
   ])
 })
 
-test('native history is materialized into the flat Writer Prompt and counted in the complete budget', () => {
+test('native history is materialized into the flat Writer Prompt without a local budget', () => {
   const history = normalizeContextSource({
     id: 'rp.conversation', kind: 'conversation', delivery: 'native-history',
     defaultSlot: { id: 'conversation-history', label: '对话历史' }, prepare() {},
@@ -255,7 +254,7 @@ test('native history is materialized into the flat Writer Prompt and counted in 
     ['conversation-history', false],
   ])
   const candidates = [history, definitions[1]].map(definition => ({ ...definition, text: `${definition.id} text`, characters: definition.delivery === 'native-history' ? 999 : 10, revision: 1, diagnostics: null }))
-  const build = compileContextBuild({ layout, candidates, maxCharacters: 1000 })
+  const build = compileContextBuild({ layout, candidates })
   assert.ok(build.fragments.some(fragment => fragment.id === 'rp.conversation'))
   assert.equal(build.usedCharacters, [...build.contextText].length)
   assert.match(build.contextText, /rp\.conversation text/)
@@ -273,7 +272,7 @@ test('multi-source slots preserve source tags and protect only emitted ContextBu
     revision: 1,
     diagnostics: null,
   }))
-  const build = compileContextBuild({ layout, candidates, maxCharacters: 1000 })
+  const build = compileContextBuild({ layout, candidates })
   assert.match(build.contextText, /<section name="连续性">/)
   assert.match(build.contextText, /<item name="纪要">/)
   assert.match(build.contextText, /<item name="引用事实">/)
@@ -299,7 +298,7 @@ test('each slot controls its own section and item tags', () => {
     revision: 1,
     diagnostics: null,
   }))
-  const build = compileContextBuild({ layout, candidates, maxCharacters: 1000 })
+  const build = compileContextBuild({ layout, candidates })
   assert.deepEqual(build.slots.map(slot => [slot.id, slot.sectionTag]), [['continuity', false], ['facts', true], ['frame', true]])
   assert.match(build.contextText, /^第一段<\/section>\n<section name="事实">/)
   assert.match(build.contextText, /<item name="引用事实">\n&lt;item&gt;第二段&lt;\/item&gt;\n<\/item>/)
@@ -329,13 +328,12 @@ test('source-side operational metadata is ignored by Slot serialization', () => 
   const build = compileContextBuild({
     layout,
     candidates: [{ ...definition, revision: 2, text: '潮门已开启。', directorText: 'Use expectedRevision 2.', characters: 6, diagnostics: null }],
-    maxCharacters: 1000,
   })
   assert.doesNotMatch(build.contextText, /expectedRevision/)
   assert.equal(Object.hasOwn(build, 'directorText'), false)
 })
 
-test('required current input must appear exactly once and fails loudly when the complete prompt cannot fit', () => {
+test('required current input appears exactly once without local capacity rejection', () => {
   const input = normalizeContextSource({
     id: 'rp.current-input', label: '当前输入', required: true,
     defaultSlot: { id: 'current-input', label: '当前输入' }, prepare() {},
@@ -347,11 +345,7 @@ test('required current input must appear exactly once and fails loudly when the 
     error => error.code === 'RP_INVALID_CONTEXT_BUILD',
   )
   const candidate = { ...input, text: '继续。', characters: 3, revision: 1, diagnostics: null }
-  assert.throws(
-    () => compileContextBuild({ layout, candidates: [candidate], maxCharacters: 10 }),
-    error => error.code === 'RP_REQUIRED_CONTEXT_LIMIT',
-  )
-  const build = compileContextBuild({ layout, candidates: [candidate], maxCharacters: 1000 })
+  const build = compileContextBuild({ layout, candidates: [candidate] })
   assert.equal(build.fragments.filter(fragment => fragment.id === 'rp.current-input').length, 1)
 })
 

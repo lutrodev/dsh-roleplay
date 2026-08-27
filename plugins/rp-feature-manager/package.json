@@ -53,6 +53,7 @@
     "motion": "12.43.0",
     "dsh-roleplay-rp-compact-access-mode": "workspace:^",
     "dsh-roleplay-rp-standard": "workspace:^",
+    "dsh-roleplay-rp-conversation-summary": "workspace:^",
     "dsh-roleplay-rp-core": "workspace:^",
     "dsh-roleplay-rp-subagent-manager": "workspace:^",
     "dsh-roleplay-rp-session": "workspace:^",
@@ -101,5 +102,5 @@
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
-  "packageManager": "pnpm@11.7.0"
+  "packageManager": "pnpm@11.23.0"
 }

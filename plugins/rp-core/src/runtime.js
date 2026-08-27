@@ -44,6 +44,8 @@ import {
   TASK_SUBAGENT_TOOL_DESCRIPTION,
 } from './prompts.js'
 
+const CONVERSATION_HISTORY_CONTEXT_NOTE = '[Context note: Original dialogue text, including the latest events and wording. It takes precedence over Conversation Summary.]'
+
 const WRITER_ACTION_PARAMETER = Object.freeze({
   type: 'string',
   enum: Object.freeze([RP_WRITE_ACTION]),
@@ -112,7 +114,7 @@ class RpCommitToolArgsError extends ToolArgsError {
 export class RpRuntime extends Service {
   /**
    * @param {import('@deepseek-ai/cordis').Context} ctx Harness context.
-   * @param {{ chatMaxStepsPerRun: number, agentMaxStepsPerRun: number, maxContextCharacters: number, maxEffectsPerCommit: number, maxArtifactBytes: number, maxNarrativeCharacters: number }} config Resolved limits.
+   * @param {{ chatMaxStepsPerRun: number, agentMaxStepsPerRun: number, maxEffectsPerCommit: number, maxArtifactBytes: number, maxNarrativeCharacters: number }} config Resolved limits.
    */
   constructor(ctx, config) {
     super(ctx, 'rpRuntime')
@@ -549,7 +551,7 @@ export class RpRuntime extends Service {
     const input = await this.normalizeInput(transformedMessages, { agent, profile, runId, turn: null, messages: transformedMessages })
     const ingredients = await this.prepareIngredients({ agent, profile, runId, turn: null, messages: transformedMessages, input, textTransforms, ...settings })
     const layout = reconcileChatContextBuild(profile?.contextBuild, ingredients.definitions)
-    const build = compileContextBuild({ layout, candidates: ingredients.candidates, unavailable: ingredients.unavailable, maxCharacters: settings.maxContextCharacters })
+    const build = compileContextBuild({ layout, candidates: ingredients.candidates, unavailable: ingredients.unavailable })
     return this.buildView({ ...settings, runId, layout, build, ingredients, owner: 'session' })
   }
 
@@ -637,11 +639,11 @@ export class RpRuntime extends Service {
       const ingredients = await this.prepareIngredients({
         agent, runId: run.runId, turn: run.turn, contextEpoch, messages, input,
         profile, textTransforms: run.textTransforms,
-        executionMode: run.executionMode, maxContextCharacters: run.maxContextCharacters,
+        executionMode: run.executionMode,
       })
       const catalog = this.catalogEntries(ingredients)
       const layout = reconcileChatContextBuild(profile?.contextBuild, ingredients.definitions)
-      const build = compileContextBuild({ layout, candidates: ingredients.candidates, unavailable: ingredients.unavailable, maxCharacters: run.maxContextCharacters })
+      const build = compileContextBuild({ layout, candidates: ingredients.candidates, unavailable: ingredients.unavailable })
       assignIngredients(run, { profile, input, messages, ingredients, catalog, contextEpoch })
       this.acceptBuild(run, build, 'session')
       if (run.writerArtifact !== undefined) {
@@ -751,11 +753,11 @@ export class RpRuntime extends Service {
       }]))
       run.subagentRevisions = subagents.revisions
       run.input = await this.normalizeInput(transformedMessages, { agent, profile, runId, turn, messages: transformedMessages })
-      const ingredients = await this.prepareIngredients({ agent, profile, runId, turn, contextEpoch: run.contextEpoch, messages: transformedMessages, input: run.input, textTransforms, executionMode: run.executionMode, maxContextCharacters: run.maxContextCharacters })
+      const ingredients = await this.prepareIngredients({ agent, profile, runId, turn, contextEpoch: run.contextEpoch, messages: transformedMessages, input: run.input, textTransforms, executionMode: run.executionMode })
       run.excludedFragments = ingredients.unavailable
       run.catalog = this.catalogEntries(ingredients)
       const layout = reconcileChatContextBuild(profile?.contextBuild, ingredients.definitions)
-      const build = compileContextBuild({ layout, candidates: ingredients.candidates, unavailable: ingredients.unavailable, maxCharacters: run.maxContextCharacters })
+      const build = compileContextBuild({ layout, candidates: ingredients.candidates, unavailable: ingredients.unavailable })
       this.acceptBuild(run, build, 'session')
       run.status = 'running'
       return run
@@ -773,7 +775,6 @@ export class RpRuntime extends Service {
     return {
       executionMode,
       maxSteps: Math.min(policyMaxSteps, sessionRuntime.maxSteps ?? policyMaxSteps),
-      maxContextCharacters: Math.min(this.config.maxContextCharacters, sessionRuntime.maxContextCharacters ?? this.config.maxContextCharacters),
     }
   }
 
@@ -1071,7 +1072,6 @@ export class RpRuntime extends Service {
       executionMode: run.executionMode,
       contextOwner: 'session',
       maxSteps: run.maxSteps,
-      maxContextCharacters: run.maxContextCharacters,
       usedCharacters: [...run.contextText].length,
       inputAdapters: ordered(this.inputAdapters.values()).map(adapter => adapter.id),
       textTransforms: publicTextTransformSnapshots(run.textTransforms),
@@ -1085,14 +1085,13 @@ export class RpRuntime extends Service {
   }
 
   /** @param {object} input */
-  buildView({ executionMode, maxSteps, maxContextCharacters, runId, layout, build, ingredients, owner }) {
+  buildView({ executionMode, maxSteps, runId, layout, build, ingredients, owner }) {
     return JSON.parse(JSON.stringify({
       version: 1,
       runId,
       executionMode,
       contextOwner: owner,
       maxSteps,
-      maxContextCharacters,
       usedCharacters: build.usedCharacters,
       slots: build.slots,
       layoutSlots: layout.slots,
@@ -1143,9 +1142,6 @@ export class RpRuntime extends Service {
           throw new RpRuntimeError('RP_WRITER_BRIEF_LIMIT', `Writer brief exceeds ${runtime.config.maxWriterBriefCharacters} characters.`)
         }
         const prompt = renderWriterPrompt(run.contextText, brief)
-        if ([...prompt].length > run.maxContextCharacters) {
-          throw new RpRuntimeError('RP_WRITER_PROMPT_LIMIT', `Writer Prompt exceeds ${run.maxContextCharacters} characters.`)
-        }
         const callId = String(exec.callId ?? '')
         if (callId.length === 0) throw new RpRuntimeError('RP_WRITER_CALL_REQUIRED', 'rp_write_turn requires a durable model tool call id.')
         run.writerCallId = callId
@@ -1512,7 +1508,6 @@ export class RpRuntime extends Service {
       runId: run.runId,
       turn: run.turn,
       executionMode: run.executionMode,
-      maxContextCharacters: run.maxContextCharacters,
       contextEpoch: run.contextEpoch,
       buildIndex: run.contextBuilds.length,
       contextMessages: run.contextMessages,
@@ -1628,7 +1623,6 @@ export class RpRuntime extends Service {
         profile,
         textTransforms: context.textTransforms,
         executionMode: context.executionMode,
-        maxContextCharacters: context.maxContextCharacters,
       })
     } catch {
       throw new RpRuntimeError(
@@ -2192,7 +2186,8 @@ function renderConversationHistory(session) {
     return [{ role: message.role === 'assistant' ? '回复' : '用户', text }]
   })
   if (visible.length === 0) return undefined
-  const text = visible.map(item => `${item.role}：${item.text}`).join('\n\n')
+  const dialogue = visible.map(item => `${item.role}：${item.text}`).join('\n\n')
+  const text = `${CONVERSATION_HISTORY_CONTEXT_NOTE}\n\n${dialogue}`
   return {
     revision: `messages:${visible.length}`,
     text,

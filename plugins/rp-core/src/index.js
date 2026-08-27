@@ -15,7 +15,6 @@ export const inject = ['agents', 'tools', 'systemPrompt', 'subagents', 'rpFeatur
 export const Config = Schema.object({
   chatMaxStepsPerRun: Schema.number().default(5),
   agentMaxStepsPerRun: Schema.number().default(20),
-  maxContextCharacters: Schema.number().default(60000),
   maxEffectsPerCommit: Schema.number().default(64),
   maxArtifactBytes: Schema.number().default(262144),
   maxNarrativeCharacters: Schema.number().default(200000),
@@ -29,10 +28,10 @@ export const Config = Schema.object({
  * Mount the roleplay runtime service and its Agent hooks.
  *
  * @param {import('@deepseek-ai/cordis').Context} ctx Harness context.
- * @param {{ chatMaxStepsPerRun: number, agentMaxStepsPerRun: number, maxContextCharacters: number, maxEffectsPerCommit: number, maxArtifactBytes: number, maxNarrativeCharacters: number, maxWriterBriefCharacters: number, maxSubagentPromptCharacters: number, subagentProvider: string, writerPersona: string }} config Runtime limits and Writer configuration.
+ * @param {{ chatMaxStepsPerRun: number, agentMaxStepsPerRun: number, maxEffectsPerCommit: number, maxArtifactBytes: number, maxNarrativeCharacters: number, maxWriterBriefCharacters: number, maxSubagentPromptCharacters: number, subagentProvider: string, writerPersona: string }} config Runtime limits and Writer configuration.
  */
 export function apply(ctx, config) {
-  for (const key of ['chatMaxStepsPerRun', 'agentMaxStepsPerRun', 'maxContextCharacters', 'maxEffectsPerCommit', 'maxArtifactBytes', 'maxNarrativeCharacters', 'maxWriterBriefCharacters', 'maxSubagentPromptCharacters']) {
+  for (const key of ['chatMaxStepsPerRun', 'agentMaxStepsPerRun', 'maxEffectsPerCommit', 'maxArtifactBytes', 'maxNarrativeCharacters', 'maxWriterBriefCharacters', 'maxSubagentPromptCharacters']) {
     if (!Number.isSafeInteger(config[key]) || config[key] < 1) throw new Error(`rp-core: ${key} must be a positive safe integer`)
   }
   if (config.chatMaxStepsPerRun < 5) throw new Error('rp-core: chatMaxStepsPerRun must be at least 5 so Writer and commit failures both have recovery room')
