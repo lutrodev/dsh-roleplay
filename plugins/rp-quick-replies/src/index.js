@@ -19,7 +19,7 @@ const QUICK_REPLY_CONFIG = Schema.object({
 })
 
 export const name = 'rp-quick-replies'
-export const inject = ['connection']
+export const inject = ['rpRemote']
 export const Config = Schema.object({
   replies: Schema.array(QUICK_REPLY_CONFIG).default(DEFAULT_QUICK_REPLIES),
 })
@@ -76,7 +76,7 @@ export function apply(ctx, config) {
 }
 
 function registerBrowser(ctx, quickReplies) {
-  const dispose = ctx.connection.rpc.handle(QUICK_REPLIES_RPC_PATH, async (endpoint, payload) => {
+  const dispose = ctx.rpRemote.register(QUICK_REPLIES_RPC_PATH, async (endpoint, payload) => {
     try {
       if (endpoint === 'list') return transportSuccess(success(quickReplies.snapshot()))
       if (endpoint === 'replace') return transportSuccess(success(await quickReplies.replace(payload)))
@@ -85,8 +85,8 @@ function registerBrowser(ctx, quickReplies) {
       const code = codeFor(error)
       return transportSuccess(failure(code, userMessage(code)))
     }
-  }, { authority: 'trusted-host' })
-  ctx.effect(() => dispose, 'rp-quick-replies: trusted Host RPC')
+  })
+  ctx.effect(() => dispose, 'rp-quick-replies: typed Remote')
 }
 
 export async function dispatchBrowser(quickReplies, endpoint, payload) {

@@ -93,9 +93,9 @@ describe('Roleplay message action presentation', () => {
     const slots = []
     const registrations = []
     const ctx = {
-      connection: {},
+      rpRemote: {},
       sessions: {},
-      conversationEvents: { register: definition => definitions.push(definition) },
+      uiConversation: { events: { register: definition => definitions.push(definition) } },
       effect: cleanup => cleanup,
       slots: {
         inject: (name, callback) => { slots.push(name); return callback() },
@@ -103,7 +103,7 @@ describe('Roleplay message action presentation', () => {
       },
     }
     apply(ctx)
-    expect(inject).toEqual(['slots', 'conversationEvents', 'connection', 'sessions'])
+    expect(inject).toEqual(['slots', 'uiConversation', 'rpRemote', 'sessions'])
     expect(definitions.map(item => item.kind)).toEqual([
       'rp-floor-user-actions',
       'rp-floor-assistant-actions',
@@ -130,15 +130,13 @@ describe('Roleplay message action presentation', () => {
   it('adds projected Roleplay operations without a render-time detail RPC', async () => {
     let AssistantActions
     const connection = {
-      rpc: {
-        call: vi.fn(async () => { throw new Error('render must not query message details') }),
-      },
+      call: vi.fn(async () => { throw new Error('render must not query message details') }),
     }
     const sessions = { fork: vi.fn(), open: vi.fn() }
     const ctx = {
-      connection,
+      rpRemote: connection,
       sessions,
-      conversationEvents: { register: () => {} },
+      uiConversation: { events: { register: () => {} } },
       effect: cleanup => cleanup,
       slots: {
         inject: (_name, callback) => callback(),
@@ -151,13 +149,14 @@ describe('Roleplay message action presentation', () => {
     apply(ctx)
 
     let sessionSnapshot = roleplayActionProjection({ turn: 2 }).snapshot
-    const sessionsSnapshot = { byId: { 'session-1': { agentPreset: 'roleplay' } } }
+    const sessionsSnapshot = { byId: { 'session-1': { projectionValues: { agentPreset: 'roleplay' } } } }
     const props = {
       sessionId: 'session-1',
       messageId: 'assistant-1',
       connection,
       sessions,
       useSession: selector => selector(sessionSnapshot),
+      useChat: selector => selector(sessionSnapshot.chat),
       useSessions: selector => selector(sessionsSnapshot),
     }
     const view = render(React.createElement(AssistantActions, props))
@@ -167,7 +166,7 @@ describe('Roleplay message action presentation', () => {
     expect(screen.getByRole('button', { name: '编辑第 2 条回复' }).disabled).toBe(false)
     expect(screen.getByRole('button', { name: '删除第 2 条回复' }).disabled).toBe(false)
     expect(screen.queryByRole('button', { name: /复制/ })).toBeNull()
-    expect(connection.rpc.call).not.toHaveBeenCalled()
+    expect(connection.call).not.toHaveBeenCalled()
 
     sessionSnapshot = { ...sessionSnapshot, running: true }
     view.rerender(React.createElement(AssistantActions, props))
@@ -175,7 +174,7 @@ describe('Roleplay message action presentation', () => {
     expect(screen.getByRole('button', { name: '从第 2 条回复新建对话' }).disabled).toBe(true)
     expect(screen.getByRole('button', { name: '编辑第 2 条回复' }).disabled).toBe(true)
     expect(screen.getByRole('button', { name: '删除第 2 条回复' }).disabled).toBe(true)
-    expect(connection.rpc.call).not.toHaveBeenCalled()
+    expect(connection.call).not.toHaveBeenCalled()
     view.unmount()
   })
 
@@ -184,17 +183,15 @@ describe('Roleplay message action presentation', () => {
     const sessionId = 'session-failed-empty'
     const target = { kind: 'turn', turn: 3 }
     const connection = {
-      rpc: {
         call: vi.fn(async () => ({
           ok: true,
           value: { ok: true, value: { sessionId } },
         })),
-      },
     }
     const ctx = {
-      connection,
+      rpRemote: connection,
       sessions: {},
-      conversationEvents: { register: () => {} },
+      uiConversation: { events: { register: () => {} } },
       effect: cleanup => cleanup,
       slots: {
         inject: (_name, callback) => callback(),
@@ -243,7 +240,8 @@ describe('Roleplay message action presentation', () => {
       connection,
       sessions: {},
       useSession: selector => selector({ running: false, chat: { nodes } }),
-      useSessions: selector => selector({ byId: { [sessionId]: { agentPreset: 'roleplay' } } }),
+      useChat: selector => selector({ nodes }),
+      useSessions: selector => selector({ byId: { [sessionId]: { projectionValues: { agentPreset: 'roleplay' } } } }),
     }))
 
     expect(view.getByText('回复生成失败')).not.toBeNull()
@@ -253,7 +251,7 @@ describe('Roleplay message action presentation', () => {
     expect(view.getByRole('button', { name: '删除这次记录' })).not.toBeNull()
 
     fireEvent.click(view.getByRole('button', { name: '重新生成' }))
-    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith(
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith(
       '/rp-message-actions',
       'reroll',
       { sessionId, target },
@@ -287,11 +285,11 @@ describe('Roleplay message action presentation', () => {
 
   it('leaves inherited one-shot subagent transcripts read-only', () => {
     let AssistantActions
-    const connection = { rpc: { call: vi.fn() } }
+    const connection = { call: vi.fn() }
     const ctx = {
-      connection,
+      rpRemote: connection,
       sessions: {},
-      conversationEvents: { register: () => {} },
+      uiConversation: { events: { register: () => {} } },
       effect: cleanup => cleanup,
       slots: {
         inject: (_name, callback) => callback(),
@@ -309,10 +307,11 @@ describe('Roleplay message action presentation', () => {
       connection,
       sessions: {},
       useSession: selector => selector({ chat: {} }),
+      useChat: selector => selector({}),
       useSessions: selector => selector({
         byId: {
           'writer-child': {
-            agentPreset: 'roleplay',
+            projectionValues: { agentPreset: 'roleplay' },
             origin: 'subagent',
             parentId: 'roleplay-root',
           },
@@ -321,21 +320,19 @@ describe('Roleplay message action presentation', () => {
     }))
 
     expect(view.container.childElementCount).toBe(0)
-    expect(connection.rpc.call).not.toHaveBeenCalled()
+    expect(connection.call).not.toHaveBeenCalled()
     view.unmount()
   })
 
   it('renders projected user actions without querying message details', () => {
     let UserActions
     const connection = {
-      rpc: {
-        call: vi.fn(async () => { throw new Error('connection replaced during HMR') }),
-      },
+      call: vi.fn(async () => { throw new Error('connection replaced during HMR') }),
     }
     const ctx = {
-      connection,
+      rpRemote: connection,
       sessions: {},
-      conversationEvents: { register: () => {} },
+      uiConversation: { events: { register: () => {} } },
       effect: cleanup => cleanup,
       slots: {
         inject: (_name, callback) => callback(),
@@ -375,13 +372,14 @@ describe('Roleplay message action presentation', () => {
       connection,
       sessions: {},
       useSession: selector => selector({ running: false, chat: { nodes: new Map() } }),
-      useSessions: selector => selector({ byId: { 'session-user-fallback': { agentPreset: 'roleplay' } } }),
+      useChat: selector => selector({ nodes: new Map() }),
+      useSessions: selector => selector({ byId: { 'session-user-fallback': { projectionValues: { agentPreset: 'roleplay' } } } }),
     }), { container: mount })
 
     expect(screen.getByRole('button', { name: '复制第 1 条消息' }).disabled).toBe(false)
     expect(screen.getByRole('button', { name: '编辑第 1 条消息' }).disabled).toBe(false)
     expect(screen.getByRole('button', { name: '删除第 1 条消息' }).disabled).toBe(false)
-    expect(connection.rpc.call).not.toHaveBeenCalled()
+    expect(connection.call).not.toHaveBeenCalled()
     expect(screen.queryByText('暂时无法完成这次更改，请稍后再试。')).toBeNull()
     expect(userRow.hasAttribute('data-rp-message-actions-user-native-hidden')).toBe(true)
 
@@ -397,17 +395,15 @@ describe('Roleplay message action presentation', () => {
     const target = projection.userTargets[0]
     const node = projection.snapshot.chat.nodes.get(target.messageId)
     const connection = {
-      rpc: {
         call: vi.fn(async () => ({
           ok: true,
           value: { ok: true, value: { sessionId } },
         })),
-      },
     }
     const ctx = {
-      connection,
+      rpRemote: connection,
       sessions: {},
-      conversationEvents: { register: () => {} },
+      uiConversation: { events: { register: () => {} } },
       effect: cleanup => cleanup,
       slots: {
         inject: (_name, callback) => callback(),
@@ -438,7 +434,8 @@ describe('Roleplay message action presentation', () => {
       connection,
       sessions: {},
       useSession: selector => selector(projection.snapshot),
-      useSessions: selector => selector({ byId: { [sessionId]: { agentPreset: 'roleplay' } } }),
+      useChat: selector => selector(projection.snapshot.chat),
+      useSessions: selector => selector({ byId: { [sessionId]: { projectionValues: { agentPreset: 'roleplay' } } } }),
     }), { container: mount })
 
     fireEvent.click(screen.getByRole('button', { name: '编辑第 2 条消息' }))
@@ -448,11 +445,11 @@ describe('Roleplay message action presentation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
     await waitFor(() => expect(screen.queryByRole('textbox', { name: '消息内容' })).toBeNull())
-    expect(connection.rpc.call).not.toHaveBeenCalled()
+    expect(connection.call).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: '编辑第 2 条消息' }))
     fireEvent.click(screen.getByRole('button', { name: '保存并重新生成' }))
-    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith(
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith(
       '/rp-message-actions',
       'reroll',
       { sessionId, target, content: '继续' },
@@ -465,9 +462,9 @@ describe('Roleplay message action presentation', () => {
   it('keeps failed commits understandable while successful internal commits render no row body', () => {
     let CommitView
     const ctx = {
-      connection: {},
+      rpRemote: {},
       sessions: {},
-      conversationEvents: { register: () => {} },
+      uiConversation: { events: { register: () => {} } },
       effect: cleanup => cleanup,
       slots: {
         inject: (_name, callback) => callback(),
@@ -702,7 +699,7 @@ describe('Roleplay message action presentation', () => {
       target, replayEdit: true, content: '已编辑的开场白',
     })
 
-    expect(connection.rpc.call).toHaveBeenCalledWith('/rp-message-actions', 'edit', {
+    expect(connection.call).toHaveBeenCalledWith('/rp-message-actions', 'edit', {
       sessionId: 'child-opening', target, content: '已编辑的开场白',
     })
     expect(sessions.open).toHaveBeenCalledWith('child-opening')
@@ -716,19 +713,17 @@ describe('Roleplay message action presentation', () => {
       target: { kind: 'message', role: 'assistant', messageId: 'assistant-plain', turn: 1, step: 1 },
       replayEdit: false, content: '已包含在截取前缀中的编辑',
     })
-    expect(connection.rpc.call).not.toHaveBeenCalled()
+    expect(connection.call).not.toHaveBeenCalled()
     expect(sessions.open).toHaveBeenCalledWith('child-plain')
   })
 
   it('does not open a fork child when replaying its historical edit fails', async () => {
     const sessions = { fork: vi.fn(async () => 'child-incomplete'), open: vi.fn() }
     const connection = {
-      rpc: {
         call: vi.fn(async () => ({
           ok: true,
           value: { ok: false, error: { code: 'MESSAGE_NOT_FOUND' } },
         })),
-      },
     }
     await expect(forkMessageBranch({
       sessions, connection, sessionId: 'parent-incomplete', atSeq: 10,
@@ -752,9 +747,9 @@ describe('Roleplay message action presentation', () => {
   it('hides a deleted assistant even when its turn start is outside the history window', () => {
     let AssistantEffects
     const ctx = {
-      connection: {},
+      rpRemote: {},
       sessions: {},
-      conversationEvents: { register: () => {} },
+      uiConversation: { events: { register: () => {} } },
       effect: cleanup => cleanup,
       slots: {
         inject: (_name, callback) => callback(),
@@ -785,7 +780,7 @@ describe('Roleplay message action presentation', () => {
         location: { kind: 'unresolved' },
         data: { deleted: true, target },
       },
-      useSessions: selector => selector({ byId: { 'session-1': { agentPreset: 'roleplay' } } }),
+      useSessions: selector => selector({ byId: { 'session-1': { projectionValues: { agentPreset: 'roleplay' } } } }),
     }), { container: mount })
 
     expect(assistant.hasAttribute('data-rp-message-actions-hidden-deleted-assistant')).toBe(true)
@@ -1229,9 +1224,10 @@ describe('Roleplay message action presentation', () => {
   it('resolves message rows through avatar nodes and returns the full delete suffix', () => {
     const parent = document.createElement('div')
     const firstUser = flowRow('user', parent)
-    flowRow('rp-message-avatar-user', parent)
+    const turnProcess = flowRow('turn-process', parent)
+    const firstUserAvatar = flowRow('rp-message-avatar-user', parent)
     const firstUserActions = actionRow({ kind: 'message', role: 'user', messageId: 'user-1' }, parent)
-    flowRow('context', parent)
+    const context = flowRow('context', parent)
     const firstAssistant = flowRow('assistant-step', parent)
     flowRow('rp-message-avatar-assistant', parent)
     const firstAssistantActions = actionRow({
@@ -1243,15 +1239,18 @@ describe('Roleplay message action presentation', () => {
 
     expect(messageRowForAction(firstUserActions, 'user')).toBe(firstUser)
     expect(messageRowForAction(firstAssistantActions, 'assistant')).toBe(firstAssistant)
-    expect(suffixActionRows(carrier, {
+    const assistantSuffix = suffixActionRows(carrier, {
       kind: 'message', role: 'assistant', messageId: 'assistant-1', turn: 1, step: 1,
-    })).toEqual([
-      firstUserActions.nextElementSibling, firstAssistant, firstAssistant.nextElementSibling,
+    })
+    expect(assistantSuffix).toEqual([
+      turnProcess, context, firstAssistant, firstAssistant.nextElementSibling,
       firstAssistantActions, secondUser, secondUser.nextElementSibling,
     ])
+    expect(assistantSuffix).not.toContain(firstUserAvatar)
+    expect(assistantSuffix).not.toContain(firstUserActions)
     expect(suffixActionRows(carrier, { kind: 'message', role: 'user', messageId: 'user-1' })[0]).toBe(firstUser)
     expect(deletedUserRows(firstUserActions)).toEqual([
-      firstUser, firstUser.nextElementSibling, firstUserActions,
+      firstUser, turnProcess, firstUserAvatar, firstUserActions,
     ])
     expect(deletedAssistantTraceRows(firstAssistantActions)).toEqual([
       firstAssistant, firstAssistant.nextElementSibling, firstAssistantActions,
@@ -1261,9 +1260,9 @@ describe('Roleplay message action presentation', () => {
   it('reconciles a reroll suffix when the retired target marker lands after the carrier effect', async () => {
     let SuffixEffect
     const ctx = {
-      connection: {},
+      rpRemote: {},
       sessions: {},
-      conversationEvents: { register: () => {} },
+      uiConversation: { events: { register: () => {} } },
       effect: cleanup => cleanup,
       slots: {
         inject: (_name, callback) => callback(),
@@ -1298,6 +1297,7 @@ describe('Roleplay message action presentation', () => {
         data: { replacementStart: 1, action: { operation: 'reroll', targets: [target] } },
       },
       useSession: selector => selector({ hasMore: false, chat: { order: [], nodes: new Map() } }),
+      useChat: selector => selector({ order: [], nodes: new Map() }),
     }), { container: mount })
     expect(retiredUser.hasAttribute('data-rp-message-actions-hidden-suffix')).toBe(false)
 
@@ -1315,9 +1315,9 @@ describe('Roleplay message action presentation', () => {
   it('clips a reroll suffix to the resident page until its original target loads', async () => {
     let SuffixEffect
     const ctx = {
-      connection: {},
+      rpRemote: {},
       sessions: {},
-      conversationEvents: { register: () => {} },
+      uiConversation: { events: { register: () => {} } },
       effect: cleanup => cleanup,
       slots: {
         inject: (_name, callback) => callback(),
@@ -1357,6 +1357,7 @@ describe('Roleplay message action presentation', () => {
       },
     }
     const useSession = selector => selector(snapshot)
+    const useChat = selector => selector(snapshot.chat)
     const node = {
       key: 'suffix-259',
       id: '259',
@@ -1365,7 +1366,7 @@ describe('Roleplay message action presentation', () => {
     }
 
     expect(suffixResidentStartKey(snapshot.chat, 15, node.anchorSeq)).toBe('context-27')
-    const view = render(React.createElement(SuffixEffect, { node, useSession }), { container: mount })
+    const view = render(React.createElement(SuffixEffect, { node, useSession, useChat }), { container: mount })
     expect(residentContext.hasAttribute('data-rp-message-actions-hidden-suffix')).toBe(true)
     expect(retiredAssistant.hasAttribute('data-rp-message-actions-hidden-suffix')).toBe(true)
     expect(nativeCarrier.hasAttribute('data-rp-message-actions-hidden-suffix')).toBe(true)
@@ -1382,7 +1383,7 @@ describe('Roleplay message action presentation', () => {
         nodes: new Map(),
       },
     }
-    view.rerender(React.createElement(SuffixEffect, { node, useSession }))
+    view.rerender(React.createElement(SuffixEffect, { node, useSession, useChat }))
 
     await waitFor(() => expect(retiredUser.hasAttribute('data-rp-message-actions-hidden-suffix')).toBe(true))
     expect(residentContext.hasAttribute('data-rp-message-actions-hidden-suffix')).toBe(true)
@@ -1622,11 +1623,9 @@ function actionRow(target, parent, kind = 'rp-floor-user-actions') {
 
 function successfulConnection(onCall = () => {}) {
   return {
-    rpc: {
       call: vi.fn(async (_path, endpoint, payload) => {
         onCall(endpoint, payload)
         return { ok: true, value: { ok: true, value: {} } }
       }),
-    },
   }
 }

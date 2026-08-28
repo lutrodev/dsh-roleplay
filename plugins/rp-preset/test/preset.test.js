@@ -92,7 +92,7 @@ test('seeds one template-based default and preserves an explicit default across 
   }
 })
 
-test('browser RPC returns detached templates and can create or select a default preset', async () => {
+test('browser Remote returns detached templates and can create or select a default preset', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-preset-browser-'))
   const ctx = new Context()
   const presets = new RpPresets(ctx, configFor(root))
@@ -210,15 +210,13 @@ test('initialization can be disposed without registering effects on an inactive 
     await gate.promise
     return originalEnsureDefault.call(this)
   }
-  ctx.provide('connection', {
-    rpc: {
-      handle(path, next) {
+  ctx.provide('rpRemote', {
+      register(path, next) {
         assert.equal(path, '/rp-presets')
         handler = next
         registered.resolve()
         return () => { disposed = true }
       },
-    },
   })
   try {
     fiber = ctx.plugin({ name: 'rp-preset-lifecycle-test', apply }, { ...configFor(root), exposeBrowser: true })
@@ -336,7 +334,7 @@ test('preset editor offers templates or a blank draft without client-side fixed 
   assert.match(styles, /\.deleteDialog\{/)
   assert.match(styles, /\.deleteSummary\{/)
   assert.match(styles, /\.positionGroup \.fieldGrid\{grid-template-columns:minmax\(92px,\.55fr\) 1fr 1\.5fr\}/)
-  assert.match(client, /export const inject = \['slots', 'connection', 'rpAssetEditors'\]/)
+  assert.match(client, /export const inject = \['slots', 'rpRemote', 'rpAssetEditors'\]/)
   assert.match(client, /ctx\.rpAssetEditors\.register\('preset', PresetSessionEditor\)/)
   assert.match(client, /function PresetSessionEditor/)
   assert.match(client, /h\(PresetEditor/)

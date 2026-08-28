@@ -1,4 +1,5 @@
 import Schema from '@deepseek-ai/schemastery'
+import { FIRST_PARTY_SECTION_ORDER } from '@deepseek-ai/dsh-system-prompt'
 import { RpRuntime } from './runtime.js'
 import { DEFAULT_WRITER_PERSONA } from './prompts.js'
 
@@ -41,7 +42,7 @@ export function apply(ctx, config) {
   if (typeof features?.harnessIdentity !== 'function') throw new Error('rp-core: Roleplay identity provider is unavailable')
   ctx.systemPrompt.section({
     name: 'harness:identity',
-    order: -100,
+    order: FIRST_PARTY_SECTION_ORDER.HARNESS_IDENTITY,
     text: () => features.harnessIdentity(),
   })
   new RpRuntime(ctx, config)

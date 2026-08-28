@@ -7,6 +7,7 @@ import { CORE_PACKAGES, DEFAULT_ENABLED_FEATURES, FEATURE_CATALOG, ROLEPLAY_SKIL
 
 const pluginDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pluginsDirectory = resolve(pluginDirectory, '..')
+const packagesDirectory = resolve(pluginsDirectory, '..', 'packages')
 const V0_1_5_NEW_ENTRY_IDS = ['rp-quick-replies', 'rp-state-display', 'rp-compact-access-mode']
 
 function patchEntry(patch, id) {
@@ -58,20 +59,23 @@ test('feature manager is the suite bundle and carries every managed Roleplay pac
 })
 
 test('all Roleplay packages stay on the declared suite version', async () => {
-  for (const entry of await readdir(pluginsDirectory, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue
-    let manifest
-    try {
-      manifest = JSON.parse(await readFile(resolve(pluginsDirectory, entry.name, 'package.json'), 'utf8'))
-    } catch (error) {
-      if (error?.code === 'ENOENT') continue
-      throw error
+  for (const workspaceDirectory of [packagesDirectory, pluginsDirectory]) {
+    for (const entry of await readdir(workspaceDirectory, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      let manifest
+      try {
+        manifest = JSON.parse(await readFile(resolve(workspaceDirectory, entry.name, 'package.json'), 'utf8'))
+      } catch (error) {
+        if (error?.code === 'ENOENT') continue
+        throw error
+      }
+      assert.equal(manifest.version, ROLEPLAY_SUITE_VERSION, `${manifest.name} version drifted from the suite`)
     }
-    assert.equal(manifest.version, ROLEPLAY_SUITE_VERSION, `${manifest.name} version drifted from the suite`)
   }
 })
 
-test('every Roleplay browser RPC follows the DSH trusted-host boundary', async () => {
+test('every Roleplay browser API uses the shared typed Remote boundary', async () => {
+  let registrations = 0
   for (const entry of await readdir(pluginsDirectory, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
     let source
@@ -81,15 +85,11 @@ test('every Roleplay browser RPC follows the DSH trusted-host boundary', async (
       if (error?.code === 'ENOENT') continue
       throw error
     }
-    const handles = source.match(/\.rpc\.handle\(/g)?.length ?? 0
-    if (handles === 0) continue
-    assert.doesNotMatch(source, /authority:\s*['"]loopback['"]/, `${entry.name} must not add a private loopback gate`)
-    assert.equal(
-      source.match(/authority:\s*['"]trusted-host['"]/g)?.length ?? 0,
-      handles,
-      `${entry.name} must delegate every browser RPC boundary to DSH`,
-    )
+    assert.doesNotMatch(source, /\.rpc\.handle\(/, `${entry.name} must not use the removed browser RPC API`)
+    assert.doesNotMatch(source, /authority:\s*['"](?:loopback|trusted-host)['"]/, `${entry.name} must not carry legacy RPC authority options`)
+    registrations += source.match(/ctx\.rpRemote\.register\(/g)?.length ?? 0
   }
+  assert.equal(registrations, 10)
 })
 
 test('settings UI presents activation instead of package acquisition', async () => {

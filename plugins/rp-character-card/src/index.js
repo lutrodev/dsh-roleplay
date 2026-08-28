@@ -30,7 +30,7 @@ export function apply(ctx, config) {
   const libraryDir = resolve(config.libraryDir)
   const cards = new RpCharacterCards(ctx, { ...config, libraryDir })
 
-  if (config.exposeBrowser) ctx.inject(['connection'], browserCtx => registerBrowserLibrary(browserCtx, cards))
+  if (config.exposeBrowser) ctx.inject(['rpRemote'], browserCtx => registerBrowserLibrary(browserCtx, cards))
   if (config.registerTool === false) return
   ctx.inject(['tools', 'fs'], toolCtx => registerImportTool(toolCtx, cards, config))
 }
@@ -90,19 +90,17 @@ function registerImportTool(ctx, cards, config) {
 
 const BROWSER_ENDPOINTS = new Set(['list', 'get', 'avatar', 'import', 'export', 'create', 'update'])
 
-/** Register the browser API behind the active DSH trusted-host boundary. */
+/** Register the browser API through the shared typed Remote boundary. */
 function registerBrowserLibrary(ctx, cards) {
-  const connection = ctx.get('connection')
-  if (connection === undefined) throw new Error('rp-character-card: injected connection is unavailable')
-  const dispose = connection.rpc.handle('/rp-character-cards', async (endpoint, payload, signal) => {
+  const dispose = ctx.rpRemote.register('/rp-character-cards', async (endpoint, payload, signal) => {
     if (!BROWSER_ENDPOINTS.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown character-card endpoint: ${endpoint}`))
     try {
       return transportSuccess(success(await dispatchBrowser(cards, endpoint, payload, signal)))
     } catch (error) {
       return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error)))
     }
-  }, { authority: 'trusted-host' })
-  ctx.effect(() => dispose, 'rp-character-card: /rp-character-cards RPC')
+  })
+  ctx.effect(() => dispose, 'rp-character-card: /rp-character-cards Remote')
 }
 
 /** Dispatch one validated browser library request. */

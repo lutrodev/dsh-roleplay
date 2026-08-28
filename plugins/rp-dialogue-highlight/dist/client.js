@@ -28,6 +28,15 @@ window.__ModuleLoader__.load({
 		//#endregion
 		let react = require("react");
 		react = __toESM(react, 1);
+		//#region ../../packages/rp-ui/src/session-summary.js
+		/**
+		* Read the Roleplay identity from the public DSH SessionSummary contract.
+		* Projection-backed summary fields live under projectionValues in DSH 0.1.2.
+		*/
+		function isRoleplaySessionSummary(summary) {
+			return summary?.projectionValues?.agentPreset === "roleplay";
+		}
+		//#endregion
 		//#region src/dialogue-ranges.js
 		const OPEN_TO_CLOSE = /* @__PURE__ */ new Map([
 			["“", "”"],
@@ -379,7 +388,7 @@ window.__ModuleLoader__.load({
 		}
 		//#endregion
 		//#region src/client.js
-		const inject = ["slots", "conversationEvents"];
+		const inject = ["slots", "uiConversation"];
 		const h = react.default.createElement;
 		const NODE_KIND = "rp-dialogue-highlight";
 		const NODE_OFFSET = .01;
@@ -421,7 +430,7 @@ window.__ModuleLoader__.load({
 		};
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
-			ctx.conversationEvents.register(dialogueHighlightNodeDefinition);
+			ctx.uiConversation.events.register(dialogueHighlightNodeDefinition);
 			ctx.slots.inject("conversation.chat.node", () => ctx.slots.register({
 				name: "conversation.chat.node",
 				key: NODE_KIND
@@ -474,7 +483,7 @@ window.__ModuleLoader__.load({
 		function DialogueHighlightAnchor({ node, sessionId, useSessions }) {
 			const anchorRef = (0, react.useRef)(null);
 			const entryRef = (0, react.useRef)(Symbol(String(node.id)));
-			const roleplay = useSessions((state) => state.byId?.[sessionId]?.agentPreset === "roleplay");
+			const roleplay = useSessions((state) => isRoleplaySessionSummary(state.byId?.[sessionId]));
 			(0, react.useLayoutEffect)(() => {
 				if (!roleplay) return void 0;
 				const assistant = findAssistantRow(anchorRef.current);

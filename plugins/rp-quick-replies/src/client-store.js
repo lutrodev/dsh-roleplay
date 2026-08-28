@@ -76,7 +76,7 @@ export function friendlyQuickReplyRequestError(error, intent) {
 }
 
 async function quickReplyRequest(connection, endpoint, payload = {}) {
-  const response = await connection.rpc.call(QUICK_REPLIES_RPC_PATH, endpoint, payload)
+  const response = await connection.call(QUICK_REPLIES_RPC_PATH, endpoint, payload)
   const domain = response?.ok === true && response.value?.ok !== undefined ? response.value : response
   if (domain?.ok !== true) {
     throw Object.assign(new Error(domain?.error?.message ?? '快捷回复请求失败'), { code: domain?.error?.code })

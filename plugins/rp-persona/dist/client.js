@@ -6452,7 +6452,7 @@ get: (_target, key) => {
 		//#region src/client.js
 		const inject = [
 			"slots",
-			"connection",
+			"rpRemote",
 			"rpAssetEditors"
 		];
 		const h = react.default.createElement;
@@ -6472,7 +6472,7 @@ get: (_target, key) => {
 			ctx.effect(() => ctx.rpAssetEditors.register("persona", PersonaSessionEditor), "rp-persona: canonical session editor");
 			ctx.slots.inject("rp-assets.persona-entry", () => ctx.slots.register({
 				name: "rp-assets.persona-entry",
-				inject: () => ({ connection: ctx.connection })
+				inject: () => ({ connection: ctx.rpRemote })
 			}, PersonaLibraryEntry));
 		}
 		function PersonaLibraryEntry({ wide, connection }) {
@@ -7108,7 +7108,7 @@ get: (_target, key) => {
 			}, [open]);
 		}
 		async function rpc(connection, endpoint, payload) {
-			return domainValue(await connection.rpc.call("/rp-personas", endpoint, payload));
+			return domainValue(await connection.call("/rp-personas", endpoint, payload));
 		}
 		//#endregion
 		exports.apply = apply;

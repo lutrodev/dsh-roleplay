@@ -121,7 +121,7 @@ test('角色卡详情只列出关联世界书名称', () => {
 
 test('角色卡插件向会话编排注册唯一的原生创建与编辑界面', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
-  assert.match(client, /export const inject = \['slots', 'connection', 'rpAssetEditors'\]/)
+  assert.match(client, /export const inject = \['slots', 'rpRemote', 'rpAssetEditors'\]/)
   assert.match(client, /ctx\.rpAssetEditors\.register\('character', CharacterSessionEditor\)/)
   assert.match(client, /function CharacterSessionEditor/)
   assert.match(client, /h\(CharacterEditForm/)

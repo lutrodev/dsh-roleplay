@@ -5,7 +5,7 @@ import { domainValue } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 import { ContentTransition, DirtyBar, Inspector, LoadingSpinner, RpMotionProvider } from 'dsh-roleplay-rp-ui'
 
-export const inject = ['slots', 'connection', 'rpAssetEditors']
+export const inject = ['slots', 'rpRemote', 'rpAssetEditors']
 const h = React.createElement
 const MODAL_SCROLL_LOCK = Symbol.for('dsh-roleplay.asset-modal-scroll-lock')
 const LEVELS = [
@@ -17,7 +17,7 @@ const LEVELS = [
 export function apply(ctx) {
   ctx.effect(ensureStyles)
   ctx.effect(() => ctx.rpAssetEditors.register('lorebook', LoreSessionEditor), 'rp-lore-book: canonical session editor')
-  ctx.slots.inject('rp-assets.lore-entry', () => ctx.slots.register({ name: 'rp-assets.lore-entry', inject: () => ({ connection: ctx.connection }) }, LoreLibraryEntry))
+  ctx.slots.inject('rp-assets.lore-entry', () => ctx.slots.register({ name: 'rp-assets.lore-entry', inject: () => ({ connection: ctx.rpRemote }) }, LoreLibraryEntry))
 }
 
 function LoreLibraryEntry({ wide, connection }) {
@@ -405,5 +405,5 @@ function slotSummary(slots, total) {
   if (!slots) return `${total} 个条目`
   return LEVELS.map(level => `${level.short} ${slots[level.id] ?? 0}`).join(' · ')
 }
-async function rpc(connection, endpoint, payload) { return domainValue(await connection.rpc.call('/rp-lore-books', endpoint, payload)) }
+async function rpc(connection, endpoint, payload) { return domainValue(await connection.call('/rp-lore-books', endpoint, payload)) }
 function bytesToBase64(bytes) { let binary=''; for(let offset=0;offset<bytes.length;offset+=0x8000) binary+=String.fromCharCode(...bytes.subarray(offset,offset+0x8000)); return btoa(binary) }

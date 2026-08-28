@@ -9992,7 +9992,7 @@ get: (_target, key) => {
 		//#region src/client.js
 		const inject = [
 			"slots",
-			"connection",
+			"rpRemote",
 			"rpAssetEditors"
 		];
 		const h = react.default.createElement;
@@ -10010,7 +10010,7 @@ get: (_target, key) => {
 			ctx.effect(() => ctx.rpAssetEditors.register("preset", PresetSessionEditor), "rp-preset: canonical session editor");
 			ctx.slots.inject("rp-assets.preset-entry", () => ctx.slots.register({
 				name: "rp-assets.preset-entry",
-				inject: () => ({ connection: ctx.connection })
+				inject: () => ({ connection: ctx.rpRemote })
 			}, PresetLibraryEntry));
 		}
 		function PresetLibraryEntry({ wide, connection }) {
@@ -10615,7 +10615,7 @@ get: (_target, key) => {
 			return next;
 		}
 		async function rpc(connection, endpoint, payload) {
-			const response = await connection.rpc.call("/rp-presets", endpoint, payload);
+			const response = await connection.call("/rp-presets", endpoint, payload);
 			const domain = response?.ok === true && response.value?.ok !== void 0 ? response.value : response;
 			if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? "请求失败"), { code: domain?.error?.code });
 			return domain.value;

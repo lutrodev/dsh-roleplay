@@ -21,6 +21,7 @@ vi.mock('motion/react', async () => {
 })
 
 import {
+  StateDisplayAnchor,
   StateVariableCard,
   apply,
 } from '../src/client.js'
@@ -34,7 +35,7 @@ describe('Roleplay current variable card', () => {
     const slots = []
     const ctx = {
       effect: cleanup => cleanup,
-      conversationEvents: { register: definition => definitions.push(definition) },
+      uiConversation: { events: { register: definition => definitions.push(definition) } },
       slots: {
         inject: (_name, callback) => callback(),
         register: (config, component) => { slots.push({ config, component }); return () => {} },
@@ -43,6 +44,37 @@ describe('Roleplay current variable card', () => {
     apply(ctx)
     expect(definitions.map(item => item.kind)).toEqual(['rp-state-display-anchor', 'rp-state-display-retraction'])
     expect(slots.map(item => item.config.key)).toEqual(['rp-state-display-anchor', 'rp-state-display-retraction'])
+  })
+
+  it('reads the active card from the independent Chat view for a projected Roleplay summary', () => {
+    const node = {
+      key: 'state-anchor',
+      kind: 'rp-state-display-anchor',
+      data: { turn: 1, assistantSeq: 8 },
+    }
+    const chat = { order: [node.key], nodes: new Map([[node.key, node]]) }
+    const projections = {
+      'rp/state': {
+        namespaces: {
+          story: {
+            value: { hp: 7 },
+            definition: { title: '故事状态', schema: { type: 'object' } },
+          },
+        },
+      },
+      'rp/state/activity': { available: true, namespaces: {} },
+    }
+    render(React.createElement(StateDisplayAnchor, {
+      node,
+      sessionId: 'session-1',
+      useChat: selector => selector(chat),
+      useSessions: selector => selector({
+        byId: { 'session-1': { projectionValues: { agentPreset: 'roleplay' } } },
+      }),
+      useProjection: key => projections[key],
+    }))
+
+    expect(screen.getByLabelText('当前会话变量')).toBeTruthy()
   })
 
   it('renders schema labels, all values, recent changes, and long-value disclosure', () => {

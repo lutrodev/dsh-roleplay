@@ -10607,7 +10607,7 @@ get: (_target, key) => {
 		//#region src/client.js
 		const inject = [
 			"slots",
-			"connection",
+			"rpRemote",
 			"rpAssetEditors"
 		];
 		const h = react.default.createElement;
@@ -10634,7 +10634,7 @@ get: (_target, key) => {
 			ctx.effect(() => ctx.rpAssetEditors.register("lorebook", LoreSessionEditor), "rp-lore-book: canonical session editor");
 			ctx.slots.inject("rp-assets.lore-entry", () => ctx.slots.register({
 				name: "rp-assets.lore-entry",
-				inject: () => ({ connection: ctx.connection })
+				inject: () => ({ connection: ctx.rpRemote })
 			}, LoreLibraryEntry));
 		}
 		function LoreLibraryEntry({ wide, connection }) {
@@ -11439,7 +11439,7 @@ get: (_target, key) => {
 			return LEVELS.map((level) => `${level.short} ${slots[level.id] ?? 0}`).join(" · ");
 		}
 		async function rpc(connection, endpoint, payload) {
-			return domainValue(await connection.rpc.call("/rp-lore-books", endpoint, payload));
+			return domainValue(await connection.call("/rp-lore-books", endpoint, payload));
 		}
 		function bytesToBase64(bytes) {
 			let binary = "";

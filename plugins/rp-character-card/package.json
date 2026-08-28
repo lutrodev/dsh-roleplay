@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-character-card",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Community character-card library and importer for Roleplay",
   "license": "MIT",
   "private": true,
@@ -33,10 +33,10 @@
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-connection",
-        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-sidebar",
-        "dsh-roleplay-rp-library"
+        "dsh-roleplay-rp-library",
+        "dsh-roleplay-rp-remote"
       ],
       "platform": "web"
     }
@@ -47,13 +47,13 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-client-connection": "^0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-runtime": "^0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.1-rc.2",
-    "@deepseek-ai/dsh-fs": "^0.1.1-rc.2",
-    "@deepseek-ai/dsh-tools": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.2-alpha.1",
+    "@deepseek-ai/dsh-fs": "^0.1.2-alpha.1",
+    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.1",
     "dsh-roleplay-rp-core": "^0.1.0",
-    "dsh-roleplay-rp-library": "^0.1.0"
+    "dsh-roleplay-rp-library": "^0.1.0",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.1",
+    "dsh-roleplay-rp-remote": "^0.1.7"
   },
   "peerDependenciesMeta": {
     "dsh-roleplay-rp-core": {
@@ -62,18 +62,18 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
-    "@deepseek-ai/dsh-client-connection": "0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-runtime": "0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.1-rc.2",
-    "@deepseek-ai/dsh-fs": "0.1.1-rc.2",
-    "@deepseek-ai/dsh-tools": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.1",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.2-alpha.1",
+    "@deepseek-ai/dsh-fs": "0.1.2-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.1.2-alpha.1",
     "dsh-roleplay-rp-core": "workspace:^",
     "dsh-roleplay-rp-library": "workspace:^",
     "dsh-roleplay-rp-ui": "workspace:^",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "tsdown": "0.22.2"
+    "tsdown": "0.22.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.1",
+    "dsh-roleplay-rp-remote": "workspace:^"
   },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

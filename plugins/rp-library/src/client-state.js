@@ -1,5 +1,7 @@
+import { isRoleplaySessionSummary } from 'dsh-roleplay-rp-ui/session-summary'
+
 export function isRoleplaySummary(listState, sessionId) {
-  return listState.current === sessionId && listState.byId?.[sessionId]?.agentPreset === 'roleplay'
+  return listState.current === sessionId && isRoleplaySessionSummary(listState.byId?.[sessionId])
 }
 
 export function sessionSurfaceState(roleplay, session, profile) {
@@ -28,7 +30,7 @@ function assertResettableRoleplaySession(sessionId, sessions) {
   const list = sessions.list.getSnapshot()
   const summary = list.byId?.[sessionId]
   const snapshot = sessions.binding(sessionId)?.session.getSnapshot()
-  if (list.current !== sessionId || summary?.agentPreset !== 'roleplay' || snapshot === undefined) {
+  if (list.current !== sessionId || !isRoleplaySessionSummary(summary) || snapshot === undefined) {
     throw roleplayResetError('RP_RESET_UNAVAILABLE')
   }
   if (snapshot.composerPhase !== 'blank' || snapshot.running) {

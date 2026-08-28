@@ -4,6 +4,7 @@ import { dirname, parse, resolve } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import { FIRST_PARTY_SECTION_ORDER } from '@deepseek-ai/dsh-system-prompt'
 import { buildRoleplayPromptPreview } from 'dsh-roleplay-rp-core/prompts'
 import {
   CORE_PACKAGES,
@@ -36,16 +37,16 @@ const FEATURE_IDS = FEATURE_CATALOG.map(item => item.id)
 const RP_PACKAGE_RANGE = ROLEPLAY_SUITE_VERSION
 const ROLEPLAY_SETTINGS_NAMESPACE = settingsNamespace(SETTINGS_NAMESPACE)
 const HARNESS_PROMPT_SECTIONS = new Map([
-  ['harness:identity', { id: 'harness-identity', order: -100, source: 'dsh-system-prompt' }],
-  ['harness:source', { id: 'harness-source', order: -99, source: 'dsh-app-boot' }],
-  ['app:web-surface', { id: 'app-web-surface', order: -98, source: 'dsh-web-app' }],
+  ['harness:identity', { id: 'harness-identity', order: FIRST_PARTY_SECTION_ORDER.HARNESS_IDENTITY, source: 'dsh-system-prompt' }],
+  ['harness:source', { id: 'harness-source', order: FIRST_PARTY_SECTION_ORDER.HARNESS_SOURCE, source: 'dsh-app-boot' }],
+  ['app:web-surface', { id: 'app-web-surface', order: FIRST_PARTY_SECTION_ORDER.WEB_SURFACE, source: 'dsh-web-app' }],
 ])
 
 /** Maximum length of the Roleplay-wide Harness identity override. */
 export const MAX_HARNESS_IDENTITY_CHARACTERS = 4000
 
 export const name = 'rp-feature-manager'
-export const inject = ['loader', 'systemPrompt']
+export const inject = ['loader', 'systemPrompt', 'rpRemote']
 export const Config = Schema.object({
   enabledFeatures: Schema.array(Schema.union(FEATURE_IDS)).default(DEFAULT_ENABLED_FEATURES),
   enabledSkills: Schema.array(Schema.union(SKILL_IDS)).default(DEFAULT_ENABLED_SKILLS),
@@ -84,8 +85,17 @@ export class RpFeatureManager extends Service {
 
     ctx.on('loader/entry-init', entry => {
       queueMicrotask(() => { void this.reconcileEntry(entry).catch(error => ctx.logger.warn(error)) })
-    })
-    ctx.inject(['connection'], connectionCtx => registerBrowserApi(connectionCtx, this))
+    }, { global: true })
+    // App-owned profile startup can reapply the immutable --patch layer after
+    // this provider has enabled a managed row. That replacement reuses the
+    // Entry (so entry-init does not fire) and reports the disposal instead.
+    // Reconcile once more after the replacement commits so settings remain the
+    // final authority over both startup and live profile refreshes.
+    ctx.on('loader/partial-dispose', entry => {
+      if (!FEATURE_CATALOG.some(item => item.hostEntryIds.some(id => matchesLoaderEntry(entry, id)))) return
+      queueMicrotask(() => { this.scheduleReconcile() })
+    }, { global: true })
+    registerBrowserApi(ctx, this)
     this.scheduleReconcile()
   }
 
@@ -146,7 +156,7 @@ export class RpFeatureManager extends Service {
   }
 
   status() {
-    const loaderEntries = [...this.ctx.loader.entries()]
+    const loaderEntries = loaderEntriesFor(this.ctx)
     return {
       roleplay: { version: ROLEPLAY_SUITE_VERSION },
       dsh: this.environment.dsh,
@@ -167,7 +177,7 @@ export class RpFeatureManager extends Service {
         packageVersion: this.environment.packages[item.packageName]?.version ?? null,
         versionCompatible: this.environment.packages[item.packageName]?.compatible === true,
         active: this.enabled.includes(item.id) && (item.hostEntryIds.length === 0 || item.hostEntryIds.every(id => {
-          const entry = loaderEntries.find(candidate => candidate.options.id === id)
+          const entry = loaderEntries.find(candidate => matchesLoaderEntry(candidate, id))
           return entry !== undefined && !entry.disabled && entry.fiber !== undefined
         })),
       })),
@@ -268,13 +278,13 @@ export class RpFeatureManager extends Service {
   scheduleReconcile() {
     this.reconcileTail = this.reconcileTail
       .then(async () => {
-        for (const entry of this.ctx.loader.entries()) await this.reconcileEntry(entry)
+        for (const entry of loaderEntriesFor(this.ctx)) await this.reconcileEntry(entry)
       })
       .catch(error => { this.ctx.logger.warn(error) })
   }
 
   async reconcileEntry(entry) {
-    const feature = FEATURE_CATALOG.find(item => item.hostEntryIds.includes(entry.options.id))
+    const feature = FEATURE_CATALOG.find(item => item.hostEntryIds.some(id => matchesLoaderEntry(entry, id)))
     if (feature === undefined) return
     const shouldEnable = this.environment.compatible && this.enabled.includes(feature.id)
     if (Boolean(entry.options.disabled) === !shouldEnable) return
@@ -304,6 +314,40 @@ export class RpFeatureManager extends Service {
   }
 }
 
+/**
+ * Match both a row's authored id and its public Loader-tree id. DSH profiles
+ * now mount bundle rows below an Include tree, so the runtime id is namespaced
+ * (for example `include:rp-quick-replies`) even though the bundle patch still
+ * authors `rp-quick-replies`. Depending on which Loader boundary owns the
+ * caller, `options.id` may expose either form; the tree id is the stable
+ * fallback without accepting unrelated suffixes.
+ */
+export function matchesLoaderEntry(entry, hostEntryId) {
+  if (entry?.options?.id === hostEntryId || entry?.id === hostEntryId) return true
+  return typeof entry?.id === 'string' && entry.id.endsWith(`:${hostEntryId}`)
+}
+
+/**
+ * Read the owning Include tree as well as the injected root Loader. Current
+ * profile startup mounts third-party bundle rows inside an Include subtree;
+ * a plugin-scoped Loader view does not necessarily enumerate its siblings,
+ * while the entry's owning tree is the authoritative local roster.
+ */
+export function loaderEntriesFor(ctx) {
+  const entries = []
+  const seen = new Set()
+  const trees = [ctx?.fiber?.entry?.parent?.tree, ctx?.loader]
+  for (const tree of trees) {
+    if (typeof tree?.entries !== 'function') continue
+    for (const entry of tree.entries()) {
+      if (seen.has(entry)) continue
+      seen.add(entry)
+      entries.push(entry)
+    }
+  }
+  return entries
+}
+
 /** Read the exact Harness-owned System sections from the active Web runtime. */
 async function resolveHarnessPromptSections(ctx) {
   const assembly = await ctx.systemPrompt.assemble()
@@ -328,7 +372,7 @@ export async function apply(ctx, config) {
 }
 
 function registerBrowserApi(ctx, manager) {
-  const dispose = ctx.connection.rpc.handle('/rp-features', async (endpoint, payload) => {
+  const dispose = ctx.rpRemote.register('/rp-features', async (endpoint, payload) => {
     try {
       await manager.settled()
       if (endpoint === 'status') return transportSuccess(success(manager.status()))
@@ -344,8 +388,8 @@ function registerBrowserApi(ctx, manager) {
         ? transportSuccess(failure('PROMPT_PREVIEW_UNAVAILABLE', '暂时无法读取代理提示词预览。'))
         : transportSuccess(failure('ROLEPLAY_STATUS_UNAVAILABLE', '暂时无法读取 Roleplay 设置。'))
     }
-  }, { authority: 'trusted-host' })
-  ctx.effect(() => dispose, 'rp-feature-manager: /rp-features RPC')
+  })
+  ctx.effect(() => dispose, 'rp-feature-manager: /rp-features Remote')
 }
 
 async function migratePersistedSelection(settings) {

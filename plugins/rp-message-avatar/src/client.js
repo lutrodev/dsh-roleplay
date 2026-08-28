@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { isRoleplaySessionSummary } from 'dsh-roleplay-rp-ui/session-summary'
 import {
   avatarNodeVisibility,
   assistantAvatarStart,
@@ -11,7 +12,7 @@ import {
 } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
-export const inject = ['slots', 'conversationEvents', 'connection']
+export const inject = ['slots', 'uiConversation', 'rpRemote']
 const h = React.createElement
 const fallbackUser = Object.freeze({ id: null, name: '我', hasAvatar: false })
 const fallbackAssistant = Object.freeze({ id: null, name: '角色', hasAvatar: false })
@@ -85,10 +86,10 @@ export const openingAvatarNodeDefinition = {
 
 export function apply(ctx) {
   ctx.effect(ensureStyles)
-  ctx.conversationEvents.register(userAvatarNodeDefinition)
-  ctx.conversationEvents.register(assistantAvatarNodeDefinition)
-  ctx.conversationEvents.register(openingAvatarNodeDefinition)
-  const injectUi = () => ({ connection: ctx.connection })
+  ctx.uiConversation.events.register(userAvatarNodeDefinition)
+  ctx.uiConversation.events.register(assistantAvatarNodeDefinition)
+  ctx.uiConversation.events.register(openingAvatarNodeDefinition)
+  const injectUi = () => ({ connection: ctx.rpRemote })
   for (const key of ['rp-message-avatar-user', 'rp-message-avatar-assistant', 'rp-message-avatar-opening']) {
     ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
       name: 'conversation.chat.node',
@@ -99,7 +100,7 @@ export function apply(ctx) {
 }
 
 function MessageAvatarPortal({ node, sessionId, useProjection, useSessions, connection }) {
-  const roleplay = useSessions(state => state.byId?.[sessionId]?.agentPreset === 'roleplay')
+  const roleplay = useSessions(state => isRoleplaySessionSummary(state.byId?.[sessionId]))
   const profile = useProjection('rp/session')
   const anchorRef = useRef(null)
   const [target, setTarget] = useState(null)
@@ -201,7 +202,7 @@ function cachedAvatar(connection, side, id) {
 }
 
 async function rpc(connection, route, endpoint, payload) {
-  const transport = await connection.rpc.call(route, endpoint, payload)
+  const transport = await connection.call(route, endpoint, payload)
   if (!transport?.ok || !transport.value?.ok) throw new Error('ROLEPLAY_ASSET_UNAVAILABLE')
   return transport.value.value
 }

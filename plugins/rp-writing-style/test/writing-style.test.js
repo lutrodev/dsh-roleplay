@@ -154,7 +154,7 @@ test('creates, updates and lists reusable writing styles', async () => {
   }
 })
 
-test('deletes a writing style through the service and browser RPC', async () => {
+test('deletes a writing style through the service and browser Remote', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-delete-'))
   const ctx = new Context()
   const styles = new RpWritingStyles(ctx, configFor(root))
@@ -238,15 +238,13 @@ test('initialization can be disposed without registering effects on an inactive 
     await gate.promise
     return originalEnsureDefault.call(this)
   }
-  ctx.provide('connection', {
-    rpc: {
-      handle(path, next) {
+  ctx.provide('rpRemote', {
+      register(path, next) {
         assert.equal(path, '/rp-writing-styles')
         handler = next
         registered.resolve()
         return () => { disposed = true }
       },
-    },
   })
   try {
     fiber = ctx.plugin({ name: 'rp-writing-style-lifecycle-test', apply }, { ...configFor(root), exposeBrowser: true })
@@ -290,7 +288,7 @@ test('browser entry provides creation, editing and reduced-motion behavior', asy
   assert.match(styles, /\.list\{width:min\(680px,100%\);gap:6px;/)
   assert.match(styles, /\.row\{grid-template-columns:36px minmax\(0,1fr\) auto;gap:10px;min-height:60px;/)
   assert.match(styles, /\.compactDialog\{width:min\(760px,calc\(100vw - 48px\)\);height:min\(520px,/)
-  assert.match(client, /export const inject = \['slots', 'connection', 'rpAssetEditors'\]/)
+  assert.match(client, /export const inject = \['slots', 'rpRemote', 'rpAssetEditors'\]/)
   assert.match(client, /ctx\.rpAssetEditors\.register\('writingStyle', WritingStyleSessionEditor\)/)
   assert.match(client, /function WritingStyleSessionEditor/)
   assert.match(client, /h\(WritingStyleEditor/)

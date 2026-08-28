@@ -1,4 +1,6 @@
 - insert:
+    - id: rp-remote
+      name: dsh-roleplay-rp-remote
     - id: rp-feature-manager
       name: dsh-roleplay-rp-feature-manager
       inject:
@@ -139,8 +141,10 @@
         maxStylesPerSession: 16
         exposeBrowser: true
     # New 0.1.5 browser contributions start parked. rp-feature-manager removes
-    # this flag only after the saved 0.1.5 selection has settled, so a feature
-    # cannot mount briefly while its settings card already says it is off.
+    # this flag only after the saved 0.1.5 selection has settled, then
+    # reasserts that selection if app-owned Profile startup replays --patch.
+    # A feature therefore cannot mount briefly while its settings card says it
+    # is off, nor remain parked after its saved switch says it is on.
     - id: rp-quick-replies
       name: dsh-roleplay-rp-quick-replies
       disabled: true

@@ -10480,7 +10480,7 @@ get: (_target, key) => {
 		//#region src/client.js
 		const inject = [
 			"slots",
-			"connection",
+			"rpRemote",
 			"rpAssetEditors"
 		];
 		const h = react.default.createElement;
@@ -10490,7 +10490,7 @@ get: (_target, key) => {
 			ctx.effect(() => ctx.rpAssetEditors.register("character", CharacterSessionEditor), "rp-character-card: canonical session editor");
 			ctx.slots.inject("rp-assets.character-entry", () => ctx.slots.register({
 				name: "rp-assets.character-entry",
-				inject: () => ({ connection: ctx.connection })
+				inject: () => ({ connection: ctx.rpRemote })
 			}, CharacterLibraryEntry));
 		}
 		function CharacterLibraryEntry({ wide, connection }) {
@@ -11210,10 +11210,10 @@ get: (_target, key) => {
 			}, [open]);
 		}
 		async function rpc(connection, endpoint, payload) {
-			return domainValue(await connection.rpc.call("/rp-character-cards", endpoint, payload));
+			return domainValue(await connection.call("/rp-character-cards", endpoint, payload));
 		}
 		async function assetRpc(connection, endpoint, payload) {
-			return domainValue(await connection.rpc.call("/rp-assets", endpoint, payload));
+			return domainValue(await connection.call("/rp-assets", endpoint, payload));
 		}
 		function bytesToBase64(bytes) {
 			let binary = "";

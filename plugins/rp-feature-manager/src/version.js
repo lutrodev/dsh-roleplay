@@ -43,6 +43,12 @@ export function satisfiesVersion(version, range) {
   }
   const minimum = parseVersion(range.slice(1))
   if (minimum === undefined || compareVersions(parsed, minimum) < 0) return false
+  if (parsed.prerelease.length > 0) {
+    const sameCore = parsed.major === minimum.major
+      && parsed.minor === minimum.minor
+      && parsed.patch === minimum.patch
+    if (minimum.prerelease.length === 0 || !sameCore) return false
+  }
   const maximum = minimum.major > 0
     ? { major: minimum.major + 1, minor: 0, patch: 0, prerelease: [] }
     : minimum.minor > 0

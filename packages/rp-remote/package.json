@@ -1,0 +1,77 @@
+{
+  "name": "dsh-roleplay-rp-remote",
+  "version": "0.1.7",
+  "description": "Typed Remote transport shared by the dsh-roleplay host and browser plugins",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./client": "./dist/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.d.ts",
+    "lib/types/types.js",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts",
+    "dist/client.js",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm run build:host && node --test test/*.test.js",
+    "build:host": "tsc -b tsconfig.json && tsdown --config tsdown.host.config.js --config-loader native",
+    "build:client": "pnpm run build:host && tsdown --config tsdown.client.config.js --config-loader native",
+    "verify": "pnpm run check && pnpm test && pnpm run build:client"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-api-remotes": "^0.1.2-alpha.1",
+    "@deepseek-ai/dsh-typert-protocol": "^0.1.2-alpha.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-api-remotes": "0.1.2-alpha.1",
+    "@deepseek-ai/dsh-typert-generator": "0.1.2-alpha.1",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.2-alpha.1",
+    "tsdown": "0.22.2",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@11.23.0"
+}

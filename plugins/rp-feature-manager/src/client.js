@@ -27,7 +27,7 @@ import {
 import { QuickReplyManager, createQuickReplyStore } from './quick-reply-settings.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
-export const inject = ['slots', 'locale', 'connection', 'settingsScope']
+export const inject = ['slots', 'locale', 'rpRemote', 'settingsScope']
 const h = React.createElement
 const NS = 'settings.roleplayFeatures'
 const TAB_IDS = Object.freeze(['features', 'skills', 'prompts'])
@@ -240,7 +240,7 @@ export function apply(ctx) {
     order: 25,
     label: () => t('nav'),
     locale: NS,
-    inject: () => ({ scope, connection: ctx.connection }),
+    inject: () => ({ scope, connection: ctx.rpRemote }),
   }, RoleplaySettingsSection))
 }
 

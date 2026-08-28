@@ -22,7 +22,12 @@ async function fixture(overrides = {}) {
     async resolveModelInfo(provider, model) {
       resolutions.push({ provider, model })
       if (provider === 'missing') throw Object.assign(new Error('adapter missing'), { code: 'NO_ADAPTER' })
-      return { provider, id: model, name: model }
+      return {
+        provider,
+        id: model,
+        name: model,
+        reasoning: { efforts: [{ id: 'low' }, { id: 'medium' }, { id: 'high' }] },
+      }
     },
   })
   const config = { ...CONFIG, catalogDir: join(root, 'subagents'), ...overrides }
@@ -58,15 +63,13 @@ test('initialization can be disposed while runtime and browser consumers wait fo
     await gate.promise
     return originalInitialize.call(this)
   }
-  ctx.provide('connection', {
-    rpc: {
-      handle(path, next) {
+  ctx.provide('rpRemote', {
+      register(path, next) {
         assert.equal(path, '/rp-subagents')
         handler = next
         browserRegistered.resolve()
         return () => { browserDisposed = true }
       },
-    },
   })
   ctx.provide('rpRuntime', {
     registerSubagentProfileProvider(value) {
@@ -119,7 +122,7 @@ test('first initialization creates fixed Writer with an empty task-subagent cata
   const f = await fixture()
   try {
     const catalog = await f.manager.list()
-    assert.equal(catalog.version, 3)
+    assert.equal(catalog.version, 4)
     assert.deepEqual(catalog.writer, { id: 'writer', fixed: true, revision: 1, route: { kind: 'inherit' } })
     const stored = JSON.parse(await readFile(join(f.config.catalogDir, 'catalog.json'), 'utf8'))
     assert.deepEqual(stored.writer, { revision: 1, route: { kind: 'inherit' } })
@@ -134,7 +137,7 @@ test('first initialization creates fixed Writer with an empty task-subagent cata
   } finally { await f.close() }
 })
 
-test('v1 role catalogs migrate atomically to v3 enabled task subagents without changing identity', async () => {
+test('v1 role catalogs migrate atomically to v4 enabled task subagents without changing identity', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-subagents-v1-'))
   const catalogDir = join(root, 'subagents')
   const ctx = new Context()
@@ -154,12 +157,12 @@ test('v1 role catalogs migrate atomically to v3 enabled task subagents without c
   try {
     await manager.initialize()
     const catalog = await manager.list()
-    assert.equal(catalog.version, 3)
+    assert.equal(catalog.version, 4)
     assert.equal(catalog.subagents[0].name, 'Existing custom task')
     assert.equal(catalog.subagents[0].revision, 3)
     assert.equal(catalog.subagents[0].enabled, true)
     const stored = JSON.parse(await readFile(join(catalogDir, 'catalog.json'), 'utf8'))
-    assert.equal(stored.version, 3)
+    assert.equal(stored.version, 4)
     assert.equal(stored.roles, undefined)
     assert.equal(stored.subagents[0].id, legacy.roles[0].id)
   } finally {
@@ -187,10 +190,39 @@ test('v2 task catalogs migrate missing enabled state to true', async () => {
   try {
     await manager.initialize()
     const catalog = await manager.list()
-    assert.equal(catalog.version, 3)
+    assert.equal(catalog.version, 4)
     assert.equal(catalog.subagents[0].enabled, true)
     assert.equal(catalog.subagents[0].revision, 4)
     assert.equal(JSON.parse(await readFile(join(catalogDir, 'catalog.json'), 'utf8')).subagents[0].enabled, true)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('v3 catalogs migrate to v4 without changing fixed routes', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-subagents-v3-'))
+  const catalogDir = join(root, 'subagents')
+  const ctx = new Context()
+  const legacy = {
+    version: 3,
+    writer: { revision: 2, route: { kind: 'fixed', provider: 'openai', model: 'gpt-test' } },
+    subagents: [{
+      id: '33333333-3333-4333-8333-333333333333', revision: 5,
+      ...role('Existing v3 task'), enabled: false,
+      createdAt: '2026-08-21T00:00:00.000Z', updatedAt: '2026-08-22T00:00:00.000Z',
+    }],
+  }
+  await mkdir(catalogDir, { recursive: true })
+  await writeFile(join(catalogDir, 'catalog.json'), `${JSON.stringify(legacy, null, 2)}\n`)
+  const manager = new RpSubagentManager(ctx, { ...CONFIG, catalogDir })
+  try {
+    await manager.initialize()
+    const catalog = await manager.list()
+    assert.equal(catalog.version, 4)
+    assert.deepEqual(catalog.writer.route, legacy.writer.route)
+    assert.equal(catalog.subagents[0].enabled, false)
+    assert.equal(JSON.parse(await readFile(join(catalogDir, 'catalog.json'), 'utf8')).version, 4)
   } finally {
     await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })
@@ -308,11 +340,18 @@ test('field, count and tool boundaries reject invalid data without changing the 
 test('fixed model validation succeeds before persistence and failures leave revisions unchanged', async () => {
   const f = await fixture()
   try {
-    const writer = await f.manager.updateWriter({ kind: 'fixed', provider: 'openai', model: 'gpt-test' }, 1)
+    const writer = await f.manager.updateWriter({
+      kind: 'fixed', provider: 'openai', model: 'gpt-test', reasoningEffort: 'high',
+    }, 1)
     assert.equal(writer.revision, 2)
-    assert.deepEqual(writer.route, { kind: 'fixed', provider: 'openai', model: 'gpt-test' })
+    assert.deepEqual(writer.route, {
+      kind: 'fixed', provider: 'openai', model: 'gpt-test', reasoningEffort: 'high',
+    })
     assert.deepEqual(f.resolutions, [{ provider: 'openai', model: 'gpt-test' }])
     await assert.rejects(f.manager.updateWriter({ kind: 'fixed', provider: 'missing', model: 'gone' }, 2), error => error.code === 'MODEL_UNAVAILABLE')
+    await assert.rejects(f.manager.updateWriter({
+      kind: 'fixed', provider: 'openai', model: 'gpt-test', reasoningEffort: 'ultra',
+    }, 2), error => error.code === 'MODEL_UNAVAILABLE')
     assert.equal((await f.manager.get('writer')).revision, 2)
     await assert.rejects(f.manager.create(role('Broken', { route: { kind: 'fixed', provider: 'missing', model: 'gone' } })), error => error.code === 'MODEL_UNAVAILABLE')
     assert.equal((await f.manager.list()).subagents.length, 0)
@@ -356,10 +395,10 @@ test('damaged catalog fails closed and is never replaced by initialization', asy
 test('runtime projection uses the user-defined instructions as the complete System persona and stays detached', async () => {
   const f = await fixture()
   try {
-    await f.manager.updateWriter({ kind: 'fixed', provider: 'p', model: 'writer' }, 1)
+    await f.manager.updateWriter({ kind: 'fixed', provider: 'p', model: 'writer', reasoningEffort: 'high' }, 1)
     await f.manager.create(role('Continuity', { tools: ['web_search', 'skill'] }))
     const snapshot = await f.manager.prepareRuntimeProfile()
-    assert.deepEqual(snapshot.writer, { provider: 'p', model: 'writer' })
+    assert.deepEqual(snapshot.writer, { provider: 'p', model: 'writer', reasoningEffort: 'high' })
     assert.deepEqual(snapshot.subagents[0].inputSchema, { type: 'object', properties: {}, additionalProperties: true })
     assert.equal(snapshot.subagents[0].persona, 'Return concise Continuity findings only.')
     assert.deepEqual(snapshot.subagents[0].toolFilter, { allow: ['web_search', 'skill'] })

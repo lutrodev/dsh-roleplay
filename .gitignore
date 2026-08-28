@@ -4,6 +4,7 @@ Thumbs.db
 *.bak
 *.swp
 *.tgz
+*.tsbuildinfo
 
 node_modules/
 .pnpm-store/

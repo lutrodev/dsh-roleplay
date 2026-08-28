@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import {
+  RpRunMarker,
   applyInactiveOpenTrace,
   inactiveOpenTracePlan,
   latestOpenTurn,
@@ -42,6 +45,40 @@ test('Session 已空闲时遗留 open turn 不会重新展开轨迹', () => {
     status: 'unknown',
     inactiveOpen: false,
   })
+})
+
+test('run marker 从新版独立 Chat projection 读取时间线和节点', () => {
+  const value = timeline([[4, 'closed']])
+  const chatSnapshot = {
+    timeline: value,
+    locations: { getTurn: turn => turn === 4 ? [] : ['unexpected'] },
+    nodes: new Map(),
+  }
+  let sessionReads = 0
+  let chatReads = 0
+  const useSession = (selector) => {
+    sessionReads += 1
+    return selector({ running: false })
+  }
+  const useChat = (selector) => {
+    chatReads += 1
+    return selector(chatSnapshot)
+  }
+  const originalError = console.error
+  console.error = () => {}
+  try {
+    const html = renderToStaticMarkup(React.createElement(RpRunMarker, {
+      node: { data: { runId: 'run-4', turn: 4 } },
+      useSession,
+      useChat,
+    }))
+    assert.match(html, /data-rp-run="run-4"/)
+    assert.match(html, /data-rp-run-status="closed"/)
+  } finally {
+    console.error = originalError
+  }
+  assert.equal(sessionReads, 1)
+  assert.equal(chatReads, 3)
 })
 
 test('inactive open turn 隐藏上下文、工具与中间推理，保留最后一条可读助手正文', () => {
@@ -124,4 +161,3 @@ test('DOM 标记严格按 turn key 应用，cleanup 不会移除后来接管的�
   assert.equal(context.getAttribute('data-rp-library-inactive-open-trace'), null)
   assert.equal(final.getAttribute('data-rp-library-inactive-open-reasoning'), 'run-new')
 })
-

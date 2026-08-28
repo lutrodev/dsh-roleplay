@@ -71,15 +71,16 @@ test('只监听会影响运行结果的源码与配置', () => {
   assert.equal(shouldRestartForPath('README.md'), false)
 })
 
-test('发现整套插件和共享 UI package', () => {
+test('发现整套插件和共享基础 package', () => {
   const packages = discoverWorkspacePackages()
   const names = packages.map(workspacePackage => workspacePackage.name)
   assert.equal(new Set(names).size, names.length)
-  assert.equal(names.length, 23)
+  assert.equal(names.length, 24)
   assert.ok(names.includes('dsh-roleplay-rp-compact-access-mode'))
   assert.ok(names.includes('dsh-roleplay-rp-conversation-summary'))
   assert.ok(names.includes('dsh-roleplay-rp-feature-manager'))
   assert.ok(names.includes('dsh-roleplay-rp-quick-replies'))
+  assert.ok(names.includes('dsh-roleplay-rp-remote'))
   assert.ok(names.includes('dsh-roleplay-rp-state-display'))
   assert.ok(names.includes('dsh-roleplay-rp-ui'))
 })

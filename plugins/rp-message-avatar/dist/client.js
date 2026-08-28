@@ -29,6 +29,15 @@ window.__ModuleLoader__.load({
 		let react = require("react");
 		react = __toESM(react, 1);
 		let react_dom = require("react-dom");
+		//#region ../../packages/rp-ui/src/session-summary.js
+		/**
+		* Read the Roleplay identity from the public DSH SessionSummary contract.
+		* Projection-backed summary fields live under projectionValues in DSH 0.1.2.
+		*/
+		function isRoleplaySessionSummary(summary) {
+			return summary?.projectionValues?.agentPreset === "roleplay";
+		}
+		//#endregion
 		//#region src/client-state.js
 		const OPENING_PROVIDER = "rp-session";
 		const OPENING_MODEL = "selected-opening";
@@ -164,8 +173,8 @@ window.__ModuleLoader__.load({
 		//#region src/client.js
 		const inject = [
 			"slots",
-			"conversationEvents",
-			"connection"
+			"uiConversation",
+			"rpRemote"
 		];
 		const h = react.default.createElement;
 		const fallbackUser = Object.freeze({
@@ -246,10 +255,10 @@ window.__ModuleLoader__.load({
 		};
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
-			ctx.conversationEvents.register(userAvatarNodeDefinition);
-			ctx.conversationEvents.register(assistantAvatarNodeDefinition);
-			ctx.conversationEvents.register(openingAvatarNodeDefinition);
-			const injectUi = () => ({ connection: ctx.connection });
+			ctx.uiConversation.events.register(userAvatarNodeDefinition);
+			ctx.uiConversation.events.register(assistantAvatarNodeDefinition);
+			ctx.uiConversation.events.register(openingAvatarNodeDefinition);
+			const injectUi = () => ({ connection: ctx.rpRemote });
 			for (const key of [
 				"rp-message-avatar-user",
 				"rp-message-avatar-assistant",
@@ -261,7 +270,7 @@ window.__ModuleLoader__.load({
 			}, MessageAvatarPortal));
 		}
 		function MessageAvatarPortal({ node, sessionId, useProjection, useSessions, connection }) {
-			const roleplay = useSessions((state) => state.byId?.[sessionId]?.agentPreset === "roleplay");
+			const roleplay = useSessions((state) => isRoleplaySessionSummary(state.byId?.[sessionId]));
 			const profile = useProjection("rp/session");
 			const anchorRef = (0, react.useRef)(null);
 			const [target, setTarget] = (0, react.useState)(null);
@@ -384,7 +393,7 @@ window.__ModuleLoader__.load({
 			return request;
 		}
 		async function rpc(connection, route, endpoint, payload) {
-			const transport = await connection.rpc.call(route, endpoint, payload);
+			const transport = await connection.call(route, endpoint, payload);
 			if (!transport?.ok || !transport.value?.ok) throw new Error("ROLEPLAY_ASSET_UNAVAILABLE");
 			return transport.value.value;
 		}

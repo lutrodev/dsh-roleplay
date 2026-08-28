@@ -4,7 +4,7 @@ import { domAnimation, LazyMotion, m, MotionConfig } from 'motion/react'
 import { descriptionLabelInsertion, domainValue } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
-export const inject = ['slots', 'connection', 'rpAssetEditors']
+export const inject = ['slots', 'rpRemote', 'rpAssetEditors']
 const h = React.createElement
 const MODAL_SCROLL_LOCK = Symbol.for('dsh-roleplay.asset-modal-scroll-lock')
 const QUICK_DESCRIPTION_LABELS = ['性别', '外貌', '年龄', '身份', '说话方式', '背景故事', '爱好']
@@ -13,7 +13,7 @@ const DESCRIPTION_LIMIT = 4000
 export function apply(ctx) {
   ctx.effect(ensureStyles)
   ctx.effect(() => ctx.rpAssetEditors.register('persona', PersonaSessionEditor), 'rp-persona: canonical session editor')
-  ctx.slots.inject('rp-assets.persona-entry', () => ctx.slots.register({ name: 'rp-assets.persona-entry', inject: () => ({ connection: ctx.connection }) }, PersonaLibraryEntry))
+  ctx.slots.inject('rp-assets.persona-entry', () => ctx.slots.register({ name: 'rp-assets.persona-entry', inject: () => ({ connection: ctx.rpRemote }) }, PersonaLibraryEntry))
 }
 
 function PersonaLibraryEntry({ wide, connection }) {
@@ -336,4 +336,4 @@ function useModalScrollLock(open) {
     }
   }, [open])
 }
-async function rpc(connection, endpoint, payload) { return domainValue(await connection.rpc.call('/rp-personas', endpoint, payload)) }
+async function rpc(connection, endpoint, payload) { return domainValue(await connection.call('/rp-personas', endpoint, payload)) }

@@ -4,7 +4,7 @@ import { domMax, LazyMotion, m, MotionConfig, Reorder } from 'motion/react'
 import { useWorkbenchModal } from 'dsh-roleplay-rp-ui'
 import { css, ensureStyles } from './client-styles.generated.js'
 
-export const inject = ['slots', 'connection', 'rpAssetEditors']
+export const inject = ['slots', 'rpRemote', 'rpAssetEditors']
 const h = React.createElement
 const FIELD_POSITIONS = [
   { id: 'top', label: '顶部', description: '位于角色资料之前' },
@@ -14,7 +14,7 @@ const FIELD_POSITIONS = [
 export function apply(ctx) {
   ctx.effect(ensureStyles)
   ctx.effect(() => ctx.rpAssetEditors.register('preset', PresetSessionEditor), 'rp-preset: canonical session editor')
-  ctx.slots.inject('rp-assets.preset-entry', () => ctx.slots.register({ name: 'rp-assets.preset-entry', inject: () => ({ connection: ctx.connection }) }, PresetLibraryEntry))
+  ctx.slots.inject('rp-assets.preset-entry', () => ctx.slots.register({ name: 'rp-assets.preset-entry', inject: () => ({ connection: ctx.rpRemote }) }, PresetLibraryEntry))
 }
 
 function PresetLibraryEntry({ wide, connection }) {
@@ -305,7 +305,7 @@ function moveItem(items, from, to) {
 }
 
 async function rpc(connection, endpoint, payload) {
-  const response = await connection.rpc.call('/rp-presets', endpoint, payload)
+  const response = await connection.call('/rp-presets', endpoint, payload)
   const domain = response?.ok === true && response.value?.ok !== undefined ? response.value : response
   if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? '请求失败'), { code: domain?.error?.code })
   return domain.value

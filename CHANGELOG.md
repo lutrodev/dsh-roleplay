@@ -4,6 +4,15 @@
 
 ## Unreleased
 
+## 0.1.7 - 2026-08-28
+
+- 适配 DSH `0.1.2-alpha.1`：切换拆分后的 Session、Workspace、Conversation 与 Renderer 客户端 provider，跟进 `ToolCallId`、第一方 Prompt 顺序和 Harness 身份覆盖接口。
+- Roleplay 会话识别改为读取 Session Summary 的 `projectionValues.agentPreset`，消息操作与会话变量改用独立 Chat 投影，修复升级后会话工具、头像、对白高亮及编辑／删除／重新生成全部隐藏的问题。
+- 新增共享 `rp-remote` package，把十组 Roleplay 浏览器管理接口迁移到 Typert 生成的类型化 Remote；Host 继续拥有领域校验和生命周期，浏览器插件不再直接调用旧的字符串 RPC。
+- Writer 和任务子代理新增模型推理强度选择、目录 v4 迁移、路由冻结与运行 metadata；固定模型只使用该模型实际声明的推理档位，跟随父代理时继承父路由。
+- 本轮用户图片附件会以原生 durable image block 透传给新鲜 Writer 与任务子代理；仅图片输入也可建立当前输入上下文，不增加旁路存储。
+- 本地集成启动器会在 Harness commit 或 lockfile 变化后同步并重建上游 checkout，并以本地 source link 安装尚未发布的 alpha packages。公开 npm 发布仍需等待上游 `0.1.2-alpha.1` packages 发布并刷新 lockfile。
+
 ## 0.1.6 - 2026-08-27
 
 - 修复 0.1.5 新增的快捷回复、会话变量卡片和访问模式仅图标在启动时先于设置状态装载，导致卡片显示关闭但功能已经生效；三项新增功能现在会在保存的开关完成对账后再装载，已有功能的用户开关保持不变。

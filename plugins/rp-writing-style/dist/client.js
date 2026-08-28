@@ -9495,7 +9495,7 @@ get: (_target, key) => {
 		//#region src/client.js
 		const inject = [
 			"slots",
-			"connection",
+			"rpRemote",
 			"rpAssetEditors"
 		];
 		const h = react.default.createElement;
@@ -9504,7 +9504,7 @@ get: (_target, key) => {
 			ctx.effect(() => ctx.rpAssetEditors.register("writingStyle", WritingStyleSessionEditor), "rp-writing-style: canonical session editor");
 			ctx.slots.inject("rp-assets.writing-style-entry", () => ctx.slots.register({
 				name: "rp-assets.writing-style-entry",
-				inject: () => ({ connection: ctx.connection })
+				inject: () => ({ connection: ctx.rpRemote })
 			}, WritingStyleLibraryEntry));
 		}
 		function WritingStyleLibraryEntry({ wide, connection }) {
@@ -9871,7 +9871,7 @@ get: (_target, key) => {
 			};
 		}
 		async function rpc(connection, endpoint, payload) {
-			const response = await connection.rpc.call("/rp-writing-styles", endpoint, payload);
+			const response = await connection.call("/rp-writing-styles", endpoint, payload);
 			const domain = response?.ok === true && response.value?.ok !== void 0 ? response.value : response;
 			if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? "请求失败"), { code: domain?.error?.code });
 			return domain.value;

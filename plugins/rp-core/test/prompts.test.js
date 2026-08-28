@@ -118,9 +118,9 @@ test('settings preview is projected from the same runtime prompt functions', () 
     subagentsEnabled: true,
     assetToolsEnabled: true,
     harnessSections: [
-      { id: 'harness-identity', name: 'harness:identity', order: -100, source: 'dsh-system-prompt', text: harnessIdentity },
-      { id: 'harness-source', name: 'harness:source', order: -99, source: 'dsh-app-boot', text: 'Harness checkout context.' },
-      { id: 'app-web-surface', name: 'app:web-surface', order: -98, source: 'dsh-web-app', text: 'Harness Web context.' },
+      { id: 'harness-identity', name: 'harness:identity', order: -1000, source: 'dsh-system-prompt', text: harnessIdentity },
+      { id: 'harness-source', name: 'harness:source', order: -900, source: 'dsh-app-boot', text: 'Harness checkout context.' },
+      { id: 'app-web-surface', name: 'app:web-surface', order: -800, source: 'dsh-web-app', text: 'Harness Web context.' },
     ],
     harnessIdentity: {
       sectionName: 'harness:identity', value: harnessIdentity, defaultValue: harnessIdentity,
@@ -140,7 +140,7 @@ test('settings preview is projected from the same runtime prompt functions', () 
   const agent = preview.profiles.find(profile => profile.kind === 'parent-agent')
   const writer = preview.profiles.find(profile => profile.kind === 'writer')
   assert.deepEqual(chat.layers.find(layer => layer.id === 'harness-identity'), {
-    id: 'harness-identity', role: 'system', source: 'dsh-system-prompt', contentKind: 'exact', order: -100,
+    id: 'harness-identity', role: 'system', source: 'dsh-system-prompt', contentKind: 'exact', order: -1000,
     text: harnessIdentity, sectionName: 'harness:identity',
   })
   assert.deepEqual(chat.layers.slice(0, 3).map(layer => layer.id), ['harness-identity', 'harness-source', 'app-web-surface'])

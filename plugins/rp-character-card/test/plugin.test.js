@@ -81,7 +81,7 @@ test('fails plugin activation for non-positive limits', () => {
   )
 })
 
-test('mounts the browser RPC when connection becomes available after the plugin', async () => {
+test('mounts the browser Remote when the transport becomes available after the plugin', async () => {
   const ctx = new Context()
   assert.deepEqual(inject, [])
   const mounted = []
@@ -91,26 +91,25 @@ test('mounts the browser RPC when connection becomes available after the plugin'
   })
   assert.deepEqual(mounted, [])
 
-  ctx.provide('connection', { rpc: { handle(path, _handler, options) {
-    mounted.push({ path, options })
+  ctx.provide('rpRemote', { register(path, _handler) {
+    mounted.push({ path })
     return () => {}
-  } } })
+  } })
   await new Promise(resolve => setImmediate(resolve))
 
-  assert.deepEqual(mounted, [{ path: '/rp-character-cards', options: { authority: 'trusted-host' } }])
+  assert.deepEqual(mounted, [{ path: '/rp-character-cards' }])
   await ctx.fiber.dispose()
 })
 
-test('browser RPC admits export through the registered endpoint whitelist', async () => {
+test('browser Remote admits export through the registered endpoint whitelist', async () => {
   const libraryDir = await mkdtemp(join(tmpdir(), 'dsh-roleplay-card-export-rpc-'))
   const ctx = new Context()
   let handler
-  ctx.provide('connection', { rpc: { handle(path, next, options) {
+  ctx.provide('rpRemote', { register(path, next) {
     assert.equal(path, '/rp-character-cards')
-    assert.deepEqual(options, { authority: 'trusted-host' })
     handler = next
     return () => {}
-  } } })
+  } })
 
   try {
     apply(ctx, {
@@ -121,14 +120,14 @@ test('browser RPC admits export through the registered endpoint whitelist', asyn
       exposeBrowser: true,
     })
     await new Promise(resolve => setImmediate(resolve))
-    const created = (await ctx.rpCharacterCards.create({ name: 'RPC 导出角色', description: '经过完整浏览器 RPC 路径。' })).created
+    const created = (await ctx.rpCharacterCards.create({ name: 'Remote 导出角色', description: '经过完整浏览器 Remote 路径。' })).created
     const response = await handler('export', { id: created.id })
 
     assert.equal(response.ok, true)
     assert.equal(response.value.ok, true)
     assert.equal(response.value.value.format, 'character_card_v3')
     assert.equal(response.value.value.mimeType, 'image/png')
-    assert.equal(parseCharacterCard(Buffer.from(response.value.value.base64, 'base64'), { maxTextCharacters: 4096 }).character.name, 'RPC 导出角色')
+    assert.equal(parseCharacterCard(Buffer.from(response.value.value.base64, 'base64'), { maxTextCharacters: 4096 }).character.name, 'Remote 导出角色')
   } finally {
     await ctx.fiber.dispose()
     await rm(libraryDir, { recursive: true, force: true })

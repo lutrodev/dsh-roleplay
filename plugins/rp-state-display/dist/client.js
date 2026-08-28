@@ -6780,6 +6780,15 @@ get: (_target, key) => {
 		//#region ../../node_modules/.pnpm/motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/motion/dist/es/react.mjs
 		const m = m$1;
 		//#endregion
+		//#region ../../packages/rp-ui/src/session-summary.js
+		/**
+		* Read the Roleplay identity from the public DSH SessionSummary contract.
+		* Projection-backed summary fields live under projectionValues in DSH 0.1.2.
+		*/
+		function isRoleplaySessionSummary(summary) {
+			return summary?.projectionValues?.agentPreset === "roleplay";
+		}
+		//#endregion
 		//#region src/client-state.js
 		const STATE_DISPLAY_ANCHOR_KIND = "rp-state-display-anchor";
 		const STATE_DISPLAY_RETRACTION_KIND = "rp-state-display-retraction";
@@ -7133,7 +7142,7 @@ get: (_target, key) => {
 		}
 		//#endregion
 		//#region src/client.js
-		const inject = ["slots", "conversationEvents"];
+		const inject = ["slots", "uiConversation"];
 		const h = react.default.createElement;
 		const motionTransition = {
 			duration: .16,
@@ -7146,8 +7155,8 @@ get: (_target, key) => {
 		};
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
-			ctx.conversationEvents.register(stateDisplayAnchorNodeDefinition);
-			ctx.conversationEvents.register(stateDisplayRetractionNodeDefinition);
+			ctx.uiConversation.events.register(stateDisplayAnchorNodeDefinition);
+			ctx.uiConversation.events.register(stateDisplayRetractionNodeDefinition);
 			ctx.slots.inject("conversation.chat.node", () => ctx.slots.register({
 				name: "conversation.chat.node",
 				key: STATE_DISPLAY_ANCHOR_KIND
@@ -7158,9 +7167,12 @@ get: (_target, key) => {
 			}, StateDisplayRetraction));
 		}
 		/** Render the live card only at the latest successful assistant reply. */
-		function StateDisplayAnchor({ node, sessionId, useSession, useSessions, useProjection }) {
-			const activeKey = useSession((snapshot) => latestStateDisplayAnchorKey(snapshot.chat));
-			if (!useSessions((state) => state.byId?.[sessionId]?.agentPreset === "roleplay" && state.byId?.[sessionId]?.origin !== "subagent") || activeKey !== node.key) return h(HiddenMarker);
+		function StateDisplayAnchor({ node, sessionId, useChat, useSessions, useProjection }) {
+			const activeKey = useChat(latestStateDisplayAnchorKey);
+			if (!useSessions((state) => {
+				const summary = state.byId?.[sessionId];
+				return isRoleplaySessionSummary(summary) && summary.origin !== "subagent";
+			}) || activeKey !== node.key) return h(HiddenMarker);
 			return h(StateVariableCard, { useProjection });
 		}
 		function StateDisplayRetraction() {

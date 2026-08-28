@@ -1,6 +1,6 @@
 {
   "name": "@lutrodev/dsh-roleplay",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Open-source roleplay plugin suite for DeepSeek Harness",
   "license": "MIT",
   "private": true,
@@ -11,7 +11,8 @@
     "test:dev": "node --test scripts/dev.test.mjs",
     "check": "pnpm run check:compat && pnpm run check:dev && pnpm -r --if-present run check",
     "test": "pnpm run test:dev && pnpm -r --if-present run test",
-    "build": "pnpm -r --if-present run build:client",
+    "build:host": "tsc -b tsconfig.host.json && pnpm --filter dsh-roleplay-rp-remote run build:host",
+    "build": "pnpm run build:host && pnpm -r --if-present --filter '!dsh-roleplay-rp-remote' run build:client && pnpm --filter dsh-roleplay-rp-remote run build:client",
     "build:package": "pnpm run build && node scripts/build-npm-package.mjs",
     "pack:package": "pnpm run build:package && npm pack ./.npm-package",
     "publish:package": "pnpm run build:package && npm publish ./.npm-package --access public",
@@ -20,7 +21,8 @@
     "dev:config": "node scripts/dev.mjs --dump-config"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh": "0.1.1-rc.2"
+    "@deepseek-ai/dsh": "0.1.2-alpha.1",
+    "typescript": "6.0.3"
   },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

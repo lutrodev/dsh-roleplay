@@ -327,14 +327,14 @@ export async function apply(ctx, config) {
   const presets = new RpPresets(ctx, config)
   const ready = presets.ensureDefault()
   if (config.exposeBrowser !== false) {
-    ctx.inject(['connection'], browserCtx => registerBrowser(browserCtx, presets, ready))
+    ctx.inject(['rpRemote'], browserCtx => registerBrowser(browserCtx, presets, ready))
   }
   await ready
 }
 
 function registerBrowser(ctx, presets, ready) {
   const endpoints = new Set(['list', 'get', 'create', 'update', 'delete', 'set-default', 'templates'])
-  const dispose = ctx.connection.rpc.handle('/rp-presets', async (endpoint, payload) => {
+  const dispose = ctx.rpRemote.register('/rp-presets', async (endpoint, payload) => {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown preset endpoint: ${endpoint}`))
     try {
       await ready
@@ -342,8 +342,8 @@ function registerBrowser(ctx, presets, ready) {
     } catch (error) {
       return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error)))
     }
-  }, { authority: 'trusted-host' })
-  ctx.effect(() => dispose, 'rp-preset: /rp-presets RPC')
+  })
+  ctx.effect(() => dispose, 'rp-preset: /rp-presets Remote')
 }
 
 export async function dispatchBrowser(presets, endpoint, payload) {

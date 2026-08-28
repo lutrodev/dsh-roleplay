@@ -29,14 +29,12 @@ test('Skill selection remains independent while availability follows its plugin'
 
 test('prompt preview uses the dedicated read-only Roleplay endpoint', async () => {
   const connection = {
-    rpc: {
       async call(path, endpoint, payload) {
         assert.equal(path, '/rp-features')
         assert.equal(endpoint, 'prompts')
         assert.deepEqual(payload, {})
         return { ok: true, value: { ok: true, value: { version: 1, profiles: [] } } }
       },
-    },
   }
   assert.deepEqual(await promptPreview(connection), { version: 1, profiles: [] })
 })
@@ -44,12 +42,10 @@ test('prompt preview uses the dedicated read-only Roleplay endpoint', async () =
 test('Roleplay setting writes use the suite RPC with revision guards', async () => {
   const calls = []
   const connection = {
-    rpc: {
       async call(path, endpoint, payload) {
         calls.push({ path, endpoint, payload })
         return { ok: true, value: { ok: true, value: { settings: { writable: true, revision: 4 } } } }
       },
-    },
   }
   assert.deepEqual(
     await setRoleplaySetting(connection, 'enabledFeatures', ['state'], 2),

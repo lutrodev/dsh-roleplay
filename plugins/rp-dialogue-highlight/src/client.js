@@ -1,8 +1,9 @@
 import React, { useLayoutEffect, useRef } from 'react'
+import { isRoleplaySessionSummary } from 'dsh-roleplay-rp-ui/session-summary'
 import { mountDialogueHighlight } from './dom-highlight.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
-export const inject = ['slots', 'conversationEvents']
+export const inject = ['slots', 'uiConversation']
 
 const h = React.createElement
 const NODE_KIND = 'rp-dialogue-highlight'
@@ -44,7 +45,7 @@ export const dialogueHighlightNodeDefinition = {
 
 export function apply(ctx) {
   ctx.effect(ensureStyles)
-  ctx.conversationEvents.register(dialogueHighlightNodeDefinition)
+  ctx.uiConversation.events.register(dialogueHighlightNodeDefinition)
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: NODE_KIND,
@@ -103,7 +104,7 @@ function visibleTextChunk(chunk) {
 function DialogueHighlightAnchor({ node, sessionId, useSessions }) {
   const anchorRef = useRef(null)
   const entryRef = useRef(Symbol(String(node.id)))
-  const roleplay = useSessions(state => state.byId?.[sessionId]?.agentPreset === 'roleplay')
+  const roleplay = useSessions(state => isRoleplaySessionSummary(state.byId?.[sessionId]))
 
   useLayoutEffect(() => {
     if (!roleplay) return undefined

@@ -868,4 +868,4 @@ function protectPromptBoundaries(value) {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;'))
 }
-async function rpRpc(connection, endpoint, payload) { return domainValue(await connection.rpc.call('/rp-assets', endpoint, payload)) }
+async function rpRpc(connection, endpoint, payload) { return domainValue(await connection.call('/rp-assets', endpoint, payload)) }

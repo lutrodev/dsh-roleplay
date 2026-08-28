@@ -1,4 +1,5 @@
 import { isSelectedOpeningMessage } from 'dsh-roleplay-rp-session/protocol'
+import { isRoleplaySessionSummary } from 'dsh-roleplay-rp-ui/session-summary'
 import { decodeRpMessageActionEvent, rpMessageActionTargetKey } from './protocol.js'
 
 /** Resolve the nested RPC envelope used by the Roleplay host plugins. */
@@ -32,7 +33,7 @@ export function actionError(code) {
 
 export function isRoleplaySession(listState, sessionId) {
   const summary = listState.byId?.[sessionId]
-  return summary?.agentPreset === 'roleplay' && summary.origin !== 'subagent'
+  return isRoleplaySessionSummary(summary) && summary.origin !== 'subagent'
 }
 
 /** Project one message toolbar entirely from the resident Conversation state. */

@@ -3,7 +3,7 @@ import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import LlmRuntime, { CallId, LlmAdapter, createUserMessage } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { ToolCallId, LlmAdapter, createUserMessage } from '@deepseek-ai/dsh-llm'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
@@ -104,7 +104,7 @@ function userMessage(text) {
 }
 
 function toolResponse(callId, name, args) {
-  const id = CallId(callId)
+  const id = ToolCallId(callId)
   const argumentsText = JSON.stringify(args)
   return [
     { type: 'block-start', index: 0, blockType: 'tool-call' },
@@ -116,7 +116,7 @@ function toolResponse(callId, name, args) {
 }
 
 function narrativeCommitResponse(text, callId, args) {
-  const id = CallId(callId)
+  const id = ToolCallId(callId)
   const argumentsText = JSON.stringify(args)
   return [
     { type: 'block-start', index: 0, blockType: 'text' },

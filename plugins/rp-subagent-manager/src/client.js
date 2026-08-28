@@ -26,7 +26,7 @@ import {
 } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
-export const inject = ['slots', 'connection']
+export const inject = ['slots', 'rpRemote', 'remote', 'remote.session']
 const h = React.createElement
 const transition = { duration: 0.18, ease: [0.2, 0, 0, 1] }
 const RP_SUBAGENT_TOOL = 'rp_run_subagent'
@@ -57,12 +57,12 @@ export function apply(ctx) {
     name: 'sidebar.footer.action',
     id: 'rp-subagents-navigation',
     order: 0,
-    inject: () => ({ connection: ctx.connection }),
+    inject: () => ({ connection: ctx.rpRemote, modelCatalog: ctx.remote.session }),
   }, SubagentManagerEntry))
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
     name: 'tool.call.toolview',
     key: RP_SUBAGENT_TOOL,
-    inject: () => ({ connection: ctx.connection }),
+    inject: () => ({ connection: ctx.rpRemote }),
   }, SubagentToolView))
 }
 
@@ -197,7 +197,7 @@ function toolResultText(content) {
   return text.length > 0 ? text : null
 }
 
-export function SubagentManagerEntry({ wide, connection }) {
+export function SubagentManagerEntry({ wide, connection, modelCatalog }) {
   const [open, setOpen] = useState(false)
   return h(MotionConfig, { reducedMotion: 'user', transition }, h(LazyMotion, { features: domMax, strict: true }, h(React.Fragment, null,
     h(m.button, {
@@ -209,10 +209,10 @@ export function SubagentManagerEntry({ wide, connection }) {
       'aria-label': '子代理',
       title: wide ? undefined : '子代理',
     }, h(IconSubagentRobotOutline16, { size: wide ? 16 : 18 }), wide ? h('span', { className: css.triggerLabel }, '子代理') : null),
-    h(SubagentManagerModal, { open, onClose: () => setOpen(false), connection }))))
+    h(SubagentManagerModal, { open, onClose: () => setOpen(false), connection, modelCatalog }))))
 }
 
-export function SubagentManagerModal({ open, onClose, connection }) {
+export function SubagentManagerModal({ open, onClose, connection, modelCatalog }) {
   const reduced = useReducedMotion()
   const [catalog, setCatalog] = useState(null)
   const [models, setModels] = useState({ groups: [], failures: [] })
@@ -236,14 +236,14 @@ export function SubagentManagerModal({ open, onClose, connection }) {
   }
   const loadModels = async () => {
     setModelLoadFailed(false)
-    try { setModels(modelCatalogValue(await connection.api.llm.models({}))) }
+    try { setModels(modelCatalogValue(await modelCatalog.modelCatalog())) }
     catch { setModelLoadFailed(true); setModels({ groups: [], failures: [] }) }
   }
   useEffect(() => {
     if (!open) return
     setView('list'); setDraft(null); setWriterDraft(null); setDeleteTarget(null); setTogglingId(null); setError(null)
     void reload(); void loadModels()
-  }, [connection, open])
+  }, [connection, modelCatalog, open])
 
   const editWriter = () => {
     if (catalog === null) return
@@ -416,17 +416,41 @@ function EditorShell({ title, subtitle, saving, onBack, onSave, saveLabel, onDel
 function ModelField({ route, onChange, models, modelLoadFailed }) {
   const key = routeKey(route)
   const available = routeAvailable(route, models.groups)
+  const selectedModel = route.kind === 'fixed'
+    ? models.groups.find(group => group.id === route.provider)?.models?.find(model => model.id === route.model)
+    : undefined
+  const efforts = selectedModel?.reasoning?.efforts ?? []
+  const defaultEffort = selectedModel?.reasoning?.defaultEffort
+  const explicitEffort = typeof route.reasoningEffort === 'string' ? route.reasoningEffort : ''
+  const effortAvailable = explicitEffort === '' || efforts.some(effort => effort.id === explicitEffort)
+  const defaultEffortName = efforts.find(effort => effort.id === defaultEffort)?.name
   const failures = models.failures ?? []
-  return h('label', { className: css.field },
-    h('span', null, '模型'),
-    h('small', null, '跟随父代理会使用当前对话的模型，并继承其显式输出上限。'),
-    h('select', { value: key, onChange: event => onChange(routeFromKey(event.target.value)), 'aria-label': '子代理模型' },
-      h('option', { value: 'inherit' }, '跟随父代理'),
-      !available && route.kind === 'fixed' ? h('option', { value: key, disabled: true }, `${route.provider} · ${route.model}（当前不可用）`) : null,
-      ...models.groups.map(group => h('optgroup', { key: group.id, label: group.name }, ...group.models.map(model => h('option', { key: model.id, value: JSON.stringify([group.id, model.id]) }, model.name))))),
-    !available && route.kind === 'fixed' ? h('span', { className: css.fieldWarning, role: 'status' }, '已保存的模型当前不在可用目录中。请选择其他模型或改为跟随父代理后再保存。') : null,
-    modelLoadFailed ? h('span', { className: css.fieldWarning, role: 'status' }, '模型目录暂时无法读取。稍后重新打开即可重试。') : null,
-    ...failures.map(failure => h('span', { className: css.catalogFailure, key: failure.id }, `${failure.name} 的模型目录暂时不可用，其他提供方仍可选择。`)))
+  return h(React.Fragment, null,
+    h('label', { className: css.field },
+      h('span', null, '模型'),
+      h('small', null, '跟随父代理会使用当前对话的完整模型路由，包括已显式选择的推理强度与输出上限。'),
+      h('select', { value: key, onChange: event => onChange(routeFromKey(event.target.value)), 'aria-label': '子代理模型' },
+        h('option', { value: 'inherit' }, '跟随父代理'),
+        !available && route.kind === 'fixed' && selectedModel === undefined ? h('option', { value: key, disabled: true }, `${route.provider} · ${route.model}（当前不可用）`) : null,
+        ...models.groups.map(group => h('optgroup', { key: group.id, label: group.name }, ...group.models.map(model => h('option', { key: model.id, value: JSON.stringify([group.id, model.id]) }, model.name))))),
+      !available && route.kind === 'fixed' && selectedModel === undefined ? h('span', { className: css.fieldWarning, role: 'status' }, '已保存的模型当前不在可用目录中。请选择其他模型或改为跟随父代理后再保存。') : null,
+      modelLoadFailed ? h('span', { className: css.fieldWarning, role: 'status' }, '模型目录暂时无法读取。稍后重新打开即可重试。') : null,
+      ...failures.map(failure => h('span', { className: css.catalogFailure, key: failure.id }, `${failure.name} 的模型目录暂时不可用，其他提供方仍可选择。`))),
+    route.kind !== 'fixed' || selectedModel === undefined || efforts.length === 0 ? null : h('label', { className: css.field },
+      h('span', null, '推理强度'),
+      h('small', null, '不显式指定时使用该模型的默认推理强度；切换模型会自动恢复默认。'),
+      h('select', {
+        value: explicitEffort,
+        onChange: event => onChange({
+          kind: 'fixed', provider: route.provider, model: route.model,
+          ...(event.target.value === '' ? {} : { reasoningEffort: event.target.value }),
+        }),
+        'aria-label': '子代理推理强度',
+      },
+      h('option', { value: '' }, defaultEffortName === undefined ? '使用模型默认值' : `使用模型默认值（${defaultEffortName}）`),
+      !effortAvailable ? h('option', { value: explicitEffort, disabled: true }, `${explicitEffort}（当前不可用）`) : null,
+      ...efforts.map(effort => h('option', { key: effort.id, value: effort.id }, effort.name))),
+      !effortAvailable ? h('span', { className: css.fieldWarning, role: 'status' }, '已保存的推理强度不再受此模型支持。请选择其他强度或使用模型默认值。') : null))
 }
 
 function DeleteSubagentDialog({ target, pending, error, onCancel, onConfirm }) {

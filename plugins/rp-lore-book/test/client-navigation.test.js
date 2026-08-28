@@ -98,7 +98,7 @@ test('变量启用条件使用可访问的原生编辑控件并保留键盘与 r
 
 test('世界书插件向会话编排注册唯一的整本创建与编辑界面', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
-  assert.match(client, /export const inject = \['slots', 'connection', 'rpAssetEditors'\]/)
+  assert.match(client, /export const inject = \['slots', 'rpRemote', 'rpAssetEditors'\]/)
   assert.match(client, /ctx\.rpAssetEditors\.register\('lorebook', LoreSessionEditor\)/)
   assert.match(client, /function LoreSessionEditor/)
   assert.match(client, /return h\(LoreDetail/)

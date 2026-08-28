@@ -44,7 +44,7 @@ test('Roleplay shadows harness:identity from the shared live identity provider',
       writerPersona: 'Return prose only.',
     })
     const layer = sections.find(section => section.name === 'harness:identity')
-    assert.equal(layer.order, -100)
+    assert.equal(layer.order, -1000)
     assert.equal(layer.text(), identity)
     identity = 'You are the updated shared Roleplay identity.'
     assert.equal(layer.text(), identity)

@@ -6376,6 +6376,15 @@ get: (_target, key) => {
 		function isSelectedOpeningMessage(event) {
 			return event?.type === "assistant/message" && event.data?.message?.source?.provider === "rp-session" && event.data?.message?.source?.model === "selected-opening";
 		}
+		//#endregion
+		//#region ../../packages/rp-ui/src/session-summary.js
+		/**
+		* Read the Roleplay identity from the public DSH SessionSummary contract.
+		* Projection-backed summary fields live under projectionValues in DSH 0.1.2.
+		*/
+		function isRoleplaySessionSummary(summary) {
+			return summary?.projectionValues?.agentPreset === "roleplay";
+		}
 		/** Stable key for a user message, assistant message, or failed turn. */
 		function rpMessageActionTargetKey(target) {
 			return target.kind === "turn" ? `turn:${String(target.turn)}` : `message:${target.role}:${String(target.messageId)}`;
@@ -6456,7 +6465,7 @@ get: (_target, key) => {
 		}
 		function isRoleplaySession(listState, sessionId) {
 			const summary = listState.byId?.[sessionId];
-			return summary?.agentPreset === "roleplay" && summary.origin !== "subagent";
+			return isRoleplaySessionSummary(summary) && summary.origin !== "subagent";
 		}
 		/** Project one message toolbar entirely from the resident Conversation state. */
 		function projectMessageActionDetail(snapshot, target, fallbackNode) {
@@ -6861,8 +6870,8 @@ get: (_target, key) => {
 		//#region src/client.js
 		const inject = [
 			"slots",
-			"conversationEvents",
-			"connection",
+			"uiConversation",
+			"rpRemote",
 			"sessions"
 		];
 		const h = react.default.createElement;
@@ -7035,13 +7044,13 @@ get: (_target, key) => {
 		};
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
-			ctx.conversationEvents.register(userFloorNodeDefinition);
-			ctx.conversationEvents.register(assistantFloorNodeDefinition);
-			ctx.conversationEvents.register(openingFloorNodeDefinition);
-			ctx.conversationEvents.register(failedAssistantNodeDefinition);
-			ctx.conversationEvents.register(suffixActionNodeDefinition);
+			ctx.uiConversation.events.register(userFloorNodeDefinition);
+			ctx.uiConversation.events.register(assistantFloorNodeDefinition);
+			ctx.uiConversation.events.register(openingFloorNodeDefinition);
+			ctx.uiConversation.events.register(failedAssistantNodeDefinition);
+			ctx.uiConversation.events.register(suffixActionNodeDefinition);
 			const injectFloorUi = () => ({
-				connection: ctx.connection,
+				connection: ctx.rpRemote,
 				sessions: ctx.sessions
 			});
 			ctx.slots.inject("conversation.chat.node", () => ctx.slots.register({
@@ -7170,7 +7179,7 @@ get: (_target, key) => {
 		}
 		function UserFloorActions(props) {
 			const roleplay = props.useSessions((state) => isRoleplaySession(state, props.sessionId));
-			const detail = props.useSession((snapshot) => projectMessageActionDetail(snapshot, props.node.data.target, props.node));
+			const detail = useMessageActionDetail(props, props.node.data.target, props.node);
 			if (!roleplay) return h(InactiveActionNodeMarker);
 			if (props.node.data.deleted === true) return h(DeletedUserTraceMarker, { target: props.node.data.target });
 			const location = props.node.location;
@@ -7251,7 +7260,7 @@ get: (_target, key) => {
 				role: "assistant",
 				messageId: props.messageId
 			};
-			const detail = props.useSession((snapshot) => projectMessageActionDetail(snapshot, target));
+			const detail = useMessageActionDetail(props, target);
 			if (!roleplay || detail === null) return null;
 			return h(FloorActions, {
 				...props,
@@ -7277,7 +7286,7 @@ get: (_target, key) => {
 					target: props.matched.target
 				}
 			};
-			const detail = props.useSession((snapshot) => projectMessageActionDetail(snapshot, props.matched.target, fallbackNode));
+			const detail = useMessageActionDetail(props, props.matched.target, fallbackNode);
 			if (!roleplay || detail === null) return null;
 			const status = failedTurnStatus(props.matched, detail);
 			if (props.matched.target.kind === "message") return status === null ? null : h(FailedTurnStatus, { status });
@@ -7512,9 +7521,10 @@ get: (_target, key) => {
 				"data-rp-message-action-key": target === void 0 ? void 0 : rpMessageActionTargetKey(target)
 			});
 		}
-		function SuffixActionEffect({ node, useSession }) {
+		function SuffixActionEffect({ node, useSession, useChat }) {
 			const ref = (0, react.useRef)(null);
-			const residentStartKey = useSession((snapshot) => snapshot.hasMore === true ? suffixResidentStartKey(snapshot.chat, node.data.replacementStart, node.anchorSeq) : void 0);
+			const hasMore = useSession((snapshot) => snapshot.hasMore === true);
+			const residentStartKey = useChat((chat) => hasMore ? suffixResidentStartKey(chat, node.data.replacementStart, node.anchorSeq) : void 0);
 			(0, react.useLayoutEffect)(() => {
 				const host = ref.current?.closest("[data-chat-flow-kind=\"rp-message-suffix-action\"]");
 				if (!(host instanceof HTMLElement)) return void 0;
@@ -7533,6 +7543,13 @@ get: (_target, key) => {
 				"aria-hidden": true
 			});
 		}
+		/** Join the independent DSH 0.1.2 Chat view with Session execution state. */
+		function useMessageActionDetail(props, target, fallbackNode) {
+			return projectMessageActionDetail({
+				chat: props.useChat((snapshot) => snapshot),
+				running: props.useSession((snapshot) => snapshot.running === true)
+			}, target, fallbackNode);
+		}
 		/**
 		* Return the first resident Chat Node inside a replacement whose original
 		* target precedes the paged history window. The carrier's own native empty
@@ -7549,18 +7566,27 @@ get: (_target, key) => {
 		function suffixActionRows(host, firstTarget, residentStartKey) {
 			const actionRow = findActionTargetRow(host, rpMessageActionTargetKey(firstTarget));
 			let start;
+			let preserveUserCompanionsUntil = null;
 			if (actionRow === null) start = findFlowRow(host, residentStartKey);
 			else if (firstTarget.kind === "message" && firstTarget.role === "user") start = messageRowForAction(actionRow, firstTarget.role);
 			else {
-				start = firstTurnOutputRow(actionRow);
+				start = firstTurnReplacementRow(actionRow);
+				if (start !== null) preserveUserCompanionsUntil = actionRow;
 				if (start === null && firstTarget.kind === "message") start = messageRowForAction(actionRow, firstTarget.role);
 			}
 			if (start === null || start === void 0) return [];
 			const rows = [];
-			for (let row = start; row !== null && row !== host; row = row.nextElementSibling) rows.push(row);
+			let preserveUserCompanions = preserveUserCompanionsUntil !== null;
+			for (let row = start; row !== null && row !== host; row = row.nextElementSibling) {
+				if (row === preserveUserCompanionsUntil) preserveUserCompanions = false;
+				const kind = row.dataset?.chatFlowKind;
+				if (preserveUserCompanions && (kind === "rp-floor-user-actions" || kind === "rp-message-avatar-user")) continue;
+				rows.push(row);
+			}
 			return rows;
 		}
-		function firstTurnOutputRow(actionRow) {
+		/** Start at the first process/output row after the retained user message. */
+		function firstTurnReplacementRow(actionRow) {
 			let boundary = null;
 			for (let row = actionRow.previousElementSibling; row !== null; row = row.previousElementSibling) {
 				const kind = row.dataset?.chatFlowKind;
@@ -7569,9 +7595,7 @@ get: (_target, key) => {
 					break;
 				}
 			}
-			let start = boundary?.nextElementSibling ?? null;
-			while (start !== null && ["rp-floor-user-actions", "rp-message-avatar-user"].includes(start.dataset?.chatFlowKind)) start = start.nextElementSibling;
-			return start;
+			return boundary?.nextElementSibling ?? null;
 		}
 		/** Return the original user row, intervening avatar nodes, and its retired action node. */
 		function deletedUserRows(host) {
@@ -8222,7 +8246,7 @@ get: (_target, key) => {
 		}
 		async function rpc(connection, endpoint, payload) {
 			try {
-				return messageActionValue(await connection.rpc.call("/rp-message-actions", endpoint, payload));
+				return messageActionValue(await connection.call("/rp-message-actions", endpoint, payload));
 			} catch (reason) {
 				if (reason?.code !== void 0) throw reason;
 				throw actionError("SERVICE_UNAVAILABLE");

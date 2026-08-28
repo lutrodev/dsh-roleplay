@@ -5,7 +5,7 @@ import { domainValue, normalizedMime, relatedLorebookNames } from './client-stat
 import { css, ensureStyles } from './client-styles.generated.js'
 import { ContentTransition, DirtyBar, IconCharacterCardOutline16, LoadingSpinner, RpMotionProvider } from 'dsh-roleplay-rp-ui'
 
-export const inject = ['slots', 'connection', 'rpAssetEditors']
+export const inject = ['slots', 'rpRemote', 'rpAssetEditors']
 const h = React.createElement
 const MODAL_SCROLL_LOCK = Symbol.for('dsh-roleplay.asset-modal-scroll-lock')
 
@@ -13,7 +13,7 @@ export function apply(ctx) {
   ctx.effect(ensureStyles)
   ctx.effect(() => ctx.rpAssetEditors.register('character', CharacterSessionEditor), 'rp-character-card: canonical session editor')
   ctx.slots.inject('rp-assets.character-entry', () => ctx.slots.register({
-    name: 'rp-assets.character-entry', inject: () => ({ connection: ctx.connection }),
+    name: 'rp-assets.character-entry', inject: () => ({ connection: ctx.rpRemote }),
   }, CharacterLibraryEntry))
 }
 
@@ -384,8 +384,8 @@ function useModalScrollLock(open) {
     }
   }, [open])
 }
-async function rpc(connection, endpoint, payload) { return domainValue(await connection.rpc.call('/rp-character-cards', endpoint, payload)) }
-async function assetRpc(connection, endpoint, payload) { return domainValue(await connection.rpc.call('/rp-assets', endpoint, payload)) }
+async function rpc(connection, endpoint, payload) { return domainValue(await connection.call('/rp-character-cards', endpoint, payload)) }
+async function assetRpc(connection, endpoint, payload) { return domainValue(await connection.call('/rp-assets', endpoint, payload)) }
 function bytesToBase64(bytes) { let binary = ''; for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000)); return btoa(binary) }
 function downloadExport(value) {
   if (value?.mimeType !== 'image/png' || typeof value.fileName !== 'string' || !value.fileName.toLocaleLowerCase().endsWith('.png')

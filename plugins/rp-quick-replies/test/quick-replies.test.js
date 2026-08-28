@@ -66,23 +66,21 @@ test('inserts ordinary replies and wraps selections with paired delimiters', () 
   })
 })
 
-test('publishes defaults and persists remote edits through the trusted Host boundary', async () => {
+test('publishes defaults and persists edits through the typed Remote boundary', async () => {
   const ctx = new Context()
   let handler
   let route
-  ctx.provide('connection', {
-    rpc: {
-      handle(path, next, options) {
+  ctx.provide('rpRemote', {
+      register(path, next) {
         handler = next
-        route = { path, options }
+        route = { path }
         return () => {}
       },
-    },
   })
   try {
     await ctx.plugin(MemorySettings)
     await ctx.plugin(QuickRepliesPlugin, {})
-    assert.deepEqual(route, { path: '/rp-quick-replies', options: { authority: 'trusted-host' } })
+    assert.deepEqual(route, { path: '/rp-quick-replies' })
 
     const initial = await handler('list', {})
     assert.deepEqual(initial.value.value.replies, DEFAULT_QUICK_REPLIES)

@@ -524,7 +524,7 @@ function validateEditableEntries(entries) {
 export function apply(ctx, config) {
   for (const [key, value] of Object.entries(config)) if (!['libraryDir', 'registerTool', 'exposeBrowser'].includes(key) && (!Number.isSafeInteger(value) || value < (key === 'maxRecursiveDepth' ? 0 : 1))) throw new Error(`rp-lore-book: invalid ${key}`)
   const service = new RpLoreBooks(ctx, config)
-  if (config.exposeBrowser) ctx.inject(['connection'], browserCtx => registerBrowserLibrary(browserCtx, service))
+  if (config.exposeBrowser) ctx.inject(['rpRemote'], browserCtx => registerBrowserLibrary(browserCtx, service))
   if (config.registerTool === false) return
   ctx.inject(['tools', 'fs'], toolCtx => registerImportTool(toolCtx, service, config))
 }
@@ -553,14 +553,12 @@ function registerImportTool(ctx, service, config) {
 const BROWSER_ENDPOINTS = new Set(['list', 'get', 'import', 'create', 'update', 'delete'])
 
 function registerBrowserLibrary(ctx, books) {
-  const connection = ctx.get('connection')
-  if (connection === undefined) throw new Error('rp-lore-book: injected connection is unavailable')
-  const dispose = connection.rpc.handle('/rp-lore-books', async (endpoint, payload) => {
+  const dispose = ctx.rpRemote.register('/rp-lore-books', async (endpoint, payload) => {
     if (!BROWSER_ENDPOINTS.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown lore-book endpoint: ${endpoint}`))
     try { return transportSuccess(success(await dispatchBrowser(books, endpoint, payload))) }
     catch (error) { return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error))) }
-  }, { authority: 'trusted-host' })
-  ctx.effect(() => dispose, 'rp-lore-book: /rp-lore-books RPC')
+  })
+  ctx.effect(() => dispose, 'rp-lore-book: /rp-lore-books Remote')
 }
 
 export async function dispatchBrowser(books, endpoint, payload) {

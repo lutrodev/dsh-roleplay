@@ -83,7 +83,7 @@ async function copyTransformed(source, target, mapping) {
   if (info.isDirectory()) {
     await mkdir(target, { recursive: true })
     for (const entry of await readdir(source, { withFileTypes: true })) {
-      if (entry.name === 'node_modules') continue
+      if (entry.name === 'node_modules' || entry.name.endsWith('.tsbuildinfo')) continue
       await copyTransformed(join(source, entry.name), join(target, entry.name), mapping)
     }
     return
@@ -102,10 +102,18 @@ async function copyOptionalTree(source, target, mapping) {
 }
 
 function exportedPath(component, target) {
-  if (typeof target !== 'string' || !target.startsWith('./')) {
-    throw new Error(`${component.manifest.name} has an unsupported export target`)
+  if (typeof target === 'string') {
+    if (!target.startsWith('./')) throw new Error(`${component.manifest.name} has an unsupported export target`)
+    return `./${component.group}/${component.slug}/${target.slice(2)}`
   }
-  return `./${component.group}/${component.slug}/${target.slice(2)}`
+  if (Array.isArray(target)) return target.map(value => exportedPath(component, value))
+  if (target !== null && typeof target === 'object') {
+    return Object.fromEntries(Object.entries(target).map(([condition, value]) => [
+      condition,
+      exportedPath(component, value),
+    ]))
+  }
+  throw new Error(`${component.manifest.name} has an unsupported export target`)
 }
 
 function buildExports(components) {
@@ -184,6 +192,7 @@ async function buildPackage() {
   for (const component of components) {
     const target = join(outputDir, component.group, component.slug)
     await copyOptionalTree(join(component.dir, 'src'), join(target, 'src'), mapping)
+    await copyOptionalTree(join(component.dir, 'lib'), join(target, 'lib'), mapping)
     await copyOptionalTree(join(component.dir, 'skills'), join(target, 'skills'), mapping)
     await copyOptionalTree(join(component.dir, 'presets'), join(target, 'presets'), mapping)
     await copyOptionalTree(join(component.dir, 'README.md'), join(target, 'README.md'), mapping)

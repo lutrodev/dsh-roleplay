@@ -10,10 +10,18 @@ test('semantic versions compare prereleases before the stable release', () => {
 })
 
 test('caret compatibility respects the narrow zero-major release line', () => {
-  assert.equal(satisfiesVersion('0.1.1-rc.2', '^0.1.1-rc.2'), true)
-  assert.equal(satisfiesVersion('0.1.1', '^0.1.1-rc.2'), true)
-  assert.equal(satisfiesVersion('0.1.9', '^0.1.1-rc.2'), true)
-  assert.equal(satisfiesVersion('0.2.0', '^0.1.1-rc.2'), false)
-  assert.equal(satisfiesVersion('0.1.0', '^0.1.1-rc.2'), false)
-  assert.equal(satisfiesVersion('0.1.1', 'not-a-range'), false)
+  assert.equal(satisfiesVersion('0.1.2-alpha.1', '^0.1.2-alpha.1'), true)
+  assert.equal(satisfiesVersion('0.1.2-alpha.2', '^0.1.2-alpha.1'), true)
+  assert.equal(satisfiesVersion('0.1.2', '^0.1.2-alpha.1'), true)
+  assert.equal(satisfiesVersion('0.1.3-beta.1', '^0.1.2-alpha.1'), false)
+  assert.equal(satisfiesVersion('0.1.9', '^0.1.2-alpha.1'), true)
+  assert.equal(satisfiesVersion('0.2.0', '^0.1.2-alpha.1'), false)
+  assert.equal(satisfiesVersion('0.1.1', '^0.1.2-alpha.1'), false)
+  assert.equal(satisfiesVersion('0.1.2', 'not-a-range'), false)
+})
+
+test('exact prerelease compatibility admits only the pinned Harness build', () => {
+  assert.equal(satisfiesVersion('0.1.2-alpha.1', '0.1.2-alpha.1'), true)
+  assert.equal(satisfiesVersion('0.1.2-alpha.2', '0.1.2-alpha.1'), false)
+  assert.equal(satisfiesVersion('0.1.2', '0.1.2-alpha.1'), false)
 })

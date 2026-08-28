@@ -17,13 +17,19 @@ export function routeLabel(route, groups = []) {
   if (route?.kind !== 'fixed') return '跟随父代理'
   for (const group of groups) {
     const model = group.models?.find(item => item.id === route.model)
-    if (group.id === route.provider && model !== undefined) return `${group.name} · ${model.name}`
+    if (group.id === route.provider && model !== undefined) {
+      const effort = model.reasoning?.efforts?.find(item => item.id === route.reasoningEffort)
+      return `${group.name} · ${model.name}${route.reasoningEffort === undefined ? '' : ` · ${effort?.name ?? route.reasoningEffort}`}`
+    }
   }
-  return `${route.provider} · ${route.model}`
+  return `${route.provider} · ${route.model}${route.reasoningEffort === undefined ? '' : ` · ${route.reasoningEffort}`}`
 }
 
 export function routeAvailable(route, groups = []) {
-  return route?.kind !== 'fixed' || groups.some(group => group.id === route.provider && group.models?.some(model => model.id === route.model))
+  if (route?.kind !== 'fixed') return true
+  const model = groups.find(group => group.id === route.provider)?.models?.find(item => item.id === route.model)
+  if (model === undefined) return false
+  return route.reasoningEffort === undefined || model.reasoning?.efforts?.some(effort => effort.id === route.reasoningEffort) === true
 }
 
 export function emptySubagentDraft() {
@@ -74,7 +80,7 @@ export function userMessage(error, action = 'save') {
 }
 
 export async function rpc(connection, endpoint, payload) {
-  const response = await connection.rpc.call('/rp-subagents', endpoint, payload)
+  const response = await connection.call('/rp-subagents', endpoint, payload)
   const domain = response?.ok === true && response.value?.ok !== undefined ? response.value : response
   if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? '请求失败'), { code: domain?.error?.code })
   return domain.value

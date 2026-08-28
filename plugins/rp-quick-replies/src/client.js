@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { LazyMotion, MotionConfig, domAnimation, m } from 'motion/react'
+import { isRoleplaySessionSummary } from 'dsh-roleplay-rp-ui/session-summary'
 import {
   IconEllipsisOutline16,
   IconRefreshOutline14,
@@ -10,12 +11,12 @@ import { insertQuickReply } from './protocol.js'
 import { createQuickReplyStore } from './client-store.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
-export const inject = ['slots', 'connection']
+export const inject = ['slots', 'rpRemote']
 const h = React.createElement
 
 export function apply(ctx) {
   ctx.effect(ensureStyles)
-  const store = createQuickReplyStore(ctx.connection)
+  const store = createQuickReplyStore(ctx.rpRemote)
   ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
     name: 'conversation.input.right',
     id: 'rp-quick-replies',
@@ -28,7 +29,7 @@ export function QuickReplyControl(props) {
   const { input, inputActions, sessionId, useSession, useSessions, store } = props
   const roleplay = useSessions(state => {
     const summary = state.byId?.[sessionId]
-    return summary?.agentPreset === 'roleplay' && summary.origin !== 'subagent'
+    return isRoleplaySessionSummary(summary) && summary.origin !== 'subagent'
   })
   const removed = useSession(state => state.removed === true)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)

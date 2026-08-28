@@ -105,22 +105,22 @@ function t(key) { return copy[key] ?? key }
 
 function statusView(enabledFeatures, enabledSkills, revision = 0) {
   return {
-    roleplay: { version: '0.1.0' },
-    dsh: { version: '0.1.1-rc.2', compatible: true },
+    roleplay: { version: '0.1.7' },
+    dsh: { version: '0.1.2-alpha.1', compatible: true },
     compatible: true,
     problems: [],
     enabledFeatures: [...enabledFeatures],
     enabledSkills: [...enabledSkills],
     settings: { writable: true, revision },
     core: [
-      { label: '回复运行时', description: '协调父代理、Writer、上下文与每轮写作流程。', packageVersion: '0.1.0', versionCompatible: true },
-      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.6', versionCompatible: true },
+      { label: '回复运行时', description: '协调父代理、Writer、上下文与每轮写作流程。', packageVersion: '0.1.7', versionCompatible: true },
+      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.7', versionCompatible: true },
     ],
     features: FEATURE_CATALOG.map(item => ({
       ...item,
       enabled: enabledFeatures.includes(item.id),
       active: enabledFeatures.includes(item.id),
-      packageVersion: '0.1.0',
+      packageVersion: '0.1.7',
       versionCompatible: true,
     })),
     skills: ROLEPLAY_SKILL_CATALOG.map(item => ({
@@ -132,7 +132,7 @@ function statusView(enabledFeatures, enabledSkills, revision = 0) {
       selected: enabledSkills.includes(item.id),
       featureEnabled: enabledFeatures.includes(item.featureId),
       enabled: enabledSkills.includes(item.id) && enabledFeatures.includes(item.featureId),
-      packageVersion: '0.1.0',
+      packageVersion: '0.1.7',
       versionCompatible: true,
     })),
   }
@@ -178,7 +178,6 @@ function harness(
     }),
   }
   const connection = {
-    rpc: {
       call: vi.fn(async (_path, endpoint, payload) => {
         if (_path === '/rp-quick-replies') {
           if (endpoint === 'replace') quickReplies = { ...quickReplies, replies: payload.replies, revision: quickReplies.revision + 1 }
@@ -210,7 +209,6 @@ function harness(
           },
         }
       }),
-    },
   }
   return { scope, connection }
 }
@@ -242,9 +240,9 @@ function promptView(enabledFeatures, identityOverride = '') {
     subagentsEnabled: true,
     assetToolsEnabled: true,
     harnessSections: [
-      { id: 'harness-identity', name: 'harness:identity', order: -100, source: 'dsh-system-prompt', text: identity },
-      { id: 'harness-source', name: 'harness:source', order: -99, source: 'dsh-app-boot', text: 'The Harness checkout is available at /source.' },
-      { id: 'app-web-surface', name: 'app:web-surface', order: -98, source: 'dsh-web-app', text: 'You are using the Harness Web GUI.' },
+      { id: 'harness-identity', name: 'harness:identity', order: -1000, source: 'dsh-system-prompt', text: identity },
+      { id: 'harness-source', name: 'harness:source', order: -900, source: 'dsh-app-boot', text: 'The Harness checkout is available at /source.' },
+      { id: 'app-web-surface', name: 'app:web-surface', order: -800, source: 'dsh-web-app', text: 'You are using the Harness Web GUI.' },
     ],
     harnessIdentity: {
       sectionName: 'harness:identity', value: identity, defaultValue: defaultIdentity,
@@ -265,7 +263,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     let registration
     const inject = vi.fn((_name, setup) => setup())
     const ctx = {
-      connection: {},
+      rpRemote: {},
       effect: vi.fn(),
       locale: { register: vi.fn(), bind: () => t },
       settingsScope: { bind: vi.fn(() => ({})) },
@@ -287,7 +285,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     fireEvent.click(await screen.findByText('查看核心组件'))
     const card = screen.getByText('会话总结').closest('li')
     expect(card).toBeTruthy()
-    expect(card.textContent).toContain('v0.1.6')
+    expect(card.textContent).toContain('v0.1.7')
     expect(card.textContent).toContain('压缩较早的对话，并向 Writer 提供独立的会话总结。')
   })
 
@@ -299,14 +297,14 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     expect(configureButton.textContent).toBe('')
     fireEvent.click(configureButton)
     expect(await screen.findByRole('dialog', { name: '设置快捷回复' })).toBeTruthy()
-    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-quick-replies', 'list', {}))
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-quick-replies', 'list', {}))
 
     fireEvent.change(await screen.findByLabelText('第 1 项按钮名称'), { target: { value: '旁白' } })
     fireEvent.change(screen.getByLabelText('第 1 项插入内容'), { target: { value: '请从旁白视角继续。' } })
     fireEvent.click(screen.getByRole('button', { name: '保存快捷回复' }))
 
-    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-quick-replies', 'replace', expect.objectContaining({ expectedRevision: 0 })))
-    const replaceCall = connection.rpc.call.mock.calls.find(([, endpoint]) => endpoint === 'replace')
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-quick-replies', 'replace', expect.objectContaining({ expectedRevision: 0 })))
+    const replaceCall = connection.call.mock.calls.find(([, endpoint]) => endpoint === 'replace')
     expect(replaceCall[2].replies[0]).toEqual({ id: 'double-quote', label: '旁白', content: '请从旁白视角继续。' })
   })
 
@@ -343,7 +341,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     expect(screen.getByText('等待插件启用')).toBeTruthy()
 
     fireEvent.click(loreSwitch)
-    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-features', 'settings/set', {
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-features', 'settings/set', {
       field: 'enabledSkills',
       value: ['rp-guide-state'],
       expectedRevision: 0,
@@ -359,7 +357,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     expect(loreSwitch.disabled).toBe(false)
     fireEvent.click(loreSwitch)
 
-    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-features', 'settings/set', {
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-features', 'settings/set', {
       field: 'enabledFeatures',
       value: [],
       expectedRevision: 0,
@@ -408,7 +406,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     fireEvent.change(field, { target: { value: 'You are the shared Roleplay identity.' } })
     fireEvent.click(screen.getByRole('button', { name: '保存统一身份' }))
 
-    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-features', 'settings/set', {
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-features', 'settings/set', {
       field: 'harnessIdentity',
       value: 'You are the shared Roleplay identity.',
       expectedRevision: 0,
@@ -419,7 +417,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '编辑统一身份' }))
     fireEvent.click(screen.getByRole('button', { name: '恢复 Harness 默认值' }))
-    await waitFor(() => expect(connection.rpc.call).toHaveBeenCalledWith('/rp-features', 'settings/unset', {
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-features', 'settings/unset', {
       field: 'harnessIdentity',
       expectedRevision: 1,
     }))

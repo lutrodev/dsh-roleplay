@@ -3,13 +3,13 @@ import { Button, IconChevronLeftOutline14, IconEllipsisOutline16, IconListPenOut
 import { domMax, LazyMotion, m, MotionConfig } from 'motion/react'
 import { css, ensureStyles } from './client-styles.generated.js'
 
-export const inject = ['slots', 'connection', 'rpAssetEditors']
+export const inject = ['slots', 'rpRemote', 'rpAssetEditors']
 const h = React.createElement
 
 export function apply(ctx) {
   ctx.effect(ensureStyles)
   ctx.effect(() => ctx.rpAssetEditors.register('writingStyle', WritingStyleSessionEditor), 'rp-writing-style: canonical session editor')
-  ctx.slots.inject('rp-assets.writing-style-entry', () => ctx.slots.register({ name: 'rp-assets.writing-style-entry', inject: () => ({ connection: ctx.connection }) }, WritingStyleLibraryEntry))
+  ctx.slots.inject('rp-assets.writing-style-entry', () => ctx.slots.register({ name: 'rp-assets.writing-style-entry', inject: () => ({ connection: ctx.rpRemote }) }, WritingStyleLibraryEntry))
 }
 
 function WritingStyleLibraryEntry({ wide, connection }) {
@@ -190,7 +190,7 @@ function DeleteWritingStyleDialog({ target, pending, error, onCancel, onConfirm 
 function newWritingStyleDraft() { return { id: null, revision: 0, name: '', description: '', content: '' } }
 
 async function rpc(connection, endpoint, payload) {
-  const response = await connection.rpc.call('/rp-writing-styles', endpoint, payload)
+  const response = await connection.call('/rp-writing-styles', endpoint, payload)
   const domain = response?.ok === true && response.value?.ok !== undefined ? response.value : response
   if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? '请求失败'), { code: domain?.error?.code })
   return domain.value

@@ -7163,7 +7163,7 @@ get: (_target, key) => {
 			});
 		}
 		async function roleplayFeatureRequest(connection, endpoint, fallbackMessage, payload = {}) {
-			const response = await connection.rpc.call("/rp-features", endpoint, payload);
+			const response = await connection.call("/rp-features", endpoint, payload);
 			const domain = response?.ok === true && response.value?.ok !== void 0 ? response.value : response;
 			if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? fallbackMessage), { code: domain?.error?.code });
 			return domain.value;
@@ -7336,7 +7336,7 @@ get: (_target, key) => {
 			return "暂时无法读取快捷回复，请稍后重试。";
 		}
 		async function quickReplyRequest(connection, endpoint, payload = {}) {
-			const response = await connection.rpc.call(QUICK_REPLIES_RPC_PATH, endpoint, payload);
+			const response = await connection.call(QUICK_REPLIES_RPC_PATH, endpoint, payload);
 			const domain = response?.ok === true && response.value?.ok !== void 0 ? response.value : response;
 			if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? "快捷回复请求失败"), { code: domain?.error?.code });
 			return domain.value;
@@ -7679,7 +7679,7 @@ get: (_target, key) => {
 		const inject = [
 			"slots",
 			"locale",
-			"connection",
+			"rpRemote",
 			"settingsScope"
 		];
 		const h = react.default.createElement;
@@ -7963,7 +7963,7 @@ get: (_target, key) => {
 				locale: NS,
 				inject: () => ({
 					scope,
-					connection: ctx.connection
+					connection: ctx.rpRemote
 				})
 			}, RoleplaySettingsSection));
 		}

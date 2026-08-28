@@ -405,7 +405,7 @@ test('persists State conditions in schema v3 and rejects them through the generi
   }
 })
 
-test('mounts the browser RPC when connection becomes available after the plugin', async () => {
+test('mounts the browser Remote when the transport becomes available after the plugin', async () => {
   const ctx = new Context()
   assert.deepEqual(inject, [])
   const mounted = []
@@ -415,13 +415,13 @@ test('mounts the browser RPC when connection becomes available after the plugin'
   })
   assert.deepEqual(mounted, [])
 
-  ctx.provide('connection', { rpc: { handle(path, _handler, options) {
-    mounted.push({ path, options })
+  ctx.provide('rpRemote', { register(path, _handler) {
+    mounted.push({ path })
     return () => {}
-  } } })
+  } })
   await new Promise(resolve => setImmediate(resolve))
 
-  assert.deepEqual(mounted, [{ path: '/rp-lore-books', options: { authority: 'trusted-host' } }])
+  assert.deepEqual(mounted, [{ path: '/rp-lore-books' }])
   await ctx.fiber.dispose()
 })
 

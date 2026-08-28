@@ -64,7 +64,7 @@ test('人设操作错误和状态使用用户语言', async () => {
 
 test('人设插件向会话编排注册同一个创建与编辑表单', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
-  assert.match(client, /export const inject = \['slots', 'connection', 'rpAssetEditors'\]/)
+  assert.match(client, /export const inject = \['slots', 'rpRemote', 'rpAssetEditors'\]/)
   assert.match(client, /ctx\.rpAssetEditors\.register\('persona', PersonaSessionEditor\)/)
   assert.match(client, /function PersonaSessionEditor/)
   assert.match(client, /h\(PersonaForm/)

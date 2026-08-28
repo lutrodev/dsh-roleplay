@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
-import { CallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { createRpMessageActionMetadata } from '../src/conversation.js'
 import { RpRuntime } from '../src/runtime.js'
@@ -310,7 +310,7 @@ test('tool-only retry reuses prose from the latest failed commit in the same tur
       turn: 1,
       step: 1,
       message: createToolResultMessage({
-        callId: CallId('failed-commit'),
+        callId: ToolCallId('failed-commit'),
         content: [{ type: 'text', text: 'Error: invalid State update' }],
         isError: true,
       }),
@@ -754,7 +754,7 @@ test('previews only settled visible dialogue bodies without changing native mode
     message: createAssistantMessage({
       content: [
         { type: 'text', text: '不应进入对话的中间文字' },
-        { type: 'tool-call', id: CallId('build-failed'), name: 'legacy_context_tool', arguments: '{}' },
+        { type: 'tool-call', id: ToolCallId('build-failed'), name: 'legacy_context_tool', arguments: '{}' },
       ],
       source: { provider: 'mock', model: 'mock' },
     }),
@@ -763,7 +763,7 @@ test('previews only settled visible dialogue bodies without changing native mode
     turn: 2,
     step: 1,
     message: createToolResultMessage({
-      callId: CallId('build-failed'),
+      callId: ToolCallId('build-failed'),
       content: [{ type: 'text', text: 'Error: invalid arguments' }],
       isError: true,
     }),
@@ -772,7 +772,7 @@ test('previews only settled visible dialogue bodies without changing native mode
     turn: 2,
     step: 2,
     message: createAssistantMessage({
-      content: [{ type: 'tool-call', id: CallId('build-success'), name: 'legacy_context_tool', arguments: '{}' }],
+      content: [{ type: 'tool-call', id: ToolCallId('build-success'), name: 'legacy_context_tool', arguments: '{}' }],
       source: { provider: 'mock', model: 'mock' },
     }),
   }, { surfaceOp: 'append' })
@@ -780,7 +780,7 @@ test('previews only settled visible dialogue bodies without changing native mode
     turn: 2,
     step: 2,
     message: createToolResultMessage({
-      callId: CallId('build-success'),
+      callId: ToolCallId('build-success'),
       content: [{ type: 'text', text: '<rp_runtime_context>工具上下文</rp_runtime_context>' }],
       isError: false,
     }),
@@ -790,7 +790,7 @@ test('previews only settled visible dialogue bodies without changing native mode
       { type: 'reasoning', text: '不应进入对话的推理' },
       { type: 'text', text: '最终正文第一段' },
       { type: 'text', text: '最终正文第二段' },
-      { type: 'tool-call', id: CallId('commit-success'), name: 'rp_commit_turn', arguments: '{}' },
+      { type: 'tool-call', id: ToolCallId('commit-success'), name: 'rp_commit_turn', arguments: '{}' },
     ],
     source: { provider: 'mock', model: 'mock' },
   })
@@ -799,7 +799,7 @@ test('previews only settled visible dialogue bodies without changing native mode
     turn: 2,
     step: 3,
     message: createToolResultMessage({
-      callId: CallId('commit-success'),
+      callId: ToolCallId('commit-success'),
       content: [{ type: 'text', text: 'Committed.' }],
       isError: false,
     }),
@@ -1158,7 +1158,8 @@ test('Chat Writer receives one flat Prompt and its prose replaces the parent str
     prepare: () => ({ writer: { provider: 'writer-provider', model: 'writer-model' }, subagents: [], revisions: { writer: 3, subagents: {} } }),
   })
   const events = []
-  const input = currentInput('打开门。')
+  const attachment = testImageAttachment('a')
+  const input = currentInput(null, [attachment])
   agent = {
     options: { provider: 'parent-provider', model: 'parent-model', maxTokens: 123 },
     session: { id: 'writer-parent', events, append() {} },
@@ -1175,9 +1176,10 @@ test('Chat Writer receives one flat Prompt and its prose replaces the parent str
   assert.deepEqual(starts[0].request.agentOptions, { provider: 'writer-provider', model: 'writer-model', maxTokens: 123 })
   assert.deepEqual(starts[0].request.toolFilter, { allow: [] })
   assert.equal(starts[0].request.maxDepth, 1)
-  assert.equal(starts[0].request.prompt.length, 1)
+  assert.equal(starts[0].request.prompt.length, 2)
   assert.equal(starts[0].request.prompt[0].type, 'text')
-  assert.equal(starts[0].request.prompt[0].text.split('打开门。').length - 1, 1)
+  assert.equal(starts[0].request.prompt[0].text.split('本轮用户输入包含 1 张图片附件。').length - 1, 1)
+  assert.deepEqual(starts[0].request.prompt[1], { type: 'image', attachment })
   assert.doesNotMatch(starts[0].request.prompt[0].text, /rp\.conversation|对话历史/)
   assert.match(result.meta.promptHash, /^[a-f0-9]{64}$/)
   assert.equal(run.writerArtifact, undefined)
@@ -1186,7 +1188,7 @@ test('Chat Writer receives one flat Prompt and its prose replaces the parent str
   assert.equal(run.writerArtifact.narrative, result.narrative)
   await assert.rejects(write.execute({ action: 'write' }, { agent, callId: 'writer-2', signal: new AbortController().signal }), error => error.code === 'RP_WRITER_ALREADY_COMPLETED')
 
-  const commitId = CallId('chat-stream-commit')
+  const commitId = ToolCallId('chat-stream-commit')
   const parentStream = (async function* () {
     yield { type: 'block-start', index: 0, blockType: 'reasoning' }
     yield { type: 'reasoning-delta', index: 0, text: '父代理正在重写' }
@@ -1285,7 +1287,8 @@ test('Agent Writer uses the preassembled Slot context, accepts a bounded brief, 
     inputSchema: { type: 'object', additionalProperties: false, properties: { focus: { type: 'string' } } },
     toolFilter: { allow: ['web_search'] },
   })
-  const input = currentInput('继续。')
+  const attachment = testImageAttachment('b')
+  const input = currentInput('继续。', [attachment])
   const agent = { options: { provider: 'parent-provider', model: 'parent-model', maxTokens: 456 }, session: { id: 'agent-parent', events: [], append() {} } }
   const run = await runtime.prepareRun(agent, 1, [input])
   const write = tools.get('rp_write_turn')
@@ -1365,6 +1368,9 @@ test('Agent Writer uses the preassembled Slot context, accepts a bounded brief, 
   assert.equal(subagent1.text, '建议保持门锁状态。')
   assert.equal(subagent2.text, '建议保持门锁状态。')
   assert.equal(starts.at(-1).request.prompt[0].text.includes('<roleplay_context>'), false)
+  assert.ok(starts.every(start => start.request.prompt.length === 2))
+  assert.ok(starts.every(start => start.request.prompt[1].type === 'image'))
+  for (const start of starts) assert.deepEqual(start.request.prompt[1].attachment, attachment)
   assert.deepEqual(starts.at(-1).request.toolFilter, { allow: ['web_search'] })
   assert.equal(run.writerArtifact, undefined)
 
@@ -1412,19 +1418,21 @@ test('global Writer and managed task subagents are shared by Chat and Agent, the
     ...(route === undefined ? {} : { route }),
   })
   let globalProfile = {
-    writer: { provider: 'writer-provider-a', model: 'writer-model-a' },
+    writer: { provider: 'writer-provider-a', model: 'writer-model-a', reasoningEffort: 'high' },
     subagents: [managedSubagent('research', 'Research A', ['web_search'])],
     revisions: { writer: 1, subagents: { research: 1 } },
   }
   runtime.registerSubagentProfileProvider({ id: 'global', prepare: () => structuredClone(globalProfile) })
 
-  const chatAgent = { mode: 'chat', options: { provider: 'parent', model: 'parent-model', maxTokens: 111 }, session: { id: 'chat-global', events: [], append() {} } }
-  const agent = { mode: 'agent', options: { provider: 'parent', model: 'parent-model', maxTokens: 222 }, session: { id: 'agent-global', events: [], append() {} } }
+  const chatAgent = { mode: 'chat', options: { provider: 'parent', model: 'parent-model', reasoningEffort: 'medium', maxTokens: 111 }, session: { id: 'chat-global', events: [], append() {} } }
+  const agent = { mode: 'agent', options: { provider: 'parent', model: 'parent-model', reasoningEffort: 'medium', maxTokens: 222 }, session: { id: 'agent-global', events: [], append() {} } }
   const chatRun = await runtime.prepareRun(chatAgent, 1, [currentInput('Chat 继续。')])
   const agentRun = await runtime.prepareRun(agent, 1, [currentInput('Agent 继续。')])
   globalProfile = {
     writer: { provider: 'writer-provider-b', model: 'writer-model-b' },
-    subagents: [managedSubagent('audit', 'Audit B', ['skill'], { provider: 'audit-provider-b', model: 'audit-model-b' })],
+    subagents: [managedSubagent('audit', 'Audit B', ['skill'], {
+      provider: 'audit-provider-b', model: 'audit-model-b', reasoningEffort: 'low',
+    })],
     revisions: { writer: 2, subagents: { audit: 1 } },
   }
   chatAgent.options = { provider: 'changed-parent', model: 'changed-model', maxTokens: 333 }
@@ -1435,8 +1443,8 @@ test('global Writer and managed task subagents are shared by Chat and Agent, the
   await tools.get('rp_run_subagent').execute({ subagent: 'research', task: '旧配置仍应可用' }, { agent, callId: 'subagent-a', signal: new AbortController().signal })
   assert.equal(starts[0].request.label, '写作')
   assert.equal(starts[1].request.label, '写作')
-  assert.deepEqual(starts[0].request.agentOptions, { provider: 'writer-provider-a', model: 'writer-model-a', maxTokens: 111 })
-  assert.deepEqual(starts[1].request.agentOptions, { provider: 'writer-provider-a', model: 'writer-model-a', maxTokens: 222 })
+  assert.deepEqual(starts[0].request.agentOptions, { provider: 'writer-provider-a', model: 'writer-model-a', reasoningEffort: 'high', maxTokens: 111 })
+  assert.deepEqual(starts[1].request.agentOptions, { provider: 'writer-provider-a', model: 'writer-model-a', reasoningEffort: 'high', maxTokens: 222 })
   assert.equal(starts[2].request.label, 'Research A')
   assert.deepEqual(starts[2].request.toolFilter, { allow: ['web_search'] })
   assert.deepEqual(chatRun.subagentRevisions, { writer: 1, subagents: { research: 1 } })
@@ -1454,7 +1462,7 @@ test('global Writer and managed task subagents are shared by Chat and Agent, the
   )
   const delegated = await tools.get('rp_run_subagent').execute({ subagent: 'audit', task: '新子代理' }, { agent, callId: 'subagent-b', signal: new AbortController().signal })
   assert.equal(delegated.text, '结果 Audit B')
-  assert.deepEqual(starts.at(-1).request.agentOptions, { provider: 'audit-provider-b', model: 'audit-model-b', maxTokens: 444 })
+  assert.deepEqual(starts.at(-1).request.agentOptions, { provider: 'audit-provider-b', model: 'audit-model-b', reasoningEffort: 'low', maxTokens: 444 })
   assert.deepEqual(starts.at(-1).request.toolFilter, { allow: ['skill'] })
   await ctx.fiber.dispose()
 })
@@ -1493,15 +1501,15 @@ test('inherit routes resolve from the first logged parent request before child e
   }
   const run = await runtime.prepareRun(agent, 1, [currentInput('继续。')])
   assert.equal(run.writerRoute, undefined)
-  requestHeader = { config: { provider: 'selected-provider', model: 'selected-model', maxTokens: 789 } }
+  requestHeader = { config: { provider: 'selected-provider', model: 'selected-model', reasoningEffort: 'high', maxTokens: 789 } }
 
   await tools.get('rp_write_turn').execute({ action: 'write' }, { agent, callId: 'late-writer', signal: new AbortController().signal })
   requestHeader = { config: { provider: 'later-provider', model: 'later-model', maxTokens: 999 } }
   await tools.get('rp_run_subagent').execute({ subagent: 'audit', task: '检查连续性' }, { agent, callId: 'late-audit', signal: new AbortController().signal })
 
   assert.deepEqual(starts.map(start => start.request.agentOptions), [
-    { provider: 'selected-provider', model: 'selected-model', maxTokens: 789 },
-    { provider: 'selected-provider', model: 'selected-model', maxTokens: 789 },
+    { provider: 'selected-provider', model: 'selected-model', reasoningEffort: 'high', maxTokens: 789 },
+    { provider: 'selected-provider', model: 'selected-model', reasoningEffort: 'high', maxTokens: 789 },
   ])
   assert.equal(run.subagentRoutesFrozen, true)
   await ctx.fiber.dispose()
@@ -1538,11 +1546,25 @@ function appendCommitCall(events, turn, step, callId, text, extraBlocks = [], le
   events.push({ seq: events.length, type: 'tool/call', data: { turn, step, callId, name: 'rp_commit_turn', arguments: '{}' } })
 }
 
-function currentInput(text = 'Continue the story.') {
+function currentInput(text = 'Continue the story.', images = []) {
   return createUserMessage({
-    content: [{ type: 'text', text }],
+    content: [
+      ...(typeof text === 'string' ? [{ type: 'text', text }] : []),
+      ...images.map(attachment => ({ type: 'image', attachment })),
+    ],
     source: { kind: 'user' },
   })
+}
+
+function testImageAttachment(marker) {
+  return {
+    attachmentId: `sha256:${marker.repeat(64)}`,
+    mediaType: 'image/png',
+    bytes: 67,
+    width: 1,
+    height: 1,
+    name: `${marker}.png`,
+  }
 }
 
 function seedWriter(run, narrative) {

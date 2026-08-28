@@ -1,7 +1,7 @@
 /** Product-facing Roleplay feature catalog and release compatibility contract. */
 
-export const ROLEPLAY_SUITE_VERSION = '0.1.6'
-export const SUPPORTED_DSH_RANGE = '^0.1.1-rc.2'
+export const ROLEPLAY_SUITE_VERSION = '0.1.7'
+export const SUPPORTED_DSH_RANGE = '0.1.2-alpha.1'
 export const SETTINGS_NAMESPACE = 'roleplay-features'
 
 // Every always-on core package must also remain a direct dependency of

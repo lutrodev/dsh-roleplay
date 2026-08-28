@@ -606,13 +606,13 @@ test('client error mapping preserves stable domain outcomes', () => {
 
 test('client actions belong to Roleplay root sessions, never inherited subagent transcripts', () => {
   assert.equal(isRoleplaySession({
-    byId: { root: { agentPreset: 'roleplay' } },
+    byId: { root: { projectionValues: { agentPreset: 'roleplay' } } },
   }, 'root'), true)
   assert.equal(isRoleplaySession({
-    byId: { writer: { agentPreset: 'roleplay', origin: 'subagent', parentId: 'root' } },
+    byId: { writer: { projectionValues: { agentPreset: 'roleplay' }, origin: 'subagent', parentId: 'root' } },
   }, 'writer'), false)
   assert.equal(isRoleplaySession({
-    byId: { ordinary: { agentPreset: 'default' } },
+    byId: { ordinary: { projectionValues: { agentPreset: 'default' } } },
   }, 'ordinary'), false)
 })
 

@@ -9,8 +9,12 @@
 
 /* Roleplay run markers are structural Conversation Nodes. They use the
    engine's exact Turn index to scope trajectory cleanup and never occupy a
-   visible row themselves. */
+   visible row themselves. A marker anywhere in the current Chat flow also
+   identifies the whole transcript as Roleplay, so Harness request-prompt
+   disclosures stay available in logs without entering the story surface. */
 [data-chat-flow-kind="rp-run-marker"] { display: none; }
+[data-chat-flow]:has([data-chat-flow-kind="rp-run-marker"])
+  > [data-chat-flow-kind="system-prompt"] { display: none; }
 [data-rp-library-inactive-open-trace] { display: none; }
 [data-rp-library-inactive-open-reasoning] [data-variant="think"] { display: none; }
 

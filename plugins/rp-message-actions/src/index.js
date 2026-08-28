@@ -12,7 +12,7 @@ import { decodeRpCommitEvent } from 'dsh-roleplay-rp-core/protocol'
 import { isSelectedOpeningMessage } from 'dsh-roleplay-rp-session/protocol'
 
 export const name = 'rp-message-actions'
-export const inject = ['connection', 'typert', 'agentPresets', 'agents']
+export const inject = ['rpRemote', 'typert', 'agentPresets', 'agents']
 export const Config = Schema.object({
   maxNarrativeCharacters: Schema.number().default(200000),
   maxUserMessageCharacters: Schema.number().default(50000),
@@ -30,7 +30,7 @@ export function apply(ctx, config) {
   for (const agent of ctx.agents.list()) {
     if (roleplayPreset(agent.session) === 'roleplay') recoverPendingRerolls(agent)
   }
-  const dispose = ctx.connection.rpc.handle('/rp-message-actions', async (endpoint, payload) => {
+  const dispose = ctx.rpRemote.register('/rp-message-actions', async (endpoint, payload) => {
     if (!ENDPOINTS.has(endpoint)) {
       return transportSuccess(failure('INVALID_REQUEST', `Unknown message action endpoint: ${String(endpoint)}`))
     }
@@ -39,8 +39,8 @@ export function apply(ctx, config) {
     } catch (error) {
       return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error)))
     }
-  }, { authority: 'trusted-host' })
-  ctx.effect(() => dispose, 'rp-message-actions: /rp-message-actions RPC')
+  })
+  ctx.effect(() => dispose, 'rp-message-actions: /rp-message-actions Remote')
 }
 
 /** Execute one operation against a stable user message, assistant message, or failed turn. */

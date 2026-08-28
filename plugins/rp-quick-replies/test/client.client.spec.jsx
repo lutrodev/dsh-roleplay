@@ -71,7 +71,7 @@ function sessionProps(store, draft = '港口') {
     sessionId: 'session-1',
     input: { draft, phase: 'plain' },
     inputActions: { setDraft: vi.fn() },
-    useSessions: selector => selector({ byId: { 'session-1': { agentPreset: 'roleplay', origin: 'user' } } }),
+    useSessions: selector => selector({ byId: { 'session-1': { projectionValues: { agentPreset: 'roleplay' }, origin: 'user' } } }),
     useSession: selector => selector({ removed: false }),
   }
 }
@@ -97,16 +97,16 @@ function renderComposer(store, initialDraft = '港口') {
 describe('快捷回复输入栏', () => {
   it('loads and saves the shared Host catalog through one client store', async () => {
     let current = readyState()
-    const connection = { rpc: { call: vi.fn(async (_path, endpoint, payload) => {
+    const connection = { call: vi.fn(async (_path, endpoint, payload) => {
       if (endpoint === 'replace') current = { ...current, replies: payload.replies, revision: 1 }
       return { ok: true, value: { ok: true, value: current } }
-    }) } }
+    }) }
     const store = createQuickReplyStore(connection)
     await store.load()
     expect(store.getSnapshot().replies).toHaveLength(3)
     await store.replace([{ id: 'nod', label: '点头', content: '*点头*' }])
     expect(store.getSnapshot().replies[0].label).toBe('点头')
-    expect(connection.rpc.call).toHaveBeenLastCalledWith('/rp-quick-replies', 'replace', expect.objectContaining({ expectedRevision: 0 }))
+    expect(connection.call).toHaveBeenLastCalledWith('/rp-quick-replies', 'replace', expect.objectContaining({ expectedRevision: 0 }))
   })
 
   it('inserts a visible quick reply at the textarea caret without sending', async () => {
@@ -131,7 +131,7 @@ describe('快捷回复输入栏', () => {
   it('does not render in ordinary non-Roleplay conversations', () => {
     const store = fixedStore()
     const props = sessionProps(store)
-    props.useSessions = selector => selector({ byId: { 'session-1': { agentPreset: 'default' } } })
+    props.useSessions = selector => selector({ byId: { 'session-1': { projectionValues: { agentPreset: 'default' } } } })
     const { container } = render(React.createElement(QuickReplyControl, props))
     expect(container.innerHTML).toBe('')
   })

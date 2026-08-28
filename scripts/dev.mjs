@@ -20,9 +20,9 @@ export const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'
 const managerManifestPath = join(projectRoot, 'plugins', 'rp-feature-manager', 'package.json')
 const managerPatchPath = join(projectRoot, 'plugins', 'rp-feature-manager', 'cordis.patch.yml')
 const managerManifest = readJson(managerManifestPath)
-const requiredDshRange = managerManifest.dsh?.roleplay?.requiresDsh
-const requiredDshVersion = typeof requiredDshRange === 'string' && requiredDshRange.startsWith('^')
-  ? requiredDshRange.slice(1)
+const requiredDshRequirement = managerManifest.dsh?.roleplay?.requiresDsh
+const requiredDshVersion = typeof requiredDshRequirement === 'string' && /^\d+\.\d+\.\d+-[0-9A-Za-z.-]+$/.test(requiredDshRequirement)
+  ? requiredDshRequirement
   : undefined
 const defaultDevRoot = join(projectRoot, '.dsh-dev')
 const defaultHost = '127.0.0.1'
@@ -139,7 +139,7 @@ function developmentEnvironment() {
 
 function resolveDshBin() {
   if (requiredDshVersion === undefined) {
-    throw new Error(`${relative(projectRoot, managerManifestPath)}: requiresDsh 必须是明确的 caret 版本范围`)
+    throw new Error(`${relative(projectRoot, managerManifestPath)}: requiresDsh 必须固定到明确的 DSH 预发布版本`)
   }
   const manifestPath = join(projectRoot, 'node_modules', '@deepseek-ai', 'dsh', 'package.json')
   if (!existsSync(manifestPath)) {

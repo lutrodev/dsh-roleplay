@@ -161,7 +161,7 @@ test('deletes personas through revision CAS and promotes another default', async
   }
 })
 
-test('browser RPC creates and selects a default without exposing import', async () => {
+test('browser Remote creates and selects a default without exposing import', async () => {
   const created = []
   const personas = {
     config: CONFIG,
@@ -176,7 +176,7 @@ test('browser RPC creates and selects a default without exposing import', async 
   await assert.rejects(dispatchBrowser(personas, 'import', {}), error => error.code === 'INVALID_REQUEST')
 })
 
-test('browser RPC updates an existing persona and returns editable detail', async () => {
+test('browser Remote updates an existing persona and returns editable detail', async () => {
   const id = '00000000-0000-0000-0000-000000000001'
   const calls = []
   const personas = {
@@ -203,12 +203,12 @@ test('rejects invalid and over-limit persona content at the complete limit', asy
   }
 })
 
-test('browser RPC registration is disposed with the plugin fiber', async () => {
+test('browser Remote registration is disposed with the plugin fiber', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-persona-rpc-'))
   const ctx = new Context()
   let handler
   let disposed = false
-  ctx.provide('connection', { rpc: { handle(path, next, options) { assert.equal(path, '/rp-personas'); assert.deepEqual(options, { authority: 'trusted-host' }); handler = next; return () => { disposed = true } } } })
+  ctx.provide('rpRemote', { register(path, next) { assert.equal(path, '/rp-personas'); handler = next; return () => { disposed = true } } })
   try {
     await apply(ctx, configFor(root))
     const response = await handler('list', { limit: 10 })
@@ -242,15 +242,13 @@ test('initialization can be disposed without registering effects on an inactive 
     await gate.promise
     return originalEnsureDefault.call(this)
   }
-  ctx.provide('connection', {
-    rpc: {
-      handle(path, next) {
+  ctx.provide('rpRemote', {
+      register(path, next) {
         assert.equal(path, '/rp-personas')
         handler = next
         registered.resolve()
         return () => { disposed = true }
       },
-    },
   })
   try {
     fiber = ctx.plugin({ name: 'rp-persona-lifecycle-test', apply }, configFor(root, { exposeBrowser: true }))

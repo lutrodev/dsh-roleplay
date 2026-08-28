@@ -3,6 +3,7 @@ import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import { SettingsProvider } from '@deepseek-ai/dsh-settings'
 import * as ManagerPlugin from '../src/index.js'
+import { loaderEntriesFor, matchesLoaderEntry } from '../src/index.js'
 import { DEFAULT_ENABLED_FEATURES, DEFAULT_ENABLED_SKILLS } from '../src/catalog.js'
 
 const DEFAULT_IDENTITY = 'You are an AI agent powered by DeepSeek Harness.'
@@ -28,16 +29,18 @@ class MemorySettings extends SettingsProvider {
   }
 }
 
-function provideSystemPrompt(ctx) {
+function provideSystemPrompt(ctx, rpRemote = { register: () => () => {} }) {
   ctx.provide('systemPrompt', {
     async assemble() {
       return { sections: structuredClone(HARNESS_SECTIONS), contexts: [], tools: [], variables: {} }
     },
   })
+  ctx.provide('rpRemote', rpRemote)
 }
 
 function loaderEntry(id, disabled = false) {
   return {
+    id,
     options: { id, disabled },
     fiber: disabled ? undefined : {},
     get disabled() { return Boolean(this.options.disabled) },
@@ -47,6 +50,67 @@ function loaderEntry(id, disabled = false) {
     },
   }
 }
+
+test('matches managed rows through the namespaced Include tree id', () => {
+  assert.equal(matchesLoaderEntry({ id: 'include:rp-quick-replies', options: { id: 'include:rp-quick-replies' } }, 'rp-quick-replies'), true)
+  assert.equal(matchesLoaderEntry({ id: 'include:rp-quick-replies', options: { id: 'rp-quick-replies' } }, 'rp-quick-replies'), true)
+  assert.equal(matchesLoaderEntry({ id: 'include:not-rp-quick-replies', options: { id: 'other' } }, 'rp-quick-replies'), false)
+})
+
+test('reads sibling entries from the owning Include tree before the root Loader view', () => {
+  const local = loaderEntry('include:rp-quick-replies', true)
+  const root = loaderEntry('root-only')
+  assert.deepEqual(loaderEntriesFor({
+    fiber: { entry: { parent: { tree: { entries: () => [local] } } } },
+    loader: { entries: () => [root, local] },
+  }), [local, root])
+})
+
+test('manager reconciles namespaced Include rows used by current DSH profiles', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  const entry = loaderEntry('include:rp-compact-access-mode', true)
+  ctx.provide('loader', { entries: () => [entry] })
+  try {
+    await ctx.plugin(ManagerPlugin, {
+      enabledFeatures: ['compact-access-mode'],
+      enabledSkills: [],
+    })
+    const manager = ctx.get('rpFeatures')
+    await manager.settled()
+    assert.equal(entry.disabled, false)
+    assert.equal(manager.status().features.find(item => item.id === 'compact-access-mode').active, true)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('manager reasserts settings after the profile patch replaces an active entry', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  const entry = loaderEntry('include:rp-compact-access-mode', true)
+  ctx.provide('loader', { entries: () => [entry] })
+  try {
+    await ctx.plugin(ManagerPlugin, {
+      enabledFeatures: ['compact-access-mode'],
+      enabledSkills: [],
+    })
+    const manager = ctx.get('rpFeatures')
+    await manager.settled()
+    assert.equal(entry.disabled, false)
+
+    const previous = { ...entry.options }
+    entry.options.disabled = true
+    entry.fiber = undefined
+    ctx.emit('loader/partial-dispose', entry, previous, true)
+    await manager.settled()
+
+    assert.equal(entry.disabled, false)
+    assert.equal(entry.fiber !== undefined, true)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
 
 test('manager reconciles independently selectable Host entries from one validated selection', async () => {
   const ctx = new Context()
@@ -77,7 +141,7 @@ test('manager reconciles independently selectable Host entries from one validate
     assert.deepEqual(manager.guidanceSkills().map(item => item.skillName), ['rp-guide-lorebook'])
     assert.deepEqual(
       manager.status().core.find(item => item.label === '会话总结'),
-      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.6', versionCompatible: true },
+      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.7', versionCompatible: true },
     )
     assert.equal(manager.status().core.some(item => item.label === '会话变量'), false)
     assert.equal(manager.status().features.find(item => item.id === 'state').active, false)
@@ -199,21 +263,18 @@ test('manager publishes its enabled selection through the shared settings namesp
   }
 })
 
-test('browser API follows the DSH trusted-host boundary and persists Roleplay settings remotely', async () => {
+test('browser API follows the typed Remote boundary and persists Roleplay settings remotely', async () => {
   const ctx = new Context()
-  provideSystemPrompt(ctx)
-  ctx.provide('loader', { entries: () => [], async await() {} })
   let handler
   let route
-  ctx.provide('connection', {
-    rpc: {
-      handle(path, next, options) {
+  provideSystemPrompt(ctx, {
+      register(path, next) {
         handler = next
-        route = { path, options }
+        route = { path }
         return () => {}
       },
-    },
   })
+  ctx.provide('loader', { entries: () => [], async await() {} })
   try {
     await ctx.plugin(MemorySettings)
     await ctx.plugin(ManagerPlugin, {
@@ -221,7 +282,7 @@ test('browser API follows the DSH trusted-host boundary and persists Roleplay se
       enabledSkills: ['rp-guide-lorebook'],
     })
     await ctx.get('rpFeatures').settled()
-    assert.deepEqual(route, { path: '/rp-features', options: { authority: 'trusted-host' } })
+    assert.deepEqual(route, { path: '/rp-features' })
 
     const initial = await handler('status', {})
     assert.deepEqual(initial.value.value.settings, { writable: true, revision: 0 })

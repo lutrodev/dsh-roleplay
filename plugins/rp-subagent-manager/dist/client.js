@@ -9873,12 +9873,18 @@ get: (_target, key) => {
 			if (route?.kind !== "fixed") return "跟随父代理";
 			for (const group of groups) {
 				const model = group.models?.find((item) => item.id === route.model);
-				if (group.id === route.provider && model !== void 0) return `${group.name} · ${model.name}`;
+				if (group.id === route.provider && model !== void 0) {
+					const effort = model.reasoning?.efforts?.find((item) => item.id === route.reasoningEffort);
+					return `${group.name} · ${model.name}${route.reasoningEffort === void 0 ? "" : ` · ${effort?.name ?? route.reasoningEffort}`}`;
+				}
 			}
-			return `${route.provider} · ${route.model}`;
+			return `${route.provider} · ${route.model}${route.reasoningEffort === void 0 ? "" : ` · ${route.reasoningEffort}`}`;
 		}
 		function routeAvailable(route, groups = []) {
-			return route?.kind !== "fixed" || groups.some((group) => group.id === route.provider && group.models?.some((model) => model.id === route.model));
+			if (route?.kind !== "fixed") return true;
+			const model = groups.find((group) => group.id === route.provider)?.models?.find((item) => item.id === route.model);
+			if (model === void 0) return false;
+			return route.reasoningEffort === void 0 || model.reasoning?.efforts?.some((effort) => effort.id === route.reasoningEffort) === true;
 		}
 		function emptySubagentDraft() {
 			return {
@@ -9927,7 +9933,7 @@ get: (_target, key) => {
 			return "暂时无法保存配置，请检查填写内容后重试。";
 		}
 		async function rpc(connection, endpoint, payload) {
-			const response = await connection.rpc.call("/rp-subagents", endpoint, payload);
+			const response = await connection.call("/rp-subagents", endpoint, payload);
 			const domain = response?.ok === true && response.value?.ok !== void 0 ? response.value : response;
 			if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? "请求失败"), { code: domain?.error?.code });
 			return domain.value;
@@ -10005,7 +10011,12 @@ get: (_target, key) => {
 		}
 		//#endregion
 		//#region src/client.js
-		const inject = ["slots", "connection"];
+		const inject = [
+			"slots",
+			"rpRemote",
+			"remote",
+			"remote.session"
+		];
 		const h = react.default.createElement;
 		const transition = {
 			duration: .18,
@@ -10070,12 +10081,15 @@ get: (_target, key) => {
 				name: "sidebar.footer.action",
 				id: "rp-subagents-navigation",
 				order: 0,
-				inject: () => ({ connection: ctx.connection })
+				inject: () => ({
+					connection: ctx.rpRemote,
+					modelCatalog: ctx.remote.session
+				})
 			}, SubagentManagerEntry));
 			ctx.slots.inject("tool.call.toolview", () => ctx.slots.register({
 				name: "tool.call.toolview",
 				key: RP_SUBAGENT_TOOL,
-				inject: () => ({ connection: ctx.connection })
+				inject: () => ({ connection: ctx.rpRemote })
 			}, SubagentToolView));
 		}
 		function SubagentToolView({ block, connection, inspect }) {
@@ -10207,7 +10221,7 @@ get: (_target, key) => {
 			const text = content.map((block) => block?.type === "text" && typeof block.text === "string" ? block.text : JSON.stringify(block, null, 2)).join("\n").trim();
 			return text.length > 0 ? text : null;
 		}
-		function SubagentManagerEntry({ wide, connection }) {
+		function SubagentManagerEntry({ wide, connection, modelCatalog }) {
 			const [open, setOpen] = (0, react.useState)(false);
 			return h(MotionConfig, {
 				reducedMotion: "user",
@@ -10226,10 +10240,11 @@ get: (_target, key) => {
 			}, h(IconSubagentRobotOutline16, { size: wide ? 16 : 18 }), wide ? h("span", { className: css.triggerLabel }, "子代理") : null), h(SubagentManagerModal, {
 				open,
 				onClose: () => setOpen(false),
-				connection
+				connection,
+				modelCatalog
 			}))));
 		}
-		function SubagentManagerModal({ open, onClose, connection }) {
+		function SubagentManagerModal({ open, onClose, connection, modelCatalog }) {
 			const reduced = useReducedMotion();
 			const [catalog, setCatalog] = (0, react.useState)(null);
 			const [models, setModels] = (0, react.useState)({
@@ -10261,7 +10276,7 @@ get: (_target, key) => {
 			const loadModels = async () => {
 				setModelLoadFailed(false);
 				try {
-					setModels(modelCatalogValue(await connection.api.llm.models({})));
+					setModels(modelCatalogValue(await modelCatalog.modelCatalog()));
 				} catch {
 					setModelLoadFailed(true);
 					setModels({
@@ -10280,7 +10295,11 @@ get: (_target, key) => {
 				setError(null);
 				reload();
 				loadModels();
-			}, [connection, open]);
+			}, [
+				connection,
+				modelCatalog,
+				open
+			]);
 			const editWriter = () => {
 				if (catalog === null) return;
 				setWriterDraft({
@@ -10695,12 +10714,18 @@ get: (_target, key) => {
 		function ModelField({ route, onChange, models, modelLoadFailed }) {
 			const key = routeKey(route);
 			const available = routeAvailable(route, models.groups);
+			const selectedModel = route.kind === "fixed" ? models.groups.find((group) => group.id === route.provider)?.models?.find((model) => model.id === route.model) : void 0;
+			const efforts = selectedModel?.reasoning?.efforts ?? [];
+			const defaultEffort = selectedModel?.reasoning?.defaultEffort;
+			const explicitEffort = typeof route.reasoningEffort === "string" ? route.reasoningEffort : "";
+			const effortAvailable = explicitEffort === "" || efforts.some((effort) => effort.id === explicitEffort);
+			const defaultEffortName = efforts.find((effort) => effort.id === defaultEffort)?.name;
 			const failures = models.failures ?? [];
-			return h("label", { className: css.field }, h("span", null, "模型"), h("small", null, "跟随父代理会使用当前对话的模型，并继承其显式输出上限。"), h("select", {
+			return h(react.default.Fragment, null, h("label", { className: css.field }, h("span", null, "模型"), h("small", null, "跟随父代理会使用当前对话的完整模型路由，包括已显式选择的推理强度与输出上限。"), h("select", {
 				value: key,
 				onChange: (event) => onChange(routeFromKey(event.target.value)),
 				"aria-label": "子代理模型"
-			}, h("option", { value: "inherit" }, "跟随父代理"), !available && route.kind === "fixed" ? h("option", {
+			}, h("option", { value: "inherit" }, "跟随父代理"), !available && route.kind === "fixed" && selectedModel === void 0 ? h("option", {
 				value: key,
 				disabled: true
 			}, `${route.provider} · ${route.model}（当前不可用）`) : null, ...models.groups.map((group) => h("optgroup", {
@@ -10709,7 +10734,7 @@ get: (_target, key) => {
 			}, ...group.models.map((model) => h("option", {
 				key: model.id,
 				value: JSON.stringify([group.id, model.id])
-			}, model.name))))), !available && route.kind === "fixed" ? h("span", {
+			}, model.name))))), !available && route.kind === "fixed" && selectedModel === void 0 ? h("span", {
 				className: css.fieldWarning,
 				role: "status"
 			}, "已保存的模型当前不在可用目录中。请选择其他模型或改为跟随父代理后再保存。") : null, modelLoadFailed ? h("span", {
@@ -10718,7 +10743,25 @@ get: (_target, key) => {
 			}, "模型目录暂时无法读取。稍后重新打开即可重试。") : null, ...failures.map((failure) => h("span", {
 				className: css.catalogFailure,
 				key: failure.id
-			}, `${failure.name} 的模型目录暂时不可用，其他提供方仍可选择。`)));
+			}, `${failure.name} 的模型目录暂时不可用，其他提供方仍可选择。`))), route.kind !== "fixed" || selectedModel === void 0 || efforts.length === 0 ? null : h("label", { className: css.field }, h("span", null, "推理强度"), h("small", null, "不显式指定时使用该模型的默认推理强度；切换模型会自动恢复默认。"), h("select", {
+				value: explicitEffort,
+				onChange: (event) => onChange({
+					kind: "fixed",
+					provider: route.provider,
+					model: route.model,
+					...event.target.value === "" ? {} : { reasoningEffort: event.target.value }
+				}),
+				"aria-label": "子代理推理强度"
+			}, h("option", { value: "" }, defaultEffortName === void 0 ? "使用模型默认值" : `使用模型默认值（${defaultEffortName}）`), !effortAvailable ? h("option", {
+				value: explicitEffort,
+				disabled: true
+			}, `${explicitEffort}（当前不可用）`) : null, ...efforts.map((effort) => h("option", {
+				key: effort.id,
+				value: effort.id
+			}, effort.name))), !effortAvailable ? h("span", {
+				className: css.fieldWarning,
+				role: "status"
+			}, "已保存的推理强度不再受此模型支持。请选择其他强度或使用模型默认值。") : null));
 		}
 		function DeleteSubagentDialog({ target, pending, error, onCancel, onConfirm }) {
 			return h(_deepseek_ai_dsh_client_ui_primitives.Modal, {

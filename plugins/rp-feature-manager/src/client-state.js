@@ -67,7 +67,7 @@ export async function unsetRoleplaySetting(connection, field, expectedRevision) 
 }
 
 async function roleplayFeatureRequest(connection, endpoint, fallbackMessage, payload = {}) {
-  const response = await connection.rpc.call('/rp-features', endpoint, payload)
+  const response = await connection.call('/rp-features', endpoint, payload)
   const domain = response?.ok === true && response.value?.ok !== undefined ? response.value : response
   if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? fallbackMessage), { code: domain?.error?.code })
   return domain.value

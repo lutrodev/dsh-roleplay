@@ -21,7 +21,7 @@ import { ContentTransition, IconCharacterCardOutline16, useWorkbenchModal, Workb
 import { MAX_OPENING_CHARACTERS, RP_SESSION_APPLY_COMMAND } from 'dsh-roleplay-rp-session/protocol'
 import { roleplayRunMarkerDefinition, RpRunMarker } from './run-marker.js'
 
-export const inject = ['slots', 'connection', 'conversation', 'conversationEvents', 'sessions', 'workspaces']
+export const inject = ['slots', 'rpRemote', 'conversation', 'uiConversation', 'sessions', 'workspaces']
 const h = React.createElement
 const motionTransition = { duration: 0.18, ease: [0.2, 0, 0, 1] }
 const exitTransition = { duration: 0.14, ease: [0.4, 0, 1, 1] }
@@ -33,13 +33,13 @@ const FINISH_RESOURCE_SELECTION = '__rp-finish-resource-selection__'
 const STATE_ACTIVITY_PROJECTION_KEY = 'rp/state/activity'
 export function apply(ctx) {
   ctx.effect(ensureStyles)
-  ctx.conversationEvents.register(roleplayRunMarkerDefinition)
+  ctx.uiConversation.events.register(roleplayRunMarkerDefinition)
   const assetEditors = new AssetEditorRegistry()
   ctx.effect(() => {
     const dispose = ctx.reflect.provide('rpAssetEditors', assetEditors)
     return () => { void dispose() }
   }, 'rp-library: canonical asset editor registry')
-  const injectUi = () => ({ connection: ctx.connection, blocks: ctx.conversation.blocks, sessions: ctx.sessions, workspaces: ctx.workspaces })
+  const injectUi = () => ({ connection: ctx.rpRemote, blocks: ctx.conversation.blocks, sessions: ctx.sessions, workspaces: ctx.workspaces })
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action', id: 'rp-assets-navigation', order: 10,
     children: {
@@ -1417,7 +1417,7 @@ async function rpc(connection, endpoint, payload) {
       : endpoint.startsWith('presets/') ? '/rp-presets'
         : endpoint.startsWith('writing-styles/') ? '/rp-writing-styles' : '/rp-assets'
   const operation = endpoint.includes('/') && route !== '/rp-assets' ? endpoint.slice(endpoint.indexOf('/') + 1) : endpoint
-  return domainValue(await connection.rpc.call(route, operation, payload))
+  return domainValue(await connection.call(route, operation, payload))
 }
 async function waitForListedSession(sessions, sessionId) {
   for (let attempt = 0; attempt < 40; attempt += 1) {

@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-state",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Schema-owned event-sourced state for roleplay agents",
   "license": "MIT",
   "private": true,
@@ -36,9 +36,9 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-commands": "^0.1.1-rc.2",
-    "@deepseek-ai/dsh-session-projection": "^0.1.1-rc.2",
-    "@deepseek-ai/dsh-tools": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-commands": "^0.1.2-alpha.1",
+    "@deepseek-ai/dsh-session-projection": "^0.1.2-alpha.1",
+    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.1",
     "dsh-roleplay-rp-core": "^0.1.0",
     "dsh-roleplay-rp-session": "^0.1.0"
   },
@@ -52,9 +52,9 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
-    "@deepseek-ai/dsh-commands": "0.1.1-rc.2",
-    "@deepseek-ai/dsh-session-projection": "0.1.1-rc.2",
-    "@deepseek-ai/dsh-tools": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-commands": "0.1.2-alpha.1",
+    "@deepseek-ai/dsh-session-projection": "0.1.2-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.1.2-alpha.1",
     "dsh-roleplay-rp-core": "workspace:^",
     "dsh-roleplay-rp-session": "workspace:^"
   },

@@ -1,16 +1,17 @@
 {
   "name": "dsh-roleplay-rp-ui",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Shared browser UI utilities for dsh-roleplay plugins",
   "license": "MIT",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.js",
-    "./json-patch": "./src/json-patch.js"
+    "./json-patch": "./src/json-patch.js",
+    "./session-summary": "./src/session-summary.js"
   },
   "scripts": {
-    "check": "node --check src/index.js && node --check src/json-patch.js",
+    "check": "node --check src/index.js && node --check src/json-patch.js && node --check src/session-summary.js",
     "test": "node --test",
     "verify": "pnpm run check && pnpm test"
   },

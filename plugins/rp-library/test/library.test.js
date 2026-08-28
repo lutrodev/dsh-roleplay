@@ -187,7 +187,7 @@ test('roleplay bootstrap requires a source session before creating an Agent', as
 test('host coordinator activates without optional asset providers', async () => {
   const ctx = new Context()
   let route
-  ctx.provide('connection', { rpc: { handle(path, _handler, options) { route = { path, options }; return () => {} } } })
+  ctx.provide('rpRemote', { register(path, _handler) { route = { path }; return () => {} } })
   ctx.provide('typert', { lookups: { get: () => undefined } })
   ctx.provide('agentPresets', {})
   ctx.provide('agents', {})
@@ -196,7 +196,7 @@ test('host coordinator activates without optional asset providers', async () => 
   ctx.provide('workspaceRegistry', {})
   try {
     await ctx.plugin(Library, {})
-    assert.deepEqual(route, { path: '/rp-assets', options: { authority: 'trusted-host' } })
+    assert.deepEqual(route, { path: '/rp-assets' })
     assert.ok(ctx.get('rpSessionBootstrap'))
   } finally {
     await ctx.fiber.dispose()
@@ -590,8 +590,8 @@ function resetFixture({ phase = 'blank', workspace = true, reusable = true } = {
   const calls = []
   let composerPhase = phase
   const byId = {
-    'rp-session': { id: 'rp-session', agentPreset: 'roleplay', blank: true, cwd: '/workspace/roleplay' },
-    ...(reusable ? { 'source-session': { id: 'source-session', agentPreset: 'default', blank: true, cwd: '/workspace/roleplay' } } : {}),
+    'rp-session': { id: 'rp-session', projectionValues: { agentPreset: 'roleplay' }, blank: true, cwd: '/workspace/roleplay' },
+    ...(reusable ? { 'source-session': { id: 'source-session', projectionValues: { agentPreset: 'default' }, blank: true, cwd: '/workspace/roleplay' } } : {}),
   }
   const sessions = {
     list: { getSnapshot: () => ({ current: 'rp-session', ids: Object.keys(byId), byId }) },
@@ -762,7 +762,7 @@ test('资料导航、会话 Wiki 与 Prompt 入口清晰分工且不泄漏内部
   assert.doesNotMatch(client, /sourceSectionLabel|>事实源<|'事实源'/)
   assert.match(client, /name: 'conversation\.input\.left', id: 'rp-session-context'/)
   assert.match(client, /name: 'conversation\.session\.header\.utilities', id: 'rp-story-library'/)
-  assert.match(client, /export const inject = \['slots', 'connection', 'conversation', 'conversationEvents', 'sessions', 'workspaces'\]/)
+  assert.match(client, /export const inject = \['slots', 'rpRemote', 'conversation', 'uiConversation', 'sessions', 'workspaces'\]/)
   assert.match(client, /workspaces: ctx\.workspaces/)
   assert.doesNotMatch(client, /id: 'rp-story-create'|function RpStoryCreator|css\.storyCreate/)
   assert.match(client, /h\(SetupPrompt, \{ onClick: \(\) => setOpen\(true\), mode: 'setup' \}\)/)
@@ -812,7 +812,7 @@ test('资料导航、会话 Wiki 与 Prompt 入口清晰分工且不泄漏内部
   assert.doesNotMatch(client, /\$\{error\.code|data\.failure\.code|item\.error/)
   assert.doesNotMatch(client, /function RpSessionContextControl\(props\)[\s\S]{0,180}blocks/)
   assert.doesNotMatch(client, /本轮已完成|故事回复|referenceCount|data\.contexts/)
-  assert.match(client, /conversationEvents\.register\(roleplayRunMarkerDefinition\)/)
+  assert.match(client, /uiConversation\.events\.register\(roleplayRunMarkerDefinition\)/)
   assert.match(client, /name: 'conversation\.chat\.node', key: 'rp-run-marker'/)
   assert.doesNotMatch(client, /runNodeNarrative|streaming-narrative/)
   assert.match(styles, /\[data-chat-flow-kind="rp-run-marker"\] \{ display: none; \}/)
@@ -1122,13 +1122,23 @@ test('故事开场不再由资料库插件重复渲染或接管消息操作', as
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
   const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
   assert.doesNotMatch(client, /openingNodeDefinition|RpOpeningNode|rp-opening|session\/opening|useAutoSizeTextarea/)
-  assert.match(client, /conversationEvents\.register\(roleplayRunMarkerDefinition\)/)
+  assert.match(client, /uiConversation\.events\.register\(roleplayRunMarkerDefinition\)/)
   assert.doesNotMatch(client, /runNodeNarrative|streaming-narrative/)
   assert.doesNotMatch(styles, /\.openingMessage|\.openingAvatarSeat|\.narrativeBody/)
 })
 
+test('Roleplay 会话正文隐藏 Harness 系统提示词但不影响普通会话', async () => {
+  const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
+  assert.match(styles,
+    /\[data-chat-flow\]:has\(\[data-chat-flow-kind="rp-run-marker"\]\)\s*> \[data-chat-flow-kind="system-prompt"\] \{ display: none; \}/)
+  assert.doesNotMatch(styles, /^\[data-chat-flow-kind="system-prompt"\] \{ display: none; \}$/m)
+})
+
 test('Roleplay UI 只跟随当前会话的 roleplay preset', () => {
-  const roleplay = { current: 'rp', byId: { rp: { agentPreset: 'roleplay' }, standard: { agentPreset: 'standard' } } }
+  const roleplay = { current: 'rp', byId: {
+    rp: { projectionValues: { agentPreset: 'roleplay' } },
+    standard: { projectionValues: { agentPreset: 'standard' } },
+  } }
   assert.equal(isRoleplaySummary(roleplay, 'rp'), true)
   assert.equal(isRoleplaySummary({ ...roleplay, current: 'standard' }, 'rp'), false)
   assert.equal(isRoleplaySummary({ ...roleplay, current: 'standard' }, 'standard'), false)

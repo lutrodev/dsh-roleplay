@@ -4,7 +4,7 @@ import { deleteCharacter, previewCharacterDeletion, withCharacterLifecycle } fro
 import { createRoleplaySession, RpSessionBootstrap } from './session-bootstrap.js'
 
 export const name = 'rp-library'
-export const inject = ['connection', 'typert', 'agentPresets', 'agents', 'sessions', 'sessionPersistence', 'workspaceRegistry']
+export const inject = ['rpRemote', 'typert', 'agentPresets', 'agents', 'sessions', 'sessionPersistence', 'workspaceRegistry']
 export const Config = Schema.object({
   agentPreset: Schema.string().default('roleplay'),
   defaultMode: Schema.union(['adaptive', 'actor', 'director']).default('adaptive'),
@@ -25,15 +25,15 @@ const ENDPOINTS = new Set([
 
 export function apply(ctx, config) {
   new RpSessionBootstrap(ctx)
-  const dispose = ctx.connection.rpc.handle('/rp-assets', async (endpoint, payload, signal) => {
+  const dispose = ctx.rpRemote.register('/rp-assets', async (endpoint, payload, signal) => {
     if (!ENDPOINTS.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown RP asset endpoint: ${endpoint}`))
     try {
       return transportSuccess(success(await dispatch(ctx, endpoint, payload, signal, config)))
     } catch (error) {
       return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error)))
     }
-  }, { authority: 'trusted-host' })
-  ctx.effect(() => dispose, 'rp-library: /rp-assets RPC')
+  })
+  ctx.effect(() => dispose, 'rp-library: /rp-assets Remote')
 }
 
 export async function dispatch(ctx, endpoint, payload, signal, config = defaultConfig()) {

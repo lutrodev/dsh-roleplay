@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-compact-access-mode",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Icon-only access mode trigger in the compact Harness composer",
   "license": "MIT",
   "private": true,
@@ -28,9 +28,7 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "inject": [
-        "@deepseek-ai/dsh-client-ui-conversation"
-      ],
+      "inject": [],
       "platform": "web"
     }
   },
@@ -38,12 +36,10 @@
     "@deepseek-ai/schemastery": "^3.18.1"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.1-rc.2"
+    "@deepseek-ai/cordis": "^4.0.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
-    "@deepseek-ai/dsh-client-ui-conversation": "0.1.1-rc.2",
     "tsdown": "0.22.2"
   },
   "engines": {

@@ -165,12 +165,12 @@ export const roleplayRunMarkerDefinition = {
 }
 
 /** Invisible renderer that scopes orphan-open trajectory cleanup to one Turn. */
-export function RpRunMarker({ node, useSession }) {
+export function RpRunMarker({ node, useSession, useChat }) {
   const markerRef = useRef(null)
   const running = useSession(snapshot => snapshot.running)
-  const timeline = useSession(snapshot => snapshot.chat.timeline)
-  const locationKeys = useSession(snapshot => snapshot.chat.locations.getTurn(node.data.turn))
-  const nodeStore = useSession(snapshot => snapshot.chat.nodes)
+  const timeline = useChat(snapshot => snapshot.timeline)
+  const locationKeys = useChat(snapshot => snapshot.locations.getTurn(node.data.turn))
+  const nodeStore = useChat(snapshot => snapshot.nodes)
   const activity = roleplayRunActivity({ running, timeline, turn: node.data.turn })
   const plan = useMemo(() => {
     if (!activity.inactiveOpen) return { hiddenKeys: [], reasoningKeys: [] }
@@ -192,4 +192,3 @@ export function RpRunMarker({ node, useSession }) {
     'data-rp-run-status': activity.status,
   })
 }
-

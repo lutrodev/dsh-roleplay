@@ -1,5 +1,6 @@
 import React, { useId, useState } from 'react'
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from 'motion/react'
+import { isRoleplaySessionSummary } from 'dsh-roleplay-rp-ui/session-summary'
 import {
   IconChevronDownOutline14,
   IconDataOutline16,
@@ -24,14 +25,14 @@ import {
 } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
-export const inject = ['slots', 'conversationEvents']
+export const inject = ['slots', 'uiConversation']
 const h = React.createElement
 const motionTransition = { duration: 0.16, ease: [0.2, 0, 0, 1] }
 
 export function apply(ctx) {
   ctx.effect(ensureStyles)
-  ctx.conversationEvents.register(stateDisplayAnchorNodeDefinition)
-  ctx.conversationEvents.register(stateDisplayRetractionNodeDefinition)
+  ctx.uiConversation.events.register(stateDisplayAnchorNodeDefinition)
+  ctx.uiConversation.events.register(stateDisplayRetractionNodeDefinition)
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: STATE_DISPLAY_ANCHOR_KIND,
@@ -43,10 +44,12 @@ export function apply(ctx) {
 }
 
 /** Render the live card only at the latest successful assistant reply. */
-export function StateDisplayAnchor({ node, sessionId, useSession, useSessions, useProjection }) {
-  const activeKey = useSession(snapshot => latestStateDisplayAnchorKey(snapshot.chat))
-  const roleplay = useSessions(state => state.byId?.[sessionId]?.agentPreset === 'roleplay'
-    && state.byId?.[sessionId]?.origin !== 'subagent')
+export function StateDisplayAnchor({ node, sessionId, useChat, useSessions, useProjection }) {
+  const activeKey = useChat(latestStateDisplayAnchorKey)
+  const roleplay = useSessions(state => {
+    const summary = state.byId?.[sessionId]
+    return isRoleplaySessionSummary(summary) && summary.origin !== 'subagent'
+  })
   if (!roleplay || activeKey !== node.key) return h(HiddenMarker)
   return h(StateVariableCard, { useProjection })
 }

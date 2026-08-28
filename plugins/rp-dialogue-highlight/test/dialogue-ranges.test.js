@@ -142,17 +142,19 @@ test('keeps styles, projection, and node registration active until unload', () =
     effect(execute) {
       effectCleanups.push(execute())
     },
-    conversationEvents: {
-      register() {
-        projectionRegistrations += 1
-        let disposed = false
-        const dispose = () => {
-          if (disposed) return
-          disposed = true
-          projectionRegistrations -= 1
-        }
-        effectCleanups.push(dispose)
-        return dispose
+    uiConversation: {
+      events: {
+        register() {
+          projectionRegistrations += 1
+          let disposed = false
+          const dispose = () => {
+            if (disposed) return
+            disposed = true
+            projectionRegistrations -= 1
+          }
+          effectCleanups.push(dispose)
+          return dispose
+        },
       },
     },
     slots: {
@@ -198,7 +200,7 @@ test('client entry mounts from a public streaming conversation node', async () =
   const source = await fs.readFile(new URL('../src/client.js', import.meta.url), 'utf8')
   const styles = await fs.readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
   assert.match(source, /conversation\.chat\.node/)
-  assert.match(source, /conversationEvents\.register/)
+  assert.match(source, /uiConversation\.events\.register/)
   assert.match(source, /slots\.inject/)
   assert.match(source, /slots\.register/)
   assert.match(source, /mountDialogueHighlight/)

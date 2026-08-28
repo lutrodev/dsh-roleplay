@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 
-const CATALOG_VERSION = 3
+const CATALOG_VERSION = 4
 const CATALOG_FILE = 'catalog.json'
 const WRITER_ID = 'writer'
 const MANAGED_TOOLS = Object.freeze(['web_search', 'skill'])
@@ -18,6 +18,7 @@ const INITIAL_SUBAGENT_CONFIG = Schema.object({
     kind: Schema.union(['inherit', 'fixed']).required(),
     provider: Schema.string(),
     model: Schema.string(),
+    reasoningEffort: Schema.string(),
   }).required(),
   tools: Schema.array(Schema.union(MANAGED_TOOLS)).default([]),
 })
@@ -224,14 +225,14 @@ export async function apply(ctx, config) {
     },
   }))
   if (config.exposeBrowser !== false) {
-    ctx.inject(['connection'], browserCtx => registerBrowser(browserCtx, manager, ready))
+    ctx.inject(['rpRemote'], browserCtx => registerBrowser(browserCtx, manager, ready))
   }
   await ready
 }
 
 function registerBrowser(ctx, manager, ready) {
   const endpoints = new Set(['list', 'get', 'create', 'update', 'delete', 'set-enabled', 'writer/update'])
-  const dispose = ctx.connection.rpc.handle('/rp-subagents', async (endpoint, payload, signal) => {
+  const dispose = ctx.rpRemote.register('/rp-subagents', async (endpoint, payload, signal) => {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown subagent endpoint: ${endpoint}`))
     try {
       await ready
@@ -239,8 +240,8 @@ function registerBrowser(ctx, manager, ready) {
     } catch (error) {
       return transportSuccess(failure(codeFor(error), error instanceof Error ? error.message : String(error)))
     }
-  }, { authority: 'trusted-host' })
-  ctx.effect(() => dispose, 'rp-subagent-manager: /rp-subagents RPC')
+  })
+  ctx.effect(() => dispose, 'rp-subagent-manager: /rp-subagents Remote')
 }
 
 export async function dispatchBrowser(manager, endpoint, payload, signal) {
@@ -293,7 +294,7 @@ function normalizeStoredCatalog(value, config) {
   if (!objectLike(value) || !objectLike(value.writer)) {
     throw coded('ASSET_CORRUPT', 'Subagent catalog shape is invalid.')
   }
-  const storedSubagents = (value.version === CATALOG_VERSION || value.version === 2) && Array.isArray(value.subagents)
+  const storedSubagents = ([CATALOG_VERSION, 3, 2].includes(value.version)) && Array.isArray(value.subagents)
     ? value.subagents
     : value.version === 1 && Array.isArray(value.roles)
       ? value.roles
@@ -363,8 +364,11 @@ function normalizeRoute(value, code = 'INVALID_REQUEST') {
   if (value.kind !== 'fixed') throw coded(code, 'Model route kind must be inherit or fixed.')
   const provider = requiredText(value.provider, 'provider', 256, code)
   const model = requiredText(value.model, 'model', 256, code)
-  if (Object.keys(value).some(key => !['kind', 'provider', 'model'].includes(key))) throw coded(code, 'Fixed model route contains unsupported fields.')
-  return { kind: 'fixed', provider, model }
+  const reasoningEffort = value.reasoningEffort === undefined
+    ? undefined
+    : requiredText(value.reasoningEffort, 'reasoningEffort', 256, code)
+  if (Object.keys(value).some(key => !['kind', 'provider', 'model', 'reasoningEffort'].includes(key))) throw coded(code, 'Fixed model route contains unsupported fields.')
+  return { kind: 'fixed', provider, model, ...(reasoningEffort === undefined ? {} : { reasoningEffort }) }
 }
 
 function normalizeTools(value, code) {
@@ -388,12 +392,19 @@ async function validateRouteModel(ctx, route, signal) {
   try {
     const resolved = await llm.resolveModelInfo(route.provider, route.model, signal)
     if (resolved.provider !== route.provider || resolved.id !== route.model) throw new Error('resolved model identity differs')
+    if (route.reasoningEffort !== undefined && resolved.reasoning?.efforts?.some(effort => effort.id === route.reasoningEffort) !== true) {
+      throw new Error(`reasoning effort ${route.reasoningEffort} is not advertised`)
+    }
   } catch (error) {
     throw coded('MODEL_UNAVAILABLE', `Model ${route.provider}/${route.model} is unavailable.`, error)
   }
 }
 
-function fixedRoute(route) { return route.kind === 'fixed' ? { provider: route.provider, model: route.model } : undefined }
+function fixedRoute(route) {
+  return route.kind === 'fixed'
+    ? { provider: route.provider, model: route.model, ...(route.reasoningEffort === undefined ? {} : { reasoningEffort: route.reasoningEffort }) }
+    : undefined
+}
 function writerView(writer) { return { id: WRITER_ID, fixed: true, revision: writer.revision, route: writer.route } }
 function assertUniqueName(subagents, name, ignoreId) { const key = nameKey(name); if (subagents.some(subagent => subagent.id !== ignoreId && nameKey(subagent.name) === key)) throw coded('NAME_CONFLICT', `Task subagent name ${name} is already in use.`) }
 function nameKey(value) { return value.normalize('NFKC').toLocaleLowerCase('en-US') }

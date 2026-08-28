@@ -44,7 +44,7 @@ afterEach(cleanup)
 
 const NOW = '2026-08-21T00:00:00.000Z'
 const baseCatalog = {
-  version: 3,
+  version: 4,
   writer: { id: 'writer', fixed: true, revision: 1, route: { kind: 'inherit' } },
   subagents: [{
     id: '11111111-1111-4111-8111-111111111111', revision: 1, name: '事实核对',
@@ -54,7 +54,13 @@ const baseCatalog = {
   limits: { subagents: 32, name: 80, description: 240, instructions: 20000 },
 }
 const models = {
-  groups: [{ id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-5', name: 'GPT-5' }] }],
+  groups: [{ id: 'openai', name: 'OpenAI', models: [{
+    id: 'gpt-5', name: 'GPT-5',
+    reasoning: {
+      defaultEffort: 'medium',
+      efforts: [{ id: 'low', name: '低' }, { id: 'medium', name: '中' }, { id: 'high', name: '高' }],
+    },
+  }] }],
   failures: [{ id: 'broken', name: '暂不可用提供方', message: 'internal details must stay hidden' }],
 }
 
@@ -63,8 +69,8 @@ function connection({ catalog = baseCatalog, handler } = {}) {
   const calls = []
   return {
     calls,
-    api: { llm: { models: vi.fn(async () => ({ result: { ok: true, value: models } })) } },
-    rpc: { call: vi.fn(async (_route, endpoint, payload) => {
+    modelCatalog: { modelCatalog: vi.fn(async () => ({ ok: true, value: models })) },
+    call: vi.fn(async (_route, endpoint, payload) => {
       calls.push({ endpoint, payload })
       if (handler !== undefined) {
         const result = await handler(endpoint, payload)
@@ -74,7 +80,7 @@ function connection({ catalog = baseCatalog, handler } = {}) {
       if (endpoint === 'get') return ok(catalog.subagents.find(item => item.id === payload.id))
       if (endpoint === 'delete') return ok({ id: payload.id })
       return ok({})
-    }) },
+    }),
   }
 }
 
@@ -82,7 +88,8 @@ describe('全局子代理管理界面', () => {
   it('注册侧栏入口和语义化子代理工具行', () => {
     const registrations = []
     const ctx = {
-      connection: {},
+      rpRemote: {},
+      remote: { session: {} },
       effect: vi.fn(),
       slots: {
         inject: vi.fn((_name, setup) => setup()),
@@ -116,7 +123,7 @@ describe('全局子代理管理界面', () => {
     expect(screen.getByText('当次事实核对')).toBeTruthy()
     expect(document.body.textContent).not.toContain('rp_run_subagent')
     expect(document.body.textContent).not.toContain(id)
-    expect(c.rpc.call).not.toHaveBeenCalled()
+    expect(c.call).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: /子代理当次事实核对/ }))
     expect(screen.getByText('检查门锁状态')).toBeTruthy()
     expect(screen.getByText('门锁状态前后一致。')).toBeTruthy()
@@ -190,7 +197,7 @@ describe('全局子代理管理界面', () => {
 
   it('固定展示 Writer、任务子代理能力与 provider 局部目录失败', async () => {
     const c = connection()
-    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c }))
+    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c, modelCatalog: c.modelCatalog }))
     expect(await screen.findByRole('button', { name: '编辑Writer' })).toBeTruthy()
     expect(document.querySelector('[data-icon="subagent-robot"]')).toBeTruthy()
     expect(screen.getByText('固定')).toBeTruthy()
@@ -206,7 +213,7 @@ describe('全局子代理管理界面', () => {
     const c = connection({ handler: (endpoint, payload) => endpoint === 'set-enabled'
       ? ok({ ...baseCatalog.subagents[0], enabled: payload.enabled, revision: 2 })
       : undefined })
-    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c }))
+    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c, modelCatalog: c.modelCatalog }))
     const toggle = await screen.findByRole('switch', { name: '停用事实核对' })
     expect(toggle.getAttribute('aria-checked')).toBe('true')
     expect(screen.getByText('固定 Writer + 1 个独立任务子代理，其中 1 个已启用')).toBeTruthy()
@@ -222,20 +229,25 @@ describe('全局子代理管理界面', () => {
 
   it('Writer 编辑页只允许选择模型并保留固定职责说明', async () => {
     const c = connection()
-    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c }))
+    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c, modelCatalog: c.modelCatalog }))
     fireEvent.click(await screen.findByRole('button', { name: '编辑Writer' }))
     expect(screen.getByText('Writer 的职责与上下文由 Roleplay 固定')).toBeTruthy()
     expect(screen.getByText('用户子代理不能替换它。', { exact: false })).toBeTruthy()
     expect(screen.getByLabelText('子代理模型').value).toBe('inherit')
     expect(screen.queryByLabelText('名称')).toBeNull()
     fireEvent.change(screen.getByLabelText('子代理模型'), { target: { value: JSON.stringify(['openai', 'gpt-5']) } })
+    expect(screen.getByLabelText('子代理推理强度').value).toBe('')
+    expect(screen.getByRole('option', { name: '使用模型默认值（中）' })).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('子代理推理强度'), { target: { value: 'high' } })
     fireEvent.click(screen.getByRole('button', { name: '保存 Writer 模型' }))
-    await waitFor(() => expect(c.calls.some(call => call.endpoint === 'writer/update' && call.payload.route.model === 'gpt-5')).toBe(true))
+    await waitFor(() => expect(c.calls.some(call => call.endpoint === 'writer/update'
+      && call.payload.route.model === 'gpt-5'
+      && call.payload.route.reasoningEffort === 'high')).toBe(true))
   })
 
   it('新增独立任务子代理可填写三项内容、选择模型与两项受控能力', async () => {
     const c = connection()
-    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c }))
+    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c, modelCatalog: c.modelCatalog }))
     fireEvent.click(await screen.findByRole('button', { name: '新增子代理' }))
     expect(screen.getByText(/原样作为 System 提示词/)).toBeTruthy()
     fireEvent.change(screen.getByLabelText('名称'), { target: { value: '史实核对' } })
@@ -261,7 +273,7 @@ describe('全局子代理管理界面', () => {
       writer: { ...baseCatalog.writer, route: { kind: 'fixed', provider: 'gone', model: 'retired' } },
     }
     const c = connection({ catalog: stale })
-    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c }))
+    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c, modelCatalog: c.modelCatalog }))
     fireEvent.click(await screen.findByRole('button', { name: '编辑Writer' }))
     expect(screen.getByRole('option', { name: 'gone · retired（当前不可用）' }).selected).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: '返回' }))
@@ -276,7 +288,7 @@ describe('全局子代理管理界面', () => {
     const c = connection({ handler: endpoint => endpoint === 'writer/update'
       ? { ok: true, value: { ok: false, error: { code: 'REVISION_CONFLICT', message: 'internal conflict' } } }
       : undefined })
-    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c }))
+    render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c, modelCatalog: c.modelCatalog }))
     fireEvent.click(await screen.findByRole('button', { name: '编辑Writer' }))
     fireEvent.click(screen.getByRole('button', { name: '保存 Writer 模型' }))
     expect((await screen.findByRole('alert')).textContent).toContain('配置已在其他位置更新，请返回列表并重新打开后再保存。')

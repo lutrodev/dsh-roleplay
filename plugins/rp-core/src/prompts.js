@@ -24,7 +24,7 @@ export const AGENT_WRITER_TOOL_DESCRIPTION = `Generate the required narrative dr
 export const CHAT_WRITER_TOOL_DESCRIPTION = `Generate the complete narrative for this Chat-mode roleplay beat from the prepared context. Call with exactly ${WRITER_CALL}. The returned prose is inserted into the next assistant message; then call rp_commit_turn directly without reproducing or revising that prose.`
 
 /** Schema guidance for an isolated task subagent. */
-export const TASK_SUBAGENT_TOOL_DESCRIPTION = 'Agent mode only. Invoke one specialist from <specialist_catalog> according to its usageContract. Each run starts with fresh context and no parent conversation history, so pass a complete objective and every required input explicitly. Pass input directly as one JSON object, never as a JSON-encoded string; use {} when no supporting material is needed. The returned result is working material only: review it and use it as the contract specifies; it is not shown automatically and does not change roleplay facts.'
+export const TASK_SUBAGENT_TOOL_DESCRIPTION = 'Agent mode only. Invoke one specialist from <specialist_catalog> according to its usageContract. Each run starts with fresh context and no parent conversation history, so pass a complete objective and every required text or structured input explicitly; current user image attachments are forwarded automatically. Pass input directly as one JSON object, never as a JSON-encoded string; use {} when no supporting material is needed. The returned result is working material only: review it and use it as the contract specifies; it is not shown automatically and does not change roleplay facts.'
 
 /** Schema guidance for the sole narrative commit. */
 export const COMMIT_TOOL_DESCRIPTION = 'Commit one narrative reply after rp_write_turn succeeds. In Chat mode, generated prose is already the complete visible narrative, so call this directly without repeating it. In Agent mode, place it after the complete final narrative in the same assistant message. Pass only authoritative summary, effects, references, and extensions; retry a failed commit without repeating prose.'
@@ -60,7 +60,7 @@ export function roleplayRuntimeContractText({ executionMode = 'chat', delegated 
   const modeContract = executionMode === 'agent'
       ? [
         'Agent mode supports discussion, planning, editing, shared-material operations, and tool-assisted narrative work. Use only the available tools that materially help complete the request.',
-        'When <specialist_catalog> is present, inspect every usageContract after classifying the request and before making any tool call whose order a contract can constrain. Each usageContract is the complete routing contract for that pluggable specialist: it may define applicability, requiredness, ordering relative to Writer or other tools, explicit input requirements, and how its result must be used. Obey every applicable required contract through rp_run_subagent. A specialist receives no parent history, so pass the complete task and supporting input. Treat its result as working material, not an automatically delivered answer or persistent change. If an applicable required specialist fails, repair the failure or explain it before any dependent step.',
+        'When <specialist_catalog> is present, inspect every usageContract after classifying the request and before making any tool call whose order a contract can constrain. Each usageContract is the complete routing contract for that pluggable specialist: it may define applicability, requiredness, ordering relative to Writer or other tools, explicit input requirements, and how its result must be used. Obey every applicable required contract through rp_run_subagent. A specialist receives no parent history, so pass the complete task and supporting text or structured input; current user image attachments are forwarded automatically. Treat its result as working material, not an automatically delivered answer or persistent change. If an applicable required specialist fails, repair the failure or explain it before any dependent step.',
         `For narrative continuation, call rp_write_turn exactly once successfully with ${WRITER_CALL}, optionally adding only one concise top-level "brief" string. Treat the returned prose as a starting draft. Review and revise it when useful without changing established facts or the user control boundaries. Then emit the complete intended final narrative as ordinary text and place exactly one rp_commit_turn call after it in the same assistant message; never send a tool-only commit.`,
       ].join('\n')
     : [
@@ -90,7 +90,7 @@ export function writerReadyInstruction(executionMode) {
       'The elements below are the complete prepared input for this Roleplay request. First classify the request as discussion or clarification, shared-material work, narrative continuation, or a mixture.',
       'For discussion or clarification, answer directly and do not call Writer or rp_commit_turn.',
       'For shared-material work, use the appropriate tools and report only confirmed results. If narrative continuation also depends on a material change, complete the change and use the refreshed context before continuing.',
-      'For narrative continuation, inspect every entry in <specialist_catalog> before Writer. Treat each usageContract as that specialist\'s complete applicability, requiredness, ordering, input, and result-use contract. Call every applicable required specialist through rp_run_subagent at its declared position: complete pre-Writer contracts before rp_write_turn, and post-Writer contracts after the draft but before the final narrative and rp_commit_turn. Pass complete task/input because specialists receive no parent history.',
+      'For narrative continuation, inspect every entry in <specialist_catalog> before Writer. Treat each usageContract as that specialist\'s complete applicability, requiredness, ordering, input, and result-use contract. Call every applicable required specialist through rp_run_subagent at its declared position: complete pre-Writer contracts before rp_write_turn, and post-Writer contracts after the draft but before the final narrative and rp_commit_turn. Pass complete task and supporting text or structured input because specialists receive no parent history; current user image attachments are forwarded automatically.',
       `After all required pre-Writer work, call rp_write_turn exactly once successfully with ${WRITER_CALL}, optionally adding only one concise top-level "brief" string synthesized from adopted working material. Review the returned draft, complete any required post-Writer work, provide the complete final narrative, then place rp_commit_turn after it.`,
       'For a mixed request, preserve those dependencies: finish prerequisite material work and refresh first, then follow the narrative path. A required specialist failure blocks the steps that depend on it.',
     ].join('\n')
@@ -301,7 +301,12 @@ function exactLayer(id, role, source, text, order, contentKind = 'exact') {
 function routeView(route) {
   return route?.provider === undefined
     ? { kind: 'inherit' }
-    : { kind: 'fixed', provider: route.provider, model: route.model }
+    : {
+        kind: 'fixed',
+        provider: route.provider,
+        model: route.model,
+        ...(route.reasoningEffort === undefined ? {} : { reasoningEffort: route.reasoningEffort }),
+      }
 }
 
 function writerReadyPreview(executionMode, subagentsEnabled) {

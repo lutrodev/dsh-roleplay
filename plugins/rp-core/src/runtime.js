@@ -167,7 +167,7 @@ export class RpRuntime extends Service {
       idleAllowed: false,
       pretransformed: true,
       defaultSlot: { id: 'current-input', label: '当前输入', order: 35 },
-      prepare: ({ messages }) => (messages ?? []).some(message => message?.role === 'user' && message?.source?.kind === 'user' && messageText(message).length > 0)
+      prepare: ({ messages }) => (messages ?? []).some(message => currentUserMessageHasContent(message))
         ? renderCurrentInput(messages)
         : undefined,
     })
@@ -1177,9 +1177,10 @@ export class RpRuntime extends Service {
         run.writerCallId = callId
         try {
           const route = runtime.writerRoute(run, exec.agent)
+          const childPrompt = promptWithCurrentUserImages(prompt, run.contextMessages)
           const child = await runFreshSubagent(runtime.ctx, runtime.config.subagentProvider, {
             label: '写作',
-            prompt: [{ type: 'text', text: prompt }],
+            prompt: childPrompt,
             parent: exec.agent,
             signal: exec.signal,
             agentOptions: route,
@@ -1208,6 +1209,7 @@ export class RpRuntime extends Service {
             writerSessionId: child.id,
             provider: route.provider,
             model: route.model,
+            ...(route.reasoningEffort === undefined ? {} : { reasoningEffort: route.reasoningEffort }),
             promptHash: createHash('sha256').update(prompt).digest('hex'),
             promptCharacters: [...prompt].length,
             contextBuild: jsonClone(run.contextBuild),
@@ -1301,9 +1303,10 @@ export class RpRuntime extends Service {
         run.subagentCallIds.add(callId)
         try {
           const route = runtime.taskSubagentRoute(run, subagent, exec.agent)
+          const childPrompt = promptWithCurrentUserImages(prompt, run.contextMessages)
           const child = await runFreshSubagent(runtime.ctx, runtime.config.subagentProvider, {
             label: subagent.label,
-            prompt: [{ type: 'text', text: prompt }],
+            prompt: childPrompt,
             parent: exec.agent,
             signal: exec.signal,
             agentOptions: route,
@@ -1330,6 +1333,7 @@ export class RpRuntime extends Service {
             subagentSessionId: child.id,
             provider: route.provider,
             model: route.model,
+            ...(route.reasoningEffort === undefined ? {} : { reasoningEffort: route.reasoningEffort }),
             completedAt: Date.now(),
           }
           return { subagent: subagent.id, label: subagent.label, ...(text === undefined ? {} : { text }), ...(structured === undefined ? {} : { structured }), meta }
@@ -2025,7 +2029,12 @@ function taskSubagentCatalog(subagents) {
     structuredOutput: subagent.outputSchema !== undefined,
     model: subagent.route?.provider === undefined
       ? { kind: 'inherit' }
-      : { kind: 'fixed', provider: subagent.route.provider, model: subagent.route.model },
+      : {
+          kind: 'fixed',
+          provider: subagent.route.provider,
+          model: subagent.route.model,
+          ...(subagent.route.reasoningEffort === undefined ? {} : { reasoningEffort: subagent.route.reasoningEffort }),
+        },
   }))
 }
 
@@ -2094,14 +2103,22 @@ function normalizeTaskSubagentRoute(value, subagentId) {
   if (!isRecord(value)) throw new RpRuntimeError('RP_INVALID_REGISTRATION', `task subagent "${subagentId}" route must be an object`)
   const provider = optionalText(value.provider)
   const model = optionalText(value.model)
+  const reasoningEffort = optionalText(value.reasoningEffort)
   if ((provider === undefined) !== (model === undefined)) {
     throw new RpRuntimeError('RP_INVALID_REGISTRATION', `task subagent "${subagentId}" route.provider and route.model must be configured together`)
+  }
+  if (reasoningEffort !== undefined && provider === undefined) {
+    throw new RpRuntimeError('RP_INVALID_REGISTRATION', `task subagent "${subagentId}" route.reasoningEffort requires route.provider and route.model`)
   }
   if (value.maxTokens !== undefined && (!Number.isSafeInteger(value.maxTokens) || value.maxTokens < 1)) {
     throw new RpRuntimeError('RP_INVALID_REGISTRATION', `task subagent "${subagentId}" route.maxTokens must be a positive safe integer`)
   }
   if (provider === undefined && value.maxTokens === undefined) return undefined
-  return { ...(provider === undefined ? {} : { provider, model }), ...(value.maxTokens === undefined ? {} : { maxTokens: value.maxTokens }) }
+  return {
+    ...(provider === undefined ? {} : { provider, model }),
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+    ...(value.maxTokens === undefined ? {} : { maxTokens: value.maxTokens }),
+  }
 }
 
 function parentChildRouteSnapshot(agent, profile) {
@@ -2110,10 +2127,12 @@ function parentChildRouteSnapshot(agent, profile) {
   const runtime = profile?.runtime ?? {}
   const provider = runtime.provider ?? header.provider ?? options.provider
   const model = runtime.model ?? header.model ?? options.model
+  const reasoningEffort = runtime.reasoningEffort ?? header.reasoningEffort ?? options.reasoningEffort
   const maxTokens = header.maxTokens ?? options.maxTokens
   return {
     ...(typeof provider === 'string' && provider.length > 0 ? { provider } : {}),
     ...(typeof model === 'string' && model.length > 0 ? { model } : {}),
+    ...(typeof reasoningEffort === 'string' && reasoningEffort.length > 0 ? { reasoningEffort } : {}),
     ...(maxTokens === undefined ? {} : { maxTokens }),
   }
 }
@@ -2123,6 +2142,7 @@ function loggedParentChildRouteSnapshot(agent) {
   return {
     ...(typeof header.provider === 'string' && header.provider.length > 0 ? { provider: header.provider } : {}),
     ...(typeof header.model === 'string' && header.model.length > 0 ? { model: header.model } : {}),
+    ...(typeof header.reasoningEffort === 'string' && header.reasoningEffort.length > 0 ? { reasoningEffort: header.reasoningEffort } : {}),
     ...(header.maxTokens === undefined ? {} : { maxTokens: header.maxTokens }),
   }
 }
@@ -2136,8 +2156,14 @@ function freezeChildRoute(parent, override) {
   const provider = override?.provider ?? parent.provider
   const model = override?.model ?? parent.model
   if (typeof provider !== 'string' || provider.length === 0 || typeof model !== 'string' || model.length === 0) return undefined
+  const reasoningEffort = override?.provider === undefined ? parent.reasoningEffort : override.reasoningEffort
   const maxTokens = override?.maxTokens ?? parent.maxTokens
-  return { provider, model, ...(maxTokens === undefined ? {} : { maxTokens }) }
+  return {
+    provider,
+    model,
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+    ...(maxTokens === undefined ? {} : { maxTokens }),
+  }
 }
 
 function requiredFrozenChildRoute(route) {
@@ -2148,19 +2174,45 @@ function requiredFrozenChildRoute(route) {
 }
 
 function renderCurrentInput(messages) {
-  const texts = (messages ?? []).flatMap(message => {
-    if (message?.role !== 'user' || message?.source?.kind !== 'user') return []
+  const currentMessages = (messages ?? []).filter(message => message?.role === 'user' && message?.source?.kind === 'user')
+  const texts = currentMessages.flatMap(message => {
     const text = messageText(message)
     return text.length === 0 ? [] : [text]
   })
-  if (texts.length === 0) throw new RpRuntimeError('RP_CURRENT_INPUT_REQUIRED', 'The active roleplay run has no non-empty current user input.')
-  const text = texts.join('\n\n')
+  const images = currentUserImageBlocks(currentMessages)
+  if (texts.length === 0 && images.length === 0) {
+    throw new RpRuntimeError('RP_CURRENT_INPUT_REQUIRED', 'The active roleplay run has no current user text or image attachment.')
+  }
+  const text = texts.length > 0
+    ? texts.join('\n\n')
+    : `本轮用户输入包含 ${images.length} 张图片附件。`
   return {
     revision: 'current-turn',
     text,
     characters: [...text].length,
-    diagnostics: { messages: texts.length },
+    diagnostics: { messages: currentMessages.length, images: images.length },
   }
+}
+
+/** Return the durable image references from the current user input in source order. */
+function currentUserImageBlocks(messages) {
+  return (messages ?? []).flatMap(message => {
+    if (message?.role !== 'user' || message?.source?.kind !== 'user' || !Array.isArray(message.content)) return []
+    return message.content.flatMap(block => isRecord(block) && block.type === 'image' && isRecord(block.attachment)
+      ? [{ type: 'image', attachment: block.attachment }]
+      : [])
+  })
+}
+
+function currentUserMessageHasContent(message) {
+  return message?.role === 'user'
+    && message?.source?.kind === 'user'
+    && (messageText(message).length > 0 || currentUserImageBlocks([message]).length > 0)
+}
+
+/** Fresh children do not inherit their parent's turn, so forward current images explicitly. */
+function promptWithCurrentUserImages(text, messages) {
+  return [{ type: 'text', text }, ...currentUserImageBlocks(messages)]
 }
 
 function escapeAttribute(value) {

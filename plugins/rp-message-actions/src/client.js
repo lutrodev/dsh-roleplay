@@ -33,7 +33,7 @@ import {
 import { decodeRpMessageActionEvent, rpMessageActionTargetKey } from './protocol.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
-export const inject = ['slots', 'conversationEvents', 'connection', 'sessions']
+export const inject = ['slots', 'uiConversation', 'rpRemote', 'sessions']
 const h = React.createElement
 const motionTransition = { duration: 0.16, ease: [0.2, 0, 0, 1] }
 const INLINE_EDITOR_LINE_HEIGHT = 24
@@ -193,12 +193,12 @@ export const failedAssistantNodeDefinition = {
 
 export function apply(ctx) {
   ctx.effect(ensureStyles)
-  ctx.conversationEvents.register(userFloorNodeDefinition)
-  ctx.conversationEvents.register(assistantFloorNodeDefinition)
-  ctx.conversationEvents.register(openingFloorNodeDefinition)
-  ctx.conversationEvents.register(failedAssistantNodeDefinition)
-  ctx.conversationEvents.register(suffixActionNodeDefinition)
-  const injectFloorUi = () => ({ connection: ctx.connection, sessions: ctx.sessions })
+  ctx.uiConversation.events.register(userFloorNodeDefinition)
+  ctx.uiConversation.events.register(assistantFloorNodeDefinition)
+  ctx.uiConversation.events.register(openingFloorNodeDefinition)
+  ctx.uiConversation.events.register(failedAssistantNodeDefinition)
+  ctx.uiConversation.events.register(suffixActionNodeDefinition)
+  const injectFloorUi = () => ({ connection: ctx.rpRemote, sessions: ctx.sessions })
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: 'rp-floor-user-actions',
@@ -336,11 +336,11 @@ function hasNonTextContent(content) {
 
 function UserFloorActions(props) {
   const roleplay = props.useSessions(state => isRoleplaySession(state, props.sessionId))
-  const detail = props.useSession(snapshot => projectMessageActionDetail(
-    snapshot,
+  const detail = useMessageActionDetail(
+    props,
     props.node.data.target,
     props.node,
-  ))
+  )
   if (!roleplay) return h(InactiveActionNodeMarker)
   if (props.node.data.deleted === true) return h(DeletedUserTraceMarker, { target: props.node.data.target })
   const location = props.node.location
@@ -431,7 +431,7 @@ function FailedCanonicalAssistantMarker() {
 function AssistantMessageActions(props) {
   const roleplay = props.useSessions(state => isRoleplaySession(state, props.sessionId))
   const target = { kind: 'message', role: 'assistant', messageId: props.messageId }
-  const detail = props.useSession(snapshot => projectMessageActionDetail(snapshot, target))
+  const detail = useMessageActionDetail(props, target)
   if (!roleplay || detail === null) return null
   return h(FloorActions, {
     ...props,
@@ -452,11 +452,11 @@ function FailedTurnRecoveryActions(props) {
     location: { kind: 'turn', turn: props.matched.turn },
     data: { ...props.matched.state, target: props.matched.target },
   }
-  const detail = props.useSession(snapshot => projectMessageActionDetail(
-    snapshot,
+  const detail = useMessageActionDetail(
+    props,
     props.matched.target,
     fallbackNode,
-  ))
+  )
   if (!roleplay || detail === null) return null
   const status = failedTurnStatus(props.matched, detail)
   if (props.matched.target.kind === 'message') {
@@ -727,10 +727,11 @@ function DeletedUserTraceMarker({ target }) {
   })
 }
 
-function SuffixActionEffect({ node, useSession }) {
+function SuffixActionEffect({ node, useSession, useChat }) {
   const ref = useRef(null)
-  const residentStartKey = useSession(snapshot => snapshot.hasMore === true
-    ? suffixResidentStartKey(snapshot.chat, node.data.replacementStart, node.anchorSeq)
+  const hasMore = useSession(snapshot => snapshot.hasMore === true)
+  const residentStartKey = useChat(chat => hasMore
+    ? suffixResidentStartKey(chat, node.data.replacementStart, node.anchorSeq)
     : undefined)
   useLayoutEffect(() => {
     const host = ref.current?.closest('[data-chat-flow-kind="rp-message-suffix-action"]')
@@ -745,6 +746,13 @@ function SuffixActionEffect({ node, useSession }) {
     )
   }, [node.data.action, node.id, residentStartKey])
   return h('span', { ref, className: css.suffixEffectAnchor, hidden: true, 'aria-hidden': true })
+}
+
+/** Join the independent DSH 0.1.2 Chat view with Session execution state. */
+function useMessageActionDetail(props, target, fallbackNode) {
+  const chat = props.useChat(snapshot => snapshot)
+  const running = props.useSession(snapshot => snapshot.running === true)
+  return projectMessageActionDetail({ chat, running }, target, fallbackNode)
 }
 
 /**
@@ -770,33 +778,39 @@ export function suffixResidentStartKey(chat, replacementStart, carrierAnchorSeq)
 export function suffixActionRows(host, firstTarget, residentStartKey) {
   const actionRow = findActionTargetRow(host, rpMessageActionTargetKey(firstTarget))
   let start
+  let preserveUserCompanionsUntil = null
   if (actionRow === null) {
     start = findFlowRow(host, residentStartKey)
   } else if (firstTarget.kind === 'message' && firstTarget.role === 'user') {
     start = messageRowForAction(actionRow, firstTarget.role)
   } else {
-    start = firstTurnOutputRow(actionRow)
+    start = firstTurnReplacementRow(actionRow)
+    if (start !== null) preserveUserCompanionsUntil = actionRow
     if (start === null && firstTarget.kind === 'message') {
       start = messageRowForAction(actionRow, firstTarget.role)
     }
   }
   if (start === null || start === undefined) return []
   const rows = []
-  for (let row = start; row !== null && row !== host; row = row.nextElementSibling) rows.push(row)
+  let preserveUserCompanions = preserveUserCompanionsUntil !== null
+  for (let row = start; row !== null && row !== host; row = row.nextElementSibling) {
+    if (row === preserveUserCompanionsUntil) preserveUserCompanions = false
+    const kind = row.dataset?.chatFlowKind
+    if (preserveUserCompanions
+      && (kind === 'rp-floor-user-actions' || kind === 'rp-message-avatar-user')) continue
+    rows.push(row)
+  }
   return rows
 }
 
-function firstTurnOutputRow(actionRow) {
+/** Start at the first process/output row after the retained user message. */
+function firstTurnReplacementRow(actionRow) {
   let boundary = null
   for (let row = actionRow.previousElementSibling; row !== null; row = row.previousElementSibling) {
     const kind = row.dataset?.chatFlowKind
     if (kind === 'user' || kind === 'steering') { boundary = row; break }
   }
-  let start = boundary?.nextElementSibling ?? null
-  while (start !== null && ['rp-floor-user-actions', 'rp-message-avatar-user'].includes(start.dataset?.chatFlowKind)) {
-    start = start.nextElementSibling
-  }
-  return start
+  return boundary?.nextElementSibling ?? null
 }
 
 /** Return the original user row, intervening avatar nodes, and its retired action node. */
@@ -1421,7 +1435,7 @@ function DialogError({ error }) {
 
 async function rpc(connection, endpoint, payload) {
   try {
-    return messageActionValue(await connection.rpc.call('/rp-message-actions', endpoint, payload))
+    return messageActionValue(await connection.call('/rp-message-actions', endpoint, payload))
   } catch (reason) {
     if (reason?.code !== undefined) throw reason
     throw actionError('SERVICE_UNAVAILABLE')

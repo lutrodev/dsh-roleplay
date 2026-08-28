@@ -6372,6 +6372,15 @@ get: (_target, key) => {
 		//#region ../../node_modules/.pnpm/motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/motion/dist/es/react.mjs
 		const m = m$1;
 		//#endregion
+		//#region ../../packages/rp-ui/src/session-summary.js
+		/**
+		* Read the Roleplay identity from the public DSH SessionSummary contract.
+		* Projection-backed summary fields live under projectionValues in DSH 0.1.2.
+		*/
+		function isRoleplaySessionSummary(summary) {
+			return summary?.projectionValues?.agentPreset === "roleplay";
+		}
+		//#endregion
 		//#region src/protocol.js
 		const QUICK_REPLIES_RPC_PATH = "/rp-quick-replies";
 		const MAX_QUICK_REPLY_CONTENT_CHARACTERS = 2e3;
@@ -6584,7 +6593,7 @@ get: (_target, key) => {
 			return "暂时无法读取快捷回复，请稍后重试。";
 		}
 		async function quickReplyRequest(connection, endpoint, payload = {}) {
-			const response = await connection.rpc.call(QUICK_REPLIES_RPC_PATH, endpoint, payload);
+			const response = await connection.call(QUICK_REPLIES_RPC_PATH, endpoint, payload);
 			const domain = response?.ok === true && response.value?.ok !== void 0 ? response.value : response;
 			if (domain?.ok !== true) throw Object.assign(new Error(domain?.error?.message ?? "快捷回复请求失败"), { code: domain?.error?.code });
 			return domain.value;
@@ -6613,11 +6622,11 @@ get: (_target, key) => {
 		}
 		//#endregion
 		//#region src/client.js
-		const inject = ["slots", "connection"];
+		const inject = ["slots", "rpRemote"];
 		const h = react.default.createElement;
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
-			const store = createQuickReplyStore(ctx.connection);
+			const store = createQuickReplyStore(ctx.rpRemote);
 			ctx.slots.inject("conversation.input.right", () => ctx.slots.register({
 				name: "conversation.input.right",
 				id: "rp-quick-replies",
@@ -6629,7 +6638,7 @@ get: (_target, key) => {
 			const { input, inputActions, sessionId, useSession, useSessions, store } = props;
 			const roleplay = useSessions((state) => {
 				const summary = state.byId?.[sessionId];
-				return summary?.agentPreset === "roleplay" && summary.origin !== "subagent";
+				return isRoleplaySessionSummary(summary) && summary.origin !== "subagent";
 			});
 			const removed = useSession((state) => state.removed === true);
 			const state = (0, react.useSyncExternalStore)(store.subscribe, store.getSnapshot);

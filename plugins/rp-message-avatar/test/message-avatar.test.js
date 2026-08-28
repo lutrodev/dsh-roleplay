@@ -84,11 +84,11 @@ test('finds native assistant and opening rows without crossing a user boundary',
   assert.equal(messageAvatarTarget(row('rp-message-avatar-user', user), 'user'), user)
 })
 
-test('uses only public Conversation Node and asset RPC extensions', async () => {
+test('uses only public Conversation Node and typed asset Remote extensions', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
   const state = await readFile(new URL('../src/client-state.js', import.meta.url), 'utf8')
   const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
-  assert.match(client, /conversationEvents\.register/)
+  assert.match(client, /uiConversation\.events\.register/)
   assert.match(client, /conversation\.chat\.node/)
   assert.match(client, /createPortal\(h\(MessageAvatar/)
   assert.doesNotMatch(client, /conversation\.chat\.(user-avatar|assistant-avatar)/)
