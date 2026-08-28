@@ -73,7 +73,14 @@ export class RpWritingStyles extends Service {
         if (bindings.length === 0) return undefined
         if (bindings.length > this.config.maxStylesPerSession) throw coded('LIMIT_EXCEEDED', `A session can use at most ${this.config.maxStylesPerSession} writing styles.`)
         const styles = []
-        for (const binding of bindings) styles.push(await this.get(binding.id))
+        for (const binding of bindings) {
+          try {
+            styles.push(await this.get(binding.id))
+          } catch (error) {
+            if (!isUnavailableBinding(error)) throw error
+          }
+        }
+        if (styles.length === 0) return undefined
         return {
           sources: styles.map((style, index) => {
             const id = `${WRITING_STYLE_SOURCE_PREFIX}${style.id}`
@@ -355,6 +362,10 @@ function failure(code, message) { return { ok: false, error: { code, message } }
 function transportSuccess(value) { return { ok: true, value } }
 function coded(code, message, cause) { const error = new Error(message, { cause }); error.code = code; return error }
 function codeFor(error) { return ['INVALID_REQUEST', 'LIMIT_EXCEEDED', 'ASSET_CORRUPT', 'ASSET_NOT_FOUND', 'REVISION_CONFLICT'].includes(error?.code) ? error.code : 'ASSET_CORRUPT' }
+
+function isUnavailableBinding(error) {
+  return error?.code === 'ASSET_NOT_FOUND' || error?.code === 'ASSET_CORRUPT'
+}
 function validateConfig(config) { for (const field of ['maxTextCharacters', 'maxStylesPerSession']) if (!Number.isSafeInteger(config[field]) || config[field] < 1) throw new Error(`rp-writing-style: ${field} must be a positive safe integer`) }
 
 async function writeRecord(libraryDir, record) {

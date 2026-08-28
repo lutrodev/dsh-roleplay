@@ -45,6 +45,13 @@ import {
 } from './prompts.js'
 
 const CONVERSATION_HISTORY_CONTEXT_NOTE = '[Context note: Original dialogue text, including the latest events and wording. It takes precedence over Conversation Summary.]'
+const SHARED_REFERENCE_UNAVAILABLE_CODES = new Set([
+  'ASSET_NOT_FOUND',
+  'ASSET_CORRUPT',
+  'UNSUPPORTED_FORMAT',
+  'UNSUPPORTED_SCHEMA',
+  'LIMIT_EXCEEDED',
+])
 
 const WRITER_ACTION_PARAMETER = Object.freeze({
   type: 'string',
@@ -966,7 +973,20 @@ export class RpRuntime extends Service {
     const candidates = []
     const unavailable = []
     for (const definition of definitions) {
-      const candidate = await definition.prepare(base)
+      let candidate
+      try {
+        candidate = await definition.prepare(base)
+      } catch (error) {
+        if (!isUnavailableSharedReference(definition, error)) throw error
+        addResolvedDefinition(resolvedDefinitions, resolvedIds, definition)
+        unavailable.push({
+          ...contextDefinitionMetadata(definition),
+          reason: 'asset-unavailable',
+          characters: 0,
+          diagnostics: { error: { code: error.code } },
+        })
+        continue
+      }
       if (candidate === undefined || candidate === null) {
         addResolvedDefinition(resolvedDefinitions, resolvedIds, definition)
         const common = contextDefinitionMetadata(definition)
@@ -1060,7 +1080,7 @@ export class RpRuntime extends Service {
         available: candidate !== undefined,
         characters: candidate?.characters ?? 0,
         revision: candidate?.revision ?? null,
-        diagnostics: candidate?.diagnostics ?? null,
+        diagnostics: candidate?.diagnostics ?? excluded?.diagnostics ?? null,
         reason: excluded?.reason ?? null,
       }
     })
@@ -1706,6 +1726,12 @@ function assetMutationSnapshot(outcome) {
 /** @param {Iterable<object>} values */
 function ordered(values) {
   return [...values].sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || String(left.id ?? left.kind).localeCompare(String(right.id ?? right.kind)))
+}
+
+function isUnavailableSharedReference(definition, error) {
+  return definition.kind === 'shared-reference'
+    && typeof error?.code === 'string'
+    && SHARED_REFERENCE_UNAVAILABLE_CODES.has(error.code)
 }
 
 /** @param {unknown} value */

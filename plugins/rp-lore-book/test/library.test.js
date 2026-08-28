@@ -118,6 +118,38 @@ test('treats deleted bound cards and lorebooks as absent during context assembly
   }
 })
 
+test('keeps available lorebooks when sibling bindings are missing or corrupt', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-lore-partial-bindings-'))
+  const missingBookId = '00000000-0000-0000-0000-000000000074'
+  const corruptBookId = '00000000-0000-0000-0000-000000000075'
+  let bindings = []
+  const ctx = new Context()
+  ctx.provide('rpSessions', {
+    get() { return { resources: { card: undefined, lorebooks: bindings } } },
+  })
+  const books = new RpLoreBooks(ctx, { libraryDir: root, maxInputBytes: 4096, maxTokens: 128, maxEntries: 16, maxRecursiveDepth: 2 })
+  try {
+    const available = await books.create({
+      name: '仍然可用的世界书',
+      entries: [{ id: 'harbor', name: '港口', keys: ['港口'], content: '港口终年有雾。' }],
+    })
+    await writeFile(join(root, `${corruptBookId}.json`), '{')
+    bindings = [{ id: missingBookId }, { id: corruptBookId }, { id: available.created.id }]
+
+    const assembly = await books.assembleLore({
+      agent: {},
+      runId: 'partial-bindings',
+      messages: [{ role: 'user', content: [{ type: 'text', text: '抵达港口。' }] }],
+    })
+
+    assert.deepEqual(assembly.books.map(book => book.id), [available.created.id])
+    assert.deepEqual(assembly.result.entries.map(entry => entry.id), ['harbor'])
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('rejects reading legacy standalone books but still allows explicit deletion', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-lore-slot-migration-'))
   const id = '00000000-0000-0000-0000-000000000123'

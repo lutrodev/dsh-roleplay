@@ -16,7 +16,13 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', async () => {
     IconTrashOutline16: () => null,
     MarkdownText: () => null,
     MessageText: () => null,
-    Modal: () => null,
+    Modal: ({ open, title, description, footer, children, className: _className, contentClassName: _contentClassName, closeLabel: _closeLabel, onClose: _onClose }) => open
+      ? ReactModule.createElement('div', { role: 'dialog', 'aria-label': title },
+          ReactModule.createElement('h2', null, title),
+          description ? ReactModule.createElement('p', null, description) : null,
+          children,
+          footer)
+      : null,
     StateDot: ({ state, className }) => ReactModule.createElement('span', { className, 'data-state': state }),
     Tooltip: ({ children }) => children,
     writeClipboard: async () => true,
@@ -242,6 +248,7 @@ describe('Roleplay message action presentation', () => {
       useSession: selector => selector({ running: false, chat: { nodes } }),
       useChat: selector => selector({ nodes }),
       useSessions: selector => selector({ byId: { [sessionId]: { projectionValues: { agentPreset: 'roleplay' } } } }),
+      useProjection: key => key === 'rp/session' ? { revision: 1, resources: {} } : undefined,
     }))
 
     expect(view.getByText('回复生成失败')).not.toBeNull()
@@ -256,6 +263,139 @@ describe('Roleplay message action presentation', () => {
       'reroll',
       { sessionId, target },
     ))
+    view.unmount()
+  })
+
+  it('explains a deleted bound preset, keeps retry available, and lets the user explicitly rebind it', async () => {
+    let TurnRecovery
+    const sessionId = 'session-missing-preset'
+    const missingPresetId = '00000000-0000-0000-0000-000000000001'
+    const replacementPresetId = '00000000-0000-0000-0000-000000000002'
+    const target = { kind: 'turn', turn: 4 }
+    const connection = {
+      call: vi.fn(async (route, endpoint, payload) => {
+        if (route === '/rp-presets' && endpoint === 'validate-binding') {
+          return payload.id === missingPresetId
+            ? { ok: true, value: { ok: false, error: { code: 'ASSET_NOT_FOUND' } } }
+            : { ok: true, value: { ok: true, value: { id: payload.id } } }
+        }
+        if (route === '/rp-presets' && endpoint === 'list') {
+          return {
+            ok: true,
+            value: {
+              ok: true,
+              value: {
+                items: [{
+                  id: replacementPresetId,
+                  name: '示例预设',
+                  fields: 6,
+                  status: 'ready',
+                  isDefault: true,
+                }],
+                defaultId: replacementPresetId,
+              },
+            },
+          }
+        }
+        if (route === '/rp-assets' && endpoint === 'session/bind') {
+          return { ok: true, value: { ok: true, value: { revision: 8 } } }
+        }
+        throw new Error(`unexpected request: ${route} ${endpoint}`)
+      }),
+    }
+    const ctx = {
+      rpRemote: connection,
+      sessions: {},
+      uiConversation: { events: { register: () => {} } },
+      effect: cleanup => cleanup,
+      slots: {
+        inject: (_name, callback) => callback(),
+        register: (config, component) => {
+          if (config.name === 'conversation.chat.turnTail') TurnRecovery = component
+          return { config, component }
+        },
+      },
+    }
+    apply(ctx)
+
+    const state = {
+      turn: 4,
+      failed: true,
+      deleted: false,
+      committed: false,
+      finalAssistantTarget: undefined,
+      finalAssistantText: '',
+      sharedAssetMutation: false,
+      endReasonKind: 'error',
+    }
+    const turn = {
+      turn: 4,
+      status: 'closed',
+      steps: [],
+      data: new Map([['rp-floor-failed-assistant', state]]),
+    }
+    const matched = selectFailedAssistant({ turn })
+    const location = { kind: 'turn', turn }
+    const nodes = new Map([['user-4', {
+      kind: 'rp-floor-user-actions',
+      id: 'user-4',
+      location,
+      data: {
+        seq: 40,
+        turn: 4,
+        text: '继续',
+        target: { kind: 'message', role: 'user', messageId: 'user-4' },
+        hasNonTextContent: false,
+        deleted: false,
+      },
+    }]])
+    const profile = {
+      revision: 7,
+      resources: { preset: { id: missingPresetId } },
+    }
+    const recoveryProps = currentProfile => ({
+      sessionId,
+      matched,
+      connection,
+      sessions: {},
+      useSession: selector => selector({ running: false, chat: { nodes } }),
+      useChat: selector => selector({ nodes }),
+      useSessions: selector => selector({ byId: { [sessionId]: { projectionValues: { agentPreset: 'roleplay' } } } }),
+      useProjection: key => key === 'rp/session' ? currentProfile : undefined,
+    })
+    const view = render(React.createElement(TurnRecovery, recoveryProps(profile)))
+
+    await waitFor(() => expect(view.getByText('已跳过不可用的创作预设')).not.toBeNull())
+    expect(view.getByText('原绑定预设已被删除，但不会再阻止生成。你可以直接重新生成，或重新选择预设。')).not.toBeNull()
+    expect(view.getByRole('button', { name: '重新生成' })).not.toBeNull()
+    expect(view.getByRole('button', { name: '重新选择预设' })).not.toBeNull()
+    expect(connection.call).toHaveBeenCalledWith('/rp-presets', 'validate-binding', { id: missingPresetId })
+    expect(connection.call.mock.calls.some(([route]) => route === '/rp-assets')).toBe(false)
+
+    fireEvent.click(view.getByRole('button', { name: '重新选择预设' }))
+    await waitFor(() => expect(view.getByRole('dialog', { name: '重新选择创作预设' })).not.toBeNull())
+    await waitFor(() => expect(view.getByRole('combobox', { name: '创作预设' }).value).toBe(replacementPresetId))
+    expect(view.getByRole('option', { name: '示例预设（默认）' })).not.toBeNull()
+    expect(view.getByRole('option', { name: '不使用创作预设' })).not.toBeNull()
+
+    fireEvent.click(view.getByRole('button', { name: '应用预设' }))
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-assets', 'session/bind', {
+      sessionId,
+      expectedRevision: 7,
+      presetId: replacementPresetId,
+    }))
+    await waitFor(() => expect(view.getByText('创作预设已更新')).not.toBeNull())
+    expect(view.getByText('现在可以重新生成这条回复。')).not.toBeNull()
+    expect(view.getByRole('button', { name: '重新生成' })).not.toBeNull()
+    expect(view.queryByRole('dialog', { name: '重新选择创作预设' })).toBeNull()
+
+    view.rerender(React.createElement(TurnRecovery, recoveryProps({
+      revision: 8,
+      resources: { preset: { id: replacementPresetId } },
+    })))
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-presets', 'validate-binding', { id: replacementPresetId }))
+    expect(view.getByText('创作预设已更新')).not.toBeNull()
+    expect(view.queryByRole('button', { name: '重新选择预设' })).toBeNull()
     view.unmount()
   })
 

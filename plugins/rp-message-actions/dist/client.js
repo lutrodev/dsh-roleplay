@@ -6848,6 +6848,11 @@ get: (_target, key) => {
 			"nativeBranchEffectAnchor": "rp-message-actions-nativeBranchEffectAnchor",
 			"nativeUserEffectAnchor": "rp-message-actions-nativeUserEffectAnchor",
 			"notice": "rp-message-actions-notice",
+			"presetRecoveryBody": "rp-message-actions-presetRecoveryBody",
+			"presetRecoveryDialog": "rp-message-actions-presetRecoveryDialog",
+			"presetRecoveryField": "rp-message-actions-presetRecoveryField",
+			"presetRecoveryHint": "rp-message-actions-presetRecoveryHint",
+			"presetRecoveryLoading": "rp-message-actions-presetRecoveryLoading",
 			"srOnly": "rp-message-actions-srOnly",
 			"suffixEffectAnchor": "rp-message-actions-suffixEffectAnchor",
 			"traceEffectAnchor": "rp-message-actions-traceEffectAnchor",
@@ -6856,7 +6861,7 @@ get: (_target, key) => {
 		};
 		const STYLE_ID = "dsh-roleplay-rp-message-actions-styles";
 		const STYLE_OWNER = "dsh-roleplay-rp-message-actions";
-		const STYLE_TEXT = ".rp-message-actions-floorActionHost {\n  width: 100%;\n  font-family: var(--dsw-font-family);\n}\n\n/* Deleted messages can orphan generation rows inside their Turn. Keep those\n   rows in the Session log and trajectory, but remove the now-unowned context,\n   reasoning, tool, and failure chrome from the chat transcript. */\n[data-rp-floor-hidden-by-message-delete],\n[data-rp-message-actions-hidden-trace],\n[data-rp-message-actions-hidden-suffix],\n[data-rp-message-actions-hidden-deleted-user],\n[data-rp-message-actions-hidden-deleted-assistant],\n[data-rp-message-actions-hidden-commit],\n[data-rp-message-actions-hidden-native-branch],\n[data-rp-message-actions-hidden-opening],\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-deletedAssistantMarker),\n[data-chat-flow-kind=\"rp-floor-failed-assistant\"]:has(.rp-message-actions-deletedAssistantMarker),\n[data-chat-flow-kind=\"rp-message-suffix-action\"]:has(.rp-message-actions-suffixEffectAnchor),\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-failed-assistant\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-deletedOpeningMarker) {\n  display: none;\n}\n\n.rp-message-actions-deletedAssistantMarker,\n.rp-message-actions-deletedUserMarker,\n.rp-message-actions-deletedOpeningMarker,\n.rp-message-actions-inactiveActionNodeMarker,\n.rp-message-actions-assistantEffectNodeMarker,\n.rp-message-actions-traceEffectAnchor,\n.rp-message-actions-nativeUserEffectAnchor,\n.rp-message-actions-nativeBranchEffectAnchor,\n.rp-message-actions-suffixEffectAnchor,\n.rp-message-actions-commitToolMarker,\n[data-chat-flow-kind=\"tool-call\"]:has(.rp-message-actions-commitToolMarker[data-rp-commit-tool-status=\"running\"]),\n[data-chat-flow-kind=\"tool-call\"]:has(.rp-message-actions-commitToolMarker[data-rp-commit-tool-status=\"succeeded\"]),\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-deletedUserMarker) {\n  display: none;\n}\n\n.rp-message-actions-commitFailure {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 10px 12px;\n  border-radius: 10px;\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n  font-family: var(--dsw-font-family);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-commitFailure strong { font-weight: 550; }\n\n.rp-message-actions-failedTurnStatus {\n  display: grid;\n  grid-template-columns: 10px minmax(0, 1fr) auto;\n  gap: 8px;\n  align-items: start;\n  padding: 2px 0;\n  font-family: var(--dsw-font-family);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-message-actions-failedTurnStatusDot { margin-top: 5px; }\n\n.rp-message-actions-failedTurnStatusCopy {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n\n.rp-message-actions-failedTurnStatusCopy strong {\n  margin-right: 6px;\n  font-weight: 600;\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"error\"] {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"warning\"] {\n  color: var(--dsw-alias-state-warn-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"ongoing\"] {\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy span { color: var(--dsw-alias-label-secondary); }\n\n.rp-message-actions-failedTurnRecoveryActions {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 4px;\n  margin-left: 18px;\n}\n\n.rp-message-actions-failedTurnStatus > .rp-message-actions-failedTurnRecoveryActions { margin-left: 0; }\n\n.rp-message-actions-failedTurnDeleteAction:not(:disabled) { color: var(--dsw-alias-state-error-primary); }\n\n.rp-message-actions-assistantActionHost {\n  display: contents;\n}\n\n/* The editor is portaled into the message body; hide the native footer until\n   editing finishes so its unrelated controls do not compete with the form. */\n[data-chat-flow-kind=\"turn-tail\"]:has(.rp-message-actions-assistantActionHost[data-rp-message-actions-editing-native]) {\n  display: none;\n}\n\n/* The Slot outlet inserts a display:contents anchor between the flow item and\n   the user renderer, so the message root is a descendant, not a direct child.\n   Require a real mounted plugin host in the adjacent projection before hiding\n   the resident time/copy row; declined standard-session projections stay out. */\n[data-chat-flow-kind=\"user\"]:has(\n  + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n)\n  [data-time-hover-root]\n  > :last-child:not(.rp-message-actions-inlineEditor),\n[data-chat-flow-kind=\"user\"]:has(\n  + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n  + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n)\n  [data-time-hover-root]\n  > :last-child:not(.rp-message-actions-inlineEditor) {\n  display: none;\n}\n\n/* JS ownership covers arbitrary public Conversation Nodes inserted between\n   the native user row and this plugin's projected action row. */\n[data-chat-flow-kind=\"user\"][data-rp-message-actions-user-native-hidden]\n  [data-time-hover-root]\n  > :last-child:not(.rp-message-actions-inlineEditor),\n[data-chat-flow-kind=\"steering\"][data-rp-message-actions-user-native-hidden]\n  [data-time-hover-root]\n  > :last-child:not(.rp-message-actions-inlineEditor) {\n  display: none;\n}\n\n/* Pull back only the Chat column's 16px gap so the replacement operation row\n   sits 2px below the bubble and reads as part of the same message. */\n.rp-message-actions-userFloorActionHost {\n  width: 100%;\n  margin-top: -14px;\n  font-family: var(--dsw-font-family);\n}\n\n.rp-message-actions-userFloorActionHost .rp-message-actions-floorActions {\n  margin-top: 0;\n  margin-bottom: 2px;\n}\n\n.rp-message-actions-userFloorTime {\n  margin-right: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 14px;\n  line-height: 24px;\n  font-variant-numeric: tabular-nums;\n  white-space: nowrap;\n}\n\n@media (hover: hover) {\n  .rp-message-actions-userFloorTime {\n    opacity: 0;\n    transition: opacity 80ms ease;\n  }\n\n  .rp-message-actions-userFloorActionHost:hover .rp-message-actions-userFloorTime,\n  .rp-message-actions-userFloorActionHost:focus-within .rp-message-actions-userFloorTime,\n  [data-chat-flow-kind=\"user\"]:has(\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n  ):hover\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"]\n    .rp-message-actions-userFloorTime,\n  [data-chat-flow-kind=\"user\"]:has(\n    + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n  ):hover\n    + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"]\n    .rp-message-actions-userFloorTime {\n    opacity: 1;\n  }\n}\n\n.rp-message-actions-floorActions {\n  display: flex;\n  min-height: 28px;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 10px;\n  margin: 2px 0 7px;\n  padding-right: 2px;\n}\n\n.rp-message-actions-floorActionHost .rp-message-actions-floorActions {\n  justify-content: flex-start;\n  padding-right: 0;\n  padding-left: 0;\n  margin-left: -6px;\n}\n\n.rp-message-actions-floorAction {\n  display: inline-flex;\n  width: 28px;\n  height: 28px;\n  padding: 6px;\n  align-items: center;\n  justify-content: center;\n  border: 0;\n  border-radius: 28px;\n  outline: none;\n  color: var(--dsw-alias-label-tertiary);\n  background: transparent;\n  cursor: pointer;\n}\n\n.rp-message-actions-floorAction:hover {\n  color: var(--dsw-alias-label-secondary);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n\n.rp-message-actions-floorAction:disabled {\n  cursor: default;\n  opacity: .4;\n}\n\n.rp-message-actions-floorAction[data-tone=\"danger\"]:hover {\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n}\n\n@media (max-width: 600px) {\n  .rp-message-actions-floorActionHost .rp-message-actions-floorActions {\n    flex-wrap: wrap;\n  }\n}\n\n.rp-message-actions-inlineEditorPortalAnchor,\n.rp-message-actions-editedMessagePortalAnchor { display: none; }\n\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor) {\n  display: none;\n}\n\n[data-rp-message-actions-original-hidden] {\n  display: none;\n}\n\n.rp-message-actions-editedUserMessage {\n  max-width: 100%;\n  align-self: flex-end;\n  padding: 10px 16px;\n  border-radius: 22px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-specific-bubble);\n  font-size: 16px;\n  line-height: 24px;\n}\n\n.rp-message-actions-editedAssistantMessage {\n  display: flex;\n  flex-direction: column;\n  gap: 16px;\n  color: var(--dsw-alias-label-primary);\n  font-size: 16px;\n  line-height: 28px;\n}\n\n.rp-message-actions-inlineEditor {\n  display: flex;\n  min-width: 0;\n  width: 100%;\n  box-sizing: border-box;\n  flex-direction: column;\n  gap: 12px;\n  padding: 14px 16px 12px;\n  border-radius: 22px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-specific-tip);\n  font-family: var(--dsw-font-family);\n}\n\n.rp-message-actions-inlineEditor[data-surface=\"user\"] {\n  align-self: stretch;\n  background: var(--dsw-specific-bubble);\n}\n\n.rp-message-actions-inlineEditor label { display: contents; }\n\n.rp-message-actions-inlineEditor textarea {\n  display: block;\n  width: 100%;\n  height: 72px;\n  min-height: 72px;\n  max-height: 144px;\n  overflow-y: hidden;\n  overscroll-behavior: contain;\n  resize: none;\n  box-sizing: border-box;\n  padding: 0;\n  border: none;\n  border-radius: 0;\n  outline: none;\n  color: var(--dsw-alias-label-primary);\n  background: transparent;\n  font: 16px/24px var(--dsw-font-family);\n}\n\n.rp-message-actions-inlineEditor textarea:focus {\n  outline: none;\n  box-shadow: none;\n}\n\n.rp-message-actions-inlineEditorFooter {\n  display: flex;\n  justify-content: flex-end;\n}\n\n.rp-message-actions-inlineEditorFooter > div {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: flex-end;\n  gap: 8px;\n}\n\n.rp-message-actions-inlineEditorFooter button {\n  min-height: 36px;\n  padding: 7px 14px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 12px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-alias-bg-layer-1);\n  cursor: pointer;\n  font: 12px/20px var(--dsw-font-family);\n  white-space: nowrap;\n}\n\n.rp-message-actions-inlineEditorFooter button[data-primary] {\n  border-color: var(--dsw-alias-button-primary-fill);\n  color: var(--dsw-alias-label-primary-foreground);\n  background: var(--dsw-alias-button-primary-fill);\n}\n\n.rp-message-actions-inlineEditorFooter button:disabled { cursor: not-allowed; opacity: .5; }\n\n.rp-message-actions-editorNotice,\n.rp-message-actions-inlineEditor .rp-message-actions-assetNotice {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-inlineEditor .rp-message-actions-error { margin-top: 0; }\n\n.rp-message-actions-srOnly {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n  clip: rect(0 0 0 0);\n  white-space: nowrap;\n}\n\n.rp-message-actions-dialog {\n  width: min(540px, calc(100vw - 32px));\n}\n\n.rp-message-actions-deleteConfirm {\n  width: min(440px, calc(100vw - 32px));\n}\n\n.rp-message-actions-deleteSummary {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  padding: 12px 14px;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 18%, var(--dsw-alias-border-l2));\n  border-radius: 12px;\n  color: var(--dsw-alias-label-secondary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 4%, var(--dsw-alias-bg-layer-1));\n}\n\n.rp-message-actions-deleteSummary strong {\n  color: var(--dsw-alias-label-primary);\n  font-size: 13px;\n  line-height: 19px;\n  font-weight: 550;\n}\n\n.rp-message-actions-deleteSummary span {\n  font-size: 12px;\n  line-height: 19px;\n}\n\n.rp-message-actions-assetNotice {\n  margin: 12px 0 0;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-message-actions-deleteAction:not(:disabled) {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-message-actions-notice,\n.rp-message-actions-error {\n  margin-top: 10px;\n  padding: 9px 11px;\n  border-radius: 10px;\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-notice {\n  color: var(--dsw-alias-state-warn-label);\n  background: var(--dsw-alias-state-warn-tertiary);\n}\n\n.rp-message-actions-error {\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n}\n\n@media (max-width: 600px) {\n  .rp-message-actions-floorActions { min-height: 28px; gap: 10px; }\n  .rp-message-actions-inlineEditor { padding: 14px; }\n  .rp-message-actions-failedTurnStatus { grid-template-columns: 10px minmax(0, 1fr); }\n  .rp-message-actions-failedTurnStatus > .rp-message-actions-failedTurnRecoveryActions {\n    grid-column: 2;\n    margin-top: 4px;\n  }\n}\n";
+		const STYLE_TEXT = ".rp-message-actions-floorActionHost {\n  width: 100%;\n  font-family: var(--dsw-font-family);\n}\n\n/* Deleted messages can orphan generation rows inside their Turn. Keep those\n   rows in the Session log and trajectory, but remove the now-unowned context,\n   reasoning, tool, and failure chrome from the chat transcript. */\n[data-rp-floor-hidden-by-message-delete],\n[data-rp-message-actions-hidden-trace],\n[data-rp-message-actions-hidden-suffix],\n[data-rp-message-actions-hidden-deleted-user],\n[data-rp-message-actions-hidden-deleted-assistant],\n[data-rp-message-actions-hidden-commit],\n[data-rp-message-actions-hidden-native-branch],\n[data-rp-message-actions-hidden-opening],\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-deletedAssistantMarker),\n[data-chat-flow-kind=\"rp-floor-failed-assistant\"]:has(.rp-message-actions-deletedAssistantMarker),\n[data-chat-flow-kind=\"rp-message-suffix-action\"]:has(.rp-message-actions-suffixEffectAnchor),\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-failed-assistant\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-deletedOpeningMarker) {\n  display: none;\n}\n\n.rp-message-actions-deletedAssistantMarker,\n.rp-message-actions-deletedUserMarker,\n.rp-message-actions-deletedOpeningMarker,\n.rp-message-actions-inactiveActionNodeMarker,\n.rp-message-actions-assistantEffectNodeMarker,\n.rp-message-actions-traceEffectAnchor,\n.rp-message-actions-nativeUserEffectAnchor,\n.rp-message-actions-nativeBranchEffectAnchor,\n.rp-message-actions-suffixEffectAnchor,\n.rp-message-actions-commitToolMarker,\n[data-chat-flow-kind=\"tool-call\"]:has(.rp-message-actions-commitToolMarker[data-rp-commit-tool-status=\"running\"]),\n[data-chat-flow-kind=\"tool-call\"]:has(.rp-message-actions-commitToolMarker[data-rp-commit-tool-status=\"succeeded\"]),\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-deletedUserMarker) {\n  display: none;\n}\n\n.rp-message-actions-commitFailure {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 10px 12px;\n  border-radius: 10px;\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n  font-family: var(--dsw-font-family);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-commitFailure strong { font-weight: 550; }\n\n.rp-message-actions-failedTurnStatus {\n  display: grid;\n  grid-template-columns: 10px minmax(0, 1fr) auto;\n  gap: 8px;\n  align-items: start;\n  padding: 2px 0;\n  font-family: var(--dsw-font-family);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-message-actions-failedTurnStatusDot { margin-top: 5px; }\n\n.rp-message-actions-failedTurnStatusCopy {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n\n.rp-message-actions-failedTurnStatusCopy strong {\n  margin-right: 6px;\n  font-weight: 600;\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"error\"] {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"warning\"] {\n  color: var(--dsw-alias-state-warn-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"ongoing\"] {\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"done\"] {\n  color: var(--dsw-alias-state-success-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy span { color: var(--dsw-alias-label-secondary); }\n\n.rp-message-actions-failedTurnRecoveryActions {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 4px;\n  margin-left: 18px;\n}\n\n.rp-message-actions-failedTurnStatus > .rp-message-actions-failedTurnRecoveryActions { margin-left: 0; }\n\n.rp-message-actions-failedTurnDeleteAction:not(:disabled) { color: var(--dsw-alias-state-error-primary); }\n\n.rp-message-actions-assistantActionHost {\n  display: contents;\n}\n\n/* The editor is portaled into the message body; hide the native footer until\n   editing finishes so its unrelated controls do not compete with the form. */\n[data-chat-flow-kind=\"turn-tail\"]:has(.rp-message-actions-assistantActionHost[data-rp-message-actions-editing-native]) {\n  display: none;\n}\n\n/* The Slot outlet inserts a display:contents anchor between the flow item and\n   the user renderer, so the message root is a descendant, not a direct child.\n   Require a real mounted plugin host in the adjacent projection before hiding\n   the resident time/copy row; declined standard-session projections stay out. */\n[data-chat-flow-kind=\"user\"]:has(\n  + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n)\n  [data-time-hover-root]\n  > :last-child:not(.rp-message-actions-inlineEditor),\n[data-chat-flow-kind=\"user\"]:has(\n  + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n  + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n)\n  [data-time-hover-root]\n  > :last-child:not(.rp-message-actions-inlineEditor) {\n  display: none;\n}\n\n/* JS ownership covers arbitrary public Conversation Nodes inserted between\n   the native user row and this plugin's projected action row. */\n[data-chat-flow-kind=\"user\"][data-rp-message-actions-user-native-hidden]\n  [data-time-hover-root]\n  > :last-child:not(.rp-message-actions-inlineEditor),\n[data-chat-flow-kind=\"steering\"][data-rp-message-actions-user-native-hidden]\n  [data-time-hover-root]\n  > :last-child:not(.rp-message-actions-inlineEditor) {\n  display: none;\n}\n\n/* Pull back only the Chat column's 16px gap so the replacement operation row\n   sits 2px below the bubble and reads as part of the same message. */\n.rp-message-actions-userFloorActionHost {\n  width: 100%;\n  margin-top: -14px;\n  font-family: var(--dsw-font-family);\n}\n\n.rp-message-actions-userFloorActionHost .rp-message-actions-floorActions {\n  margin-top: 0;\n  margin-bottom: 2px;\n}\n\n.rp-message-actions-userFloorTime {\n  margin-right: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 14px;\n  line-height: 24px;\n  font-variant-numeric: tabular-nums;\n  white-space: nowrap;\n}\n\n@media (hover: hover) {\n  .rp-message-actions-userFloorTime {\n    opacity: 0;\n    transition: opacity 80ms ease;\n  }\n\n  .rp-message-actions-userFloorActionHost:hover .rp-message-actions-userFloorTime,\n  .rp-message-actions-userFloorActionHost:focus-within .rp-message-actions-userFloorTime,\n  [data-chat-flow-kind=\"user\"]:has(\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n  ):hover\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"]\n    .rp-message-actions-userFloorTime,\n  [data-chat-flow-kind=\"user\"]:has(\n    + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n  ):hover\n    + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"]\n    .rp-message-actions-userFloorTime {\n    opacity: 1;\n  }\n}\n\n.rp-message-actions-floorActions {\n  display: flex;\n  min-height: 28px;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 10px;\n  margin: 2px 0 7px;\n  padding-right: 2px;\n}\n\n.rp-message-actions-floorActionHost .rp-message-actions-floorActions {\n  justify-content: flex-start;\n  padding-right: 0;\n  padding-left: 0;\n  margin-left: -6px;\n}\n\n.rp-message-actions-floorAction {\n  display: inline-flex;\n  width: 28px;\n  height: 28px;\n  padding: 6px;\n  align-items: center;\n  justify-content: center;\n  border: 0;\n  border-radius: 28px;\n  outline: none;\n  color: var(--dsw-alias-label-tertiary);\n  background: transparent;\n  cursor: pointer;\n}\n\n.rp-message-actions-floorAction:hover {\n  color: var(--dsw-alias-label-secondary);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n\n.rp-message-actions-floorAction:disabled {\n  cursor: default;\n  opacity: .4;\n}\n\n.rp-message-actions-floorAction[data-tone=\"danger\"]:hover {\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n}\n\n@media (max-width: 600px) {\n  .rp-message-actions-floorActionHost .rp-message-actions-floorActions {\n    flex-wrap: wrap;\n  }\n}\n\n.rp-message-actions-inlineEditorPortalAnchor,\n.rp-message-actions-editedMessagePortalAnchor { display: none; }\n\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor) {\n  display: none;\n}\n\n[data-rp-message-actions-original-hidden] {\n  display: none;\n}\n\n.rp-message-actions-editedUserMessage {\n  max-width: 100%;\n  align-self: flex-end;\n  padding: 10px 16px;\n  border-radius: 22px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-specific-bubble);\n  font-size: 16px;\n  line-height: 24px;\n}\n\n.rp-message-actions-editedAssistantMessage {\n  display: flex;\n  flex-direction: column;\n  gap: 16px;\n  color: var(--dsw-alias-label-primary);\n  font-size: 16px;\n  line-height: 28px;\n}\n\n.rp-message-actions-inlineEditor {\n  display: flex;\n  min-width: 0;\n  width: 100%;\n  box-sizing: border-box;\n  flex-direction: column;\n  gap: 12px;\n  padding: 14px 16px 12px;\n  border-radius: 22px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-specific-tip);\n  font-family: var(--dsw-font-family);\n}\n\n.rp-message-actions-inlineEditor[data-surface=\"user\"] {\n  align-self: stretch;\n  background: var(--dsw-specific-bubble);\n}\n\n.rp-message-actions-inlineEditor label { display: contents; }\n\n.rp-message-actions-inlineEditor textarea {\n  display: block;\n  width: 100%;\n  height: 72px;\n  min-height: 72px;\n  max-height: 144px;\n  overflow-y: hidden;\n  overscroll-behavior: contain;\n  resize: none;\n  box-sizing: border-box;\n  padding: 0;\n  border: none;\n  border-radius: 0;\n  outline: none;\n  color: var(--dsw-alias-label-primary);\n  background: transparent;\n  font: 16px/24px var(--dsw-font-family);\n}\n\n.rp-message-actions-inlineEditor textarea:focus {\n  outline: none;\n  box-shadow: none;\n}\n\n.rp-message-actions-inlineEditorFooter {\n  display: flex;\n  justify-content: flex-end;\n}\n\n.rp-message-actions-inlineEditorFooter > div {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: flex-end;\n  gap: 8px;\n}\n\n.rp-message-actions-inlineEditorFooter button {\n  min-height: 36px;\n  padding: 7px 14px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 12px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-alias-bg-layer-1);\n  cursor: pointer;\n  font: 12px/20px var(--dsw-font-family);\n  white-space: nowrap;\n}\n\n.rp-message-actions-inlineEditorFooter button[data-primary] {\n  border-color: var(--dsw-alias-button-primary-fill);\n  color: var(--dsw-alias-label-primary-foreground);\n  background: var(--dsw-alias-button-primary-fill);\n}\n\n.rp-message-actions-inlineEditorFooter button:disabled { cursor: not-allowed; opacity: .5; }\n\n.rp-message-actions-editorNotice,\n.rp-message-actions-inlineEditor .rp-message-actions-assetNotice {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-inlineEditor .rp-message-actions-error { margin-top: 0; }\n\n.rp-message-actions-srOnly {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n  clip: rect(0 0 0 0);\n  white-space: nowrap;\n}\n\n.rp-message-actions-dialog {\n  width: min(540px, calc(100vw - 32px));\n}\n\n.rp-message-actions-presetRecoveryDialog {\n  width: min(460px, calc(100vw - 32px));\n}\n\n.rp-message-actions-presetRecoveryBody {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n}\n\n.rp-message-actions-presetRecoveryLoading,\n.rp-message-actions-presetRecoveryHint {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 19px;\n}\n\n.rp-message-actions-presetRecoveryLoading {\n  min-height: 42px;\n  display: flex;\n  align-items: center;\n}\n\n.rp-message-actions-presetRecoveryField {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.rp-message-actions-presetRecoveryField select {\n  width: 100%;\n  box-sizing: border-box;\n  min-height: 40px;\n  padding: 8px 10px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  outline: none;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-alias-bg-layer-1);\n  font: 13px/20px var(--dsw-font-family);\n}\n\n.rp-message-actions-presetRecoveryField select:focus-visible {\n  border-color: var(--dsw-alias-brand-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 16%, transparent);\n}\n\n.rp-message-actions-deleteConfirm {\n  width: min(440px, calc(100vw - 32px));\n}\n\n.rp-message-actions-deleteSummary {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  padding: 12px 14px;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 18%, var(--dsw-alias-border-l2));\n  border-radius: 12px;\n  color: var(--dsw-alias-label-secondary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 4%, var(--dsw-alias-bg-layer-1));\n}\n\n.rp-message-actions-deleteSummary strong {\n  color: var(--dsw-alias-label-primary);\n  font-size: 13px;\n  line-height: 19px;\n  font-weight: 550;\n}\n\n.rp-message-actions-deleteSummary span {\n  font-size: 12px;\n  line-height: 19px;\n}\n\n.rp-message-actions-assetNotice {\n  margin: 12px 0 0;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-message-actions-deleteAction:not(:disabled) {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-message-actions-notice,\n.rp-message-actions-error {\n  margin-top: 10px;\n  padding: 9px 11px;\n  border-radius: 10px;\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-notice {\n  color: var(--dsw-alias-state-warn-label);\n  background: var(--dsw-alias-state-warn-tertiary);\n}\n\n.rp-message-actions-error {\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n}\n\n@media (max-width: 600px) {\n  .rp-message-actions-floorActions { min-height: 28px; gap: 10px; }\n  .rp-message-actions-inlineEditor { padding: 14px; }\n  .rp-message-actions-failedTurnStatus { grid-template-columns: 10px minmax(0, 1fr); }\n  .rp-message-actions-failedTurnStatus > .rp-message-actions-failedTurnRecoveryActions {\n    grid-column: 2;\n    margin-top: 4px;\n  }\n}\n";
 		function ensureStyles() {
 			document.getElementById(STYLE_ID)?.remove();
 			const style = document.createElement("style");
@@ -6865,6 +6870,144 @@ get: (_target, key) => {
 			style.textContent = STYLE_TEXT;
 			document.head.append(style);
 			return () => style.remove();
+		}
+		//#endregion
+		//#region src/preset-recovery.js
+		const h$1 = react.default.createElement;
+		const EMPTY_PRESET_SELECTION = "__rp-message-actions-no-preset__";
+		/** Diagnose historic pre-model failures so the failed row can offer an explicit rebind. */
+		function shouldInspectPresetFailure(matched) {
+			return matched?.target?.kind === "turn" && matched.state?.endReasonKind === "error" && matched.state?.commitAttempted !== true;
+		}
+		function usePresetFailureDiagnostic({ connection, profile, enabled }) {
+			const presetId = profile?.resources?.preset?.id;
+			const [diagnostic, setDiagnostic] = (0, react.useState)(null);
+			(0, react.useEffect)(() => {
+				if (!enabled || typeof presetId !== "string" || presetId.length === 0) {
+					setDiagnostic(null);
+					return;
+				}
+				let live = true;
+				setDiagnostic({
+					kind: "checking-preset",
+					presetId
+				});
+				roleplayRpc(connection, "/rp-presets", "validate-binding", { id: presetId }).then(() => {
+					if (live) setDiagnostic(null);
+				}, (reason) => {
+					if (!live) return;
+					const code = typeof reason?.code === "string" ? reason.code : "UNKNOWN";
+					setDiagnostic(code === "ASSET_NOT_FOUND" || code === "ASSET_CORRUPT" ? {
+						kind: "missing-preset",
+						presetId,
+						cause: code
+					} : null);
+				});
+				return () => {
+					live = false;
+				};
+			}, [
+				connection,
+				enabled,
+				presetId
+			]);
+			return diagnostic;
+		}
+		function PresetRecoveryDialog({ open, connection, sessionId, profile, onClose, onApplied }) {
+			const [items, setItems] = (0, react.useState)([]);
+			const [selectedPreset, setSelectedPreset] = (0, react.useState)(null);
+			const [loading, setLoading] = (0, react.useState)(false);
+			const [saving, setSaving] = (0, react.useState)(false);
+			const [error, setError] = (0, react.useState)(null);
+			(0, react.useEffect)(() => {
+				if (!open) return void 0;
+				let live = true;
+				setLoading(true);
+				setError(null);
+				roleplayRpc(connection, "/rp-presets", "list", { limit: 100 }).then((value) => {
+					if (!live) return;
+					const ready = (value.items ?? []).filter((item) => item?.status !== "corrupt");
+					setItems(ready);
+					setSelectedPreset(ready.some((item) => item.id === value.defaultId) ? value.defaultId : ready[0]?.id ?? null);
+					setLoading(false);
+				}, (reason) => {
+					if (!live) return;
+					setItems([]);
+					setSelectedPreset(null);
+					setError(presetRecoveryErrorMessage(reason, "load"));
+					setLoading(false);
+				});
+				return () => {
+					live = false;
+				};
+			}, [connection, open]);
+			const applyPreset = async () => {
+				if (saving || loading || !Number.isSafeInteger(profile?.revision)) return;
+				setSaving(true);
+				setError(null);
+				try {
+					await roleplayRpc(connection, "/rp-assets", "session/bind", {
+						sessionId,
+						expectedRevision: profile.revision,
+						presetId: selectedPreset
+					});
+					onApplied({ presetId: selectedPreset });
+				} catch (reason) {
+					setError(presetRecoveryErrorMessage(reason, "save"));
+				} finally {
+					setSaving(false);
+				}
+			};
+			const close = () => {
+				if (!saving) onClose();
+			};
+			return h$1(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+				open,
+				onClose: close,
+				closeLabel: "关闭重新选择预设",
+				title: "重新选择创作预设",
+				description: "原来绑定的预设已经不可用。请选择这段对话接下来使用的预设。",
+				className: css.presetRecoveryDialog,
+				footer: h$1(react.default.Fragment, null, h$1(_deepseek_ai_dsh_client_ui_primitives.Button, {
+					variant: "outline",
+					autoFocus: true,
+					disabled: saving,
+					onClick: close
+				}, "取消"), h$1(_deepseek_ai_dsh_client_ui_primitives.Button, {
+					variant: "primary",
+					disabled: loading || saving || !Number.isSafeInteger(profile?.revision),
+					onClick: () => void applyPreset()
+				}, saving ? "正在应用…" : "应用预设"))
+			}, h$1("div", { className: css.presetRecoveryBody }, loading ? h$1("p", {
+				className: css.presetRecoveryLoading,
+				role: "status"
+			}, "正在读取可用预设…") : h$1(react.default.Fragment, null, h$1("label", { className: css.presetRecoveryField }, h$1("span", null, "创作预设"), h$1("select", {
+				value: selectedPreset ?? EMPTY_PRESET_SELECTION,
+				disabled: saving,
+				onChange: (event) => setSelectedPreset(event.target.value === EMPTY_PRESET_SELECTION ? null : event.target.value)
+			}, h$1("option", { value: EMPTY_PRESET_SELECTION }, "不使用创作预设"), ...items.map((item) => h$1("option", {
+				key: item.id,
+				value: item.id
+			}, `${item.name}${item.isDefault ? "（默认）" : ""}`)))), items.length === 0 ? h$1("p", { className: css.presetRecoveryHint }, "资料库里没有可用预设，可以先选择“不使用创作预设”继续。") : h$1("p", { className: css.presetRecoveryHint }, "已有消息和会话变量会保留；新预设从下一次生成开始生效。")), error === null ? null : h$1("div", {
+				className: css.error,
+				role: "alert"
+			}, error)));
+		}
+		function presetRecoveryErrorMessage(reason, intent) {
+			const code = typeof reason?.code === "string" ? reason.code : "UNKNOWN";
+			if (code === "ASSET_NOT_FOUND") return intent === "save" ? "刚刚选择的预设已经不存在，请重新选择。" : "暂时无法读取预设列表，请刷新后重试。";
+			if (code === "REVISION_CONFLICT") return "这段对话的资料刚刚发生了变化，请关闭后重新选择。";
+			if (code === "SESSION_RUNNING") return "回复正在生成，请结束后再更换预设。";
+			if (code === "PROFILE_TOO_LARGE") return "当前会话资料过多，暂时无法应用新的预设。";
+			return intent === "save" ? "暂时无法应用预设，请稍后重试。" : "暂时无法读取预设列表，请稍后重试。";
+		}
+		async function roleplayRpc(connection, route, endpoint, payload) {
+			try {
+				return messageActionValue(await connection.call(route, endpoint, payload));
+			} catch (reason) {
+				if (reason?.code !== void 0) throw reason;
+				throw actionError("SERVICE_UNAVAILABLE");
+			}
 		}
 		//#endregion
 		//#region src/client.js
@@ -7274,6 +7417,7 @@ get: (_target, key) => {
 		}
 		function FailedTurnRecoveryActions(props) {
 			const roleplay = props.useSessions((state) => isRoleplaySession(state, props.sessionId));
+			const profile = props.useProjection("rp/session");
 			const fallbackNode = {
 				kind: "rp-floor-failed-assistant",
 				id: String(props.matched.state.turn),
@@ -7287,8 +7431,13 @@ get: (_target, key) => {
 				}
 			};
 			const detail = useMessageActionDetail(props, props.matched.target, fallbackNode);
+			const presetRecovery = usePresetFailureDiagnostic({
+				connection: props.connection,
+				profile,
+				enabled: roleplay && detail !== null && shouldInspectPresetFailure(props.matched)
+			});
 			if (!roleplay || detail === null) return null;
-			const status = failedTurnStatus(props.matched, detail);
+			const status = failedTurnStatus(props.matched, detail, presetRecovery);
 			if (props.matched.target.kind === "message") return status === null ? null : h(FailedTurnStatus, { status });
 			return h(FloorActions, {
 				...props,
@@ -7298,11 +7447,15 @@ get: (_target, key) => {
 				canEdit: false,
 				failedAssistant: true,
 				failureStatus: status,
+				presetRecovery: presetRecovery?.kind === "missing-preset" ? {
+					...presetRecovery,
+					profile
+				} : presetRecovery?.kind === "checking-preset" ? presetRecovery : null,
 				detail
 			});
 		}
 		/** Prefer DSH's visible interruption and length-limit states; translate the remaining terminal outcomes. */
-		function failedTurnStatus(matched, detail) {
+		function failedTurnStatus(matched, detail, diagnostic = null) {
 			const kind = matched.state?.endReasonKind;
 			if (kind === "max-tokens" || matched.nativeStatusVisible === true) return null;
 			const hasPartial = matched.target?.kind === "message";
@@ -7314,6 +7467,11 @@ get: (_target, key) => {
 				state: "error",
 				title: "回复未能完成保存",
 				message: recoveryMessage("正文已保留，但本次会话变量变化没有生效。", "正文已保留，但本次会话变量变化没有生效，可以重新生成这条回复。")
+			};
+			if (diagnostic?.kind === "missing-preset") return {
+				state: "warning",
+				title: "已跳过不可用的创作预设",
+				message: diagnostic.cause === "ASSET_CORRUPT" ? "原绑定预设无法读取，但不会再阻止生成。你可以直接重新生成，或重新选择预设。" : "原绑定预设已被删除，但不会再阻止生成。你可以直接重新生成，或重新选择预设。"
 			};
 			if (kind === "error") return {
 				state: "error",
@@ -7666,14 +7824,28 @@ get: (_target, key) => {
 			if (owners.size === 0) row.removeAttribute(name);
 			else row.setAttribute(name, [...owners].join(" "));
 		}
-		function FloorActions({ sessionId, useSessions, turn, target, detail, edited = false, connection, sessions, surface = "assistant", actionLabel, copyText = "", forkSeq, messageTime, canEdit = true, failedAssistant = false, failureStatus = null, nativeAssistant = false, userHadText = false, userHasNonTextContent = false }) {
+		function FloorActions({ sessionId, useSessions, turn, target, detail, edited = false, connection, sessions, surface = "assistant", actionLabel, copyText = "", forkSeq, messageTime, canEdit = true, failedAssistant = false, failureStatus = null, presetRecovery = null, nativeAssistant = false, userHadText = false, userHasNonTextContent = false }) {
 			const roleplay = useSessions((state) => isRoleplaySession(state, sessionId));
 			const targetKey = rpMessageActionTargetKey(target);
+			const recoveryTurn = Number.isSafeInteger(detail?.turn) ? detail.turn : turn?.turn;
 			const [dialog, setDialog] = (0, react.useState)(null);
 			const [editing, setEditing] = (0, react.useState)(false);
 			const [body, setBody] = (0, react.useState)("");
 			const [pending, setPending] = (0, react.useState)(null);
 			const [error, setError] = (0, react.useState)(null);
+			const [presetDialogOpen, setPresetDialogOpen] = (0, react.useState)(false);
+			const [presetRecoveryApplied, setPresetRecoveryApplied] = (0, react.useState)(null);
+			(0, react.useEffect)(() => {
+				setPresetDialogOpen(false);
+				setPresetRecoveryApplied(null);
+			}, [
+				recoveryTurn,
+				sessionId,
+				targetKey
+			]);
+			(0, react.useEffect)(() => {
+				if (presetRecovery?.kind !== "missing-preset") setPresetDialogOpen(false);
+			}, [presetRecovery?.kind]);
 			if (!roleplay || detail === null) return null;
 			const openDialog = (value) => {
 				setEditing(false);
@@ -7786,13 +7958,19 @@ get: (_target, key) => {
 			const userSurface = surface === "user";
 			const failedTurnTarget = failedAssistant && target.kind === "turn";
 			const failedReply = detail?.failed === true;
-			const actionTurn = Number.isSafeInteger(detail?.turn) ? detail.turn : turn.turn;
+			const actionTurn = recoveryTurn;
 			const resolvedActionLabel = actionLabel ?? (detail?.opening === true ? "开场白" : void 0);
 			const unitLabel = resolvedActionLabel ?? (userSurface ? "消息" : failedReply ? "未完成的回复" : "回复");
 			const toolbarLabel = resolvedActionLabel === void 0 ? userSurface ? `第 ${actionTurn} 条用户消息的操作` : `第 ${actionTurn} 条回复的操作` : `${resolvedActionLabel}的操作`;
 			const visibleText = copyText !== "" ? copyText : detail?.content ?? "";
 			const branchSeq = detail?.forkSeq ?? forkSeq;
 			const actionsDisabled = pending !== null || detail.sessionRunning === true;
+			const presetMissing = presetRecovery?.kind === "missing-preset" && presetRecoveryApplied === null;
+			const displayedFailureStatus = presetRecoveryApplied === null ? failureStatus : {
+				state: "done",
+				title: presetRecoveryApplied.presetId === null ? "已移除失效的预设" : "创作预设已更新",
+				message: detail?.canReroll === true ? "现在可以重新生成这条回复。" : "现在可以继续发送消息。"
+			};
 			const branchAction = !userSurface && detail !== null && Number.isSafeInteger(branchSeq) ? h(FloorActionButton, {
 				label: pending === "branch" ? "正在新建对话…" : "从此处新建对话",
 				ariaLabel: pending === "branch" ? "正在新建对话" : resolvedActionLabel === void 0 ? `从第 ${actionTurn} 条回复新建对话` : `从${resolvedActionLabel}新建对话`,
@@ -7841,7 +8019,12 @@ get: (_target, key) => {
 				icon: h(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline16, { size: 14 }),
 				disabled: actionsDisabled,
 				onClick: () => void reroll()
-			}, pending === "reroll" ? "正在重新生成…" : "重新生成") : null, detail?.canDelete === true ? h(_deepseek_ai_dsh_client_ui_primitives.Button, {
+			}, pending === "reroll" ? "正在重新生成…" : "重新生成") : null, presetMissing ? h(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				variant: "outline",
+				size: "sm",
+				disabled: actionsDisabled,
+				onClick: () => setPresetDialogOpen(true)
+			}, "重新选择预设") : null, detail?.canDelete === true ? h(_deepseek_ai_dsh_client_ui_primitives.Button, {
 				variant: "ghost",
 				size: "sm",
 				className: css.failedTurnDeleteAction,
@@ -7877,8 +8060,8 @@ get: (_target, key) => {
 				onCancel: closeEditor,
 				onSave: () => void edit(false),
 				onSaveAndReroll: () => void edit(true)
-			}) : failedTurnTarget ? failureStatus === null ? failedRecoveryActions : h(FailedTurnStatusRow, {
-				status: failureStatus,
+			}) : failedTurnTarget ? displayedFailureStatus === null ? failedRecoveryActions : h(FailedTurnStatusRow, {
+				status: displayedFailureStatus,
 				pending: pending === "reroll",
 				actions: failedRecoveryActions
 			}) : nativeAssistant ? h(react.default.Fragment, null, branchAction === null ? null : h(NativeAssistantBranchEffect), branchAction, rerollAction, editAction, deleteAction) : h("div", {
@@ -7911,6 +8094,16 @@ get: (_target, key) => {
 				failed: failedReply,
 				sharedAssetMutation: detail?.deleteIncludesSharedAssetMutation === true,
 				onConfirm: () => void remove()
+			}), h(PresetRecoveryDialog, {
+				open: presetDialogOpen,
+				connection,
+				sessionId,
+				profile: presetRecovery?.profile,
+				onClose: () => setPresetDialogOpen(false),
+				onApplied: (value) => {
+					setPresetDialogOpen(false);
+					setPresetRecoveryApplied(value);
+				}
 			}))));
 		}
 		/** Hide the native user footer by ownership, independent of intervening nodes. */

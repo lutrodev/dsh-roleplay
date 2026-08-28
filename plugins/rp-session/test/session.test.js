@@ -334,18 +334,16 @@ test('asset binding can detach a card after the story starts while preserving th
   await ctx.fiber.dispose()
 })
 
-test('the next profile change prunes deleted inherited card and lorebook bindings', async () => {
+test('a partial profile change preserves unavailable bindings it did not edit', async () => {
   const ctx = new Context()
   ctx.provide('rpRuntime', { registerContextSource() {}, registerRunGuard() {}, registerSessionProfileProvider() {}, syncExecutionMode() {}, transformText: async text => text })
   ctx.provide('commands', fakeCommands())
   ctx.provide('agents', { list: () => [] })
-  ctx.provide('rpCharacterCards', {
-    async get() { throw Object.assign(new Error('deleted card'), { code: 'ASSET_NOT_FOUND' }) },
-  })
-  ctx.provide('rpLoreBooks', {
-    async get() { throw Object.assign(new Error('deleted lorebook'), { code: 'ASSET_NOT_FOUND' }) },
-  })
+  ctx.provide('rpCharacterCards', { async get() { throw new Error('untouched card must not be resolved') } })
+  ctx.provide('rpLoreBooks', { async get() { throw new Error('untouched lorebook must not be resolved') } })
   ctx.provide('rpPersonas', { async get(id) { return { id } } })
+  ctx.provide('rpPresets', { async resolveBinding() { throw new Error('untouched preset must not be resolved') } })
+  ctx.provide('rpWritingStyles', { async resolveBindings() { throw new Error('untouched writing styles must not be resolved') } })
   const sessions = new RpSessions(ctx, { defaultMode: 'director', maxProfileCommandBytes: 262144 })
   const events = []
   const agent = { status: 'idle', session: fakeSession(events) }
@@ -354,6 +352,8 @@ test('the next profile change prunes deleted inherited card and lorebook binding
     expectedRevision: 0,
     card: { id: 'deleted-card' },
     lorebooks: [{ id: 'deleted-lorebook' }],
+    preset: { id: 'deleted-preset' },
+    writingStyles: [{ id: 'deleted-style' }],
     openingIndex: 0,
     openingText: '已删除角色留下的开场。',
   })
@@ -364,9 +364,11 @@ test('the next profile change prunes deleted inherited card and lorebook binding
     changes: { personaId: 'persona-new' },
   })
 
-  assert.equal(updated.resources.card, undefined)
-  assert.deepEqual(updated.resources.lorebooks, [])
+  assert.deepEqual(updated.resources.card, { id: 'deleted-card' })
+  assert.deepEqual(updated.resources.lorebooks, [{ id: 'deleted-lorebook' }])
   assert.deepEqual(updated.resources.persona, { id: 'persona-new' })
+  assert.deepEqual(updated.resources.preset, { id: 'deleted-preset' })
+  assert.deepEqual(updated.resources.writingStyles, [{ id: 'deleted-style' }])
   assert.equal(updated.scene.openingText, '已删除角色留下的开场。')
   await ctx.fiber.dispose()
 })
@@ -453,7 +455,7 @@ test('canonical asset binding resolves five live services, preserves partial fie
   assert.deepEqual(replaced.resources.lorebooks, [{ id: 'lore-a' }])
   assert.equal(replaced.resources.persona.id, 'persona-a')
   assert.equal(replaced.resources.preset.id, 'preset-a')
-  assert.equal(resolvedPreset, 'preset-a')
+  assert.equal(resolvedPreset, undefined)
   assert.deepEqual(replaced.resources.writingStyles, [{ id: 'style-a' }])
   assert.equal(replaced.scene.openingIndex, 1)
   assert.equal(replaced.scene.openingSource, 'card')
@@ -471,6 +473,12 @@ test('canonical asset binding resolves five live services, preserves partial fie
   assert.deepEqual(updated.resources.writingStyles, [{ id: 'style-b' }, { id: 'style-a' }])
   assert.equal(updated.scene.openingIndex, 1)
   assert.equal(updated.scene.openingText, '新卡第二开场。')
+  const reboundPreset = await sessions.bindAssetChangesDuringRun(agent, {
+    changes: { presetId: 'preset-b' },
+  })
+  assert.equal(resolvedPreset, 'preset-b')
+  assert.equal(reboundPreset.resources.preset.id, 'preset-b')
+  assert.deepEqual(reboundPreset.resources.writingStyles, [{ id: 'style-b' }, { id: 'style-a' }])
   await assert.rejects(
     sessions.bindAssetChangesDuringRun(agent, { changes: { writingStyleIds: ['style-a', 'style-b', 'style-c'] } }),
     error => error.code === 'LIMIT_EXCEEDED',

@@ -333,7 +333,7 @@ export async function apply(ctx, config) {
 }
 
 function registerBrowser(ctx, presets, ready) {
-  const endpoints = new Set(['list', 'get', 'create', 'update', 'delete', 'set-default', 'templates'])
+  const endpoints = new Set(['list', 'get', 'validate-binding', 'create', 'update', 'delete', 'set-default', 'templates'])
   const dispose = ctx.rpRemote.register('/rp-presets', async (endpoint, payload) => {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown preset endpoint: ${endpoint}`))
     try {
@@ -351,6 +351,10 @@ export async function dispatchBrowser(presets, endpoint, payload) {
   switch (endpoint) {
     case 'list': return presets.list({ query: input.query ?? '', cursor: input.cursor, limit: input.limit ?? 50 })
     case 'get': return presets.detail(requiredId(input.id))
+    case 'validate-binding': {
+      const preset = await presets.get(requiredId(input.id))
+      return { id: preset.id }
+    }
     case 'create': { const created = await presets.create(input.preset, { makeDefault: optionalBoolean(input.makeDefault, 'makeDefault') }); return { created, detail: await presets.detail(created.id) } }
     case 'update': return presets.update(requiredId(input.id), input.preset, input.expectedRevision)
     case 'delete': return presets.delete(requiredId(input.id), input.expectedRevision)

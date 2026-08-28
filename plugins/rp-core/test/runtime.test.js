@@ -1127,6 +1127,57 @@ test('agent mode preassembles the saved Session slots and exposes no context-bui
   await ctx.fiber.dispose()
 })
 
+test('an unavailable optional Wiki source is skipped without blocking Agent output or asset repair', async () => {
+  const ctx = new Context()
+  ctx.provide('systemPrompt', { section() {} })
+  ctx.provide('tools', { register() {} })
+  ctx.provide('agents', { get() { return undefined } })
+  ctx.provide('rpSessions', { get: () => ({
+    revision: 8,
+    runtime: { executionMode: 'agent' },
+    resources: {
+      card: undefined,
+      lorebooks: [],
+      persona: undefined,
+      preset: { id: 'missing-preset' },
+      writingStyles: [],
+    },
+    contextBuild: { version: 1, slots: [
+      { id: 'facts', label: '资料', sourceIds: ['facts'] },
+      { id: 'current-input', label: '当前输入', sourceIds: ['rp.current-input'] },
+    ] },
+  }) })
+  const runtime = new RpRuntime(ctx, {
+    chatMaxStepsPerRun: 2,
+    agentMaxStepsPerRun: 8,
+    maxEffectsPerCommit: 1,
+    maxArtifactBytes: 4096,
+  })
+  runtime.registerContextSource({
+    id: 'facts',
+    label: '已失效资料',
+    kind: 'shared-reference',
+    defaultSlot: { id: 'facts', label: '资料' },
+    prepare() { throw Object.assign(new Error('gone'), { code: 'ASSET_NOT_FOUND' }) },
+  })
+  const input = currentInput()
+  const agent = { session: { events: [], deriveMessages: () => [input], append() {} } }
+
+  const run = await runtime.prepareRun(agent, 1, [input])
+
+  assert.deepEqual(run.fragments.map(fragment => fragment.id), ['rp.current-input'])
+  assert.match(run.contextText, /Continue the story\./)
+  const facts = run.catalog.find(item => item.id === 'facts')
+  assert.equal(facts.available, false)
+  assert.equal(facts.reason, 'asset-unavailable')
+  assert.deepEqual(facts.diagnostics, { error: { code: 'ASSET_NOT_FOUND' } })
+  const readyText = runtime.writerReadyMessage(run).content.map(block => block.text ?? '').join('')
+  assert.match(readyText, /"presetId":"missing-preset"/)
+  assert.match(readyText, /<section name="当前输入">/)
+  assert.doesNotMatch(readyText, /已失效资料/)
+  await ctx.fiber.dispose()
+})
+
 test('Chat Writer receives one flat Prompt and its prose replaces the parent stream before commit', async () => {
   const ctx = new Context()
   const tools = new Map()

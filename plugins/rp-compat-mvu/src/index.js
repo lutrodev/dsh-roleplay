@@ -90,7 +90,7 @@ async function liveAsset(service, method, id) {
   try {
     return await service[method](id)
   } catch (error) {
-    if (error?.code === 'ASSET_NOT_FOUND') return undefined
+    if (error?.code === 'ASSET_NOT_FOUND' || error?.code === 'ASSET_CORRUPT' || error?.code === 'UNSUPPORTED_SCHEMA') return undefined
     throw error
   }
 }

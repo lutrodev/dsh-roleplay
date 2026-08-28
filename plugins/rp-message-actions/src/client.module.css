@@ -93,6 +93,10 @@
   color: var(--dsw-alias-state-business-primary);
 }
 
+.failedTurnStatusCopy strong[data-tone="done"] {
+  color: var(--dsw-alias-state-success-primary);
+}
+
 .failedTurnStatusCopy span { color: var(--dsw-alias-label-secondary); }
 
 .failedTurnRecoveryActions {
@@ -376,6 +380,57 @@
 
 .dialog {
   width: min(540px, calc(100vw - 32px));
+}
+
+.presetRecoveryDialog {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.presetRecoveryBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.presetRecoveryLoading,
+.presetRecoveryHint {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.presetRecoveryLoading {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+}
+
+.presetRecoveryField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.presetRecoveryField select {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  outline: none;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  font: 13px/20px var(--dsw-font-family);
+}
+
+.presetRecoveryField select:focus-visible {
+  border-color: var(--dsw-alias-brand-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 16%, transparent);
 }
 
 .deleteConfirm {

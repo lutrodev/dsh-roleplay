@@ -857,6 +857,7 @@ function sourceMetaLabel(source) {
 function unavailableSourceLabel(source) {
   if (source?.id === 'rp.current-input') return '等待输入'
   if (source?.id === 'rp.state') return '尚未初始化'
+  if (source?.reason === 'asset-unavailable') return '绑定资料不可用，已跳过'
   return '暂时没有内容'
 }
 function escapePromptAttribute(value) {

@@ -17,6 +17,7 @@ import { css, ensureStyles } from './client-styles.generated.js'
 import { PromptWorkbench } from './context-canvas.js'
 import { AssetEditorRegistry } from './asset-editor-registry.js'
 import { LoreWikiDetail, PresetWikiDetail, SessionDocumentBrowser, WikiDetailSection, WikiDocumentHeader } from './session-wiki.js'
+import { currentSessionBindingIds, readyBindingItems, sessionBindingRequest, sessionBindingSpec } from './session-binding.js'
 import { ContentTransition, IconCharacterCardOutline16, useWorkbenchModal, WorkbenchTabs } from 'dsh-roleplay-rp-ui'
 import { MAX_OPENING_CHARACTERS, RP_SESSION_APPLY_COMMAND } from 'dsh-roleplay-rp-session/protocol'
 import { roleplayRunMarkerDefinition, RpRunMarker } from './run-marker.js'
@@ -366,6 +367,7 @@ function LibraryModal({ open, onClose, connection, sessionId, session, profile, 
   const includesOpening = creating || setup
   const [step, setStep] = useState('assets')
   const [section, setSection] = useState('character')
+  const [bindingKind, setBindingKind] = useState(null)
   const [tab, setTab] = useState('characters')
   const [query, setQuery] = useState('')
   const [lists, setLists] = useState({ characters: [], lorebooks: [], personas: [], presets: [], writingStyles: [], defaultPersonaId: null, defaultPresetId: null, defaultWritingStyleId: null })
@@ -402,6 +404,7 @@ function LibraryModal({ open, onClose, connection, sessionId, session, profile, 
     defaultsApplied.current = false
     setStep('assets')
     setSection('character')
+    setBindingKind(null)
     setSelectedCard(profile?.resources?.card?.id ?? null)
     setSelectedLore((profile?.resources?.lorebooks ?? []).map(binding => binding.id))
     setSelectedPersona(profile?.resources?.persona?.id ?? null)
@@ -574,16 +577,25 @@ function LibraryModal({ open, onClose, connection, sessionId, session, profile, 
     h('div', { className: css.libraryShell, ref: dialogRef, tabIndex: -1 },
       includesOpening ? h(SetupSteps, { step }) : null,
       !guided ? h(SessionWikiOverview, { profile, state }) : null,
-      !guided ? h(SessionContextNav, { section, onSection: setSection, state, activity: stateActivity, profile, capabilities: capabilities ?? EMPTY_CAPABILITIES }) : null,
+      !guided ? h(SessionContextNav, { section, onSection: next => { setSection(next); setBindingKind(null) }, state, activity: stateActivity, profile, capabilities: capabilities ?? EMPTY_CAPABILITIES }) : null,
       actionError ? h(InlineNotice, { message: userErrorMessage(actionError.reason, actionError.intent) }) : null,
-      !guided && section === 'state'
+      !guided && bindingKind !== null
+        ? h(ContentTransition, { viewKey: `${bindingKind}-binding` }, h(SessionWikiBindingPanel, {
+          kind: bindingKind,
+          profile,
+          connection,
+          sessionId,
+          onCancel: () => setBindingKind(null),
+          onBound: () => setBindingKind(null),
+        }))
+      : !guided && section === 'state'
           ? h(ContentTransition, { viewKey: 'state' }, h(SessionStatePanel, { state, activity: stateActivity, available: capabilities?.state === true }))
           : !guided && section === 'character'
-            ? h(ContentTransition, { viewKey: 'character' }, h(SessionCharacterPanel, { profile, connection, available: capabilities?.characters === true }))
+            ? h(ContentTransition, { viewKey: 'character' }, h(SessionCharacterPanel, { profile, connection, available: capabilities?.characters === true, onBind: () => setBindingKind('character') }))
           : !guided && section === 'lorebooks'
-            ? h(ContentTransition, { viewKey: 'lorebooks' }, h(SessionLorebooksPanel, { profile, connection, available: capabilities?.lorebooks === true }))
+            ? h(ContentTransition, { viewKey: 'lorebooks' }, h(SessionLorebooksPanel, { profile, connection, available: capabilities?.lorebooks === true, onBind: () => setBindingKind('lorebooks') }))
           : !guided && ['persona', 'preset', 'writingStyles'].includes(section)
-            ? h(ContentTransition, { viewKey: section }, h(SessionSharedAssetPanel, { kind: section === 'writingStyles' ? 'writingStyle' : section, profile, connection, available: capabilities?.[sessionSectionCapability(section)] === true }))
+            ? h(ContentTransition, { viewKey: section }, h(SessionSharedAssetPanel, { kind: section === 'writingStyles' ? 'writingStyle' : section, profile, connection, available: capabilities?.[sessionSectionCapability(section)] === true, onBind: () => setBindingKind(section) }))
           : includesOpening && step === 'opening'
           ? h(OpeningStep, { card: cardPreview, selectedCard, connection, openingIndex, onOpeningIndex: setOpeningIndex, mode: openingMode, onMode: setOpeningMode, customOpening, onCustomOpening: setCustomOpening })
           : guided ? h(React.Fragment, null,
@@ -607,7 +619,7 @@ function SessionWikiOverview({ profile, state }) {
     h('span', { className: css.sessionWikiOverviewIcon }, h(IconDataOutline16, { size: 18 })),
     h('span', null,
       h('strong', null, '当前对话正在使用的资料'),
-      h('small', null, `${references} 项资料${live ? '，以及已形成的状态' : ''}。这里仅供查看，资料内容请在侧栏资料库中管理。`)))
+      h('small', null, `${references} 项资料${live ? '，以及已形成的状态' : ''}。资料空缺或失效时可在这里重新绑定，内容编辑仍在侧栏资料库中完成。`)))
 }
 
 function SessionContextNav({ section, onSection, state, activity, profile, capabilities }) {
@@ -632,13 +644,13 @@ function SessionContextNav({ section, onSection, state, activity, profile, capab
   return h('header', { className: css.contextNav }, h(WorkbenchTabs, { items, value: section, onChange: onSection, label: '会话 Wiki 内容', layoutId: 'rp-session-context-tab' }))
 }
 
-function SessionCharacterPanel({ profile, connection, available }) {
+function SessionCharacterPanel({ profile, connection, available, onBind }) {
   const cardId = profile?.resources?.card?.id
   const card = useCharacterDetail(connection, available ? cardId : undefined)
   if (!available) return h(DisabledCapability, { label: '角色卡' })
   if (card.status === 'loading') return h(StateMessage, { title: '正在加载角色卡', description: '正在准备当前角色的资料。' })
-  if (card.status === 'error') return card.error?.code === 'ASSET_NOT_FOUND'
-    ? h(ContextEmpty, { quiet: true, icon: IconCharacterCardOutline16, title: '这张角色卡已被删除', description: '已有消息和故事状态仍然保留，可以继续对话或重新关联其他角色卡。' })
+  if (card.status === 'error') return isUnavailableWikiBinding(card.error)
+    ? h(ContextEmpty, { quiet: true, icon: IconCharacterCardOutline16, title: '当前角色卡已不可用', description: '它会从后续回复资料中跳过；已有消息和故事状态不会受影响。', action: '重新选择角色卡', onAction: onBind })
     : h(StateMessage, { title: '暂时无法读取角色卡', description: userErrorMessage(card.error, 'detail') })
   return h('section', { className: `${css.contextPanel} ${css.referenceWorkbench}`, 'aria-label': '当前故事设定' },
     card.detail ? h('article', { className: css.referenceDocument },
@@ -646,31 +658,34 @@ function SessionCharacterPanel({ profile, connection, available }) {
         h(Avatar, { item: card.detail, connection }),
         h('span', null, h('small', { className: css.eyebrow }, '角色卡'), h('h3', null, card.detail.name))),
       h(CharacterDetail, { detail: card.detail, compact: false }))
-      : h(ContextEmpty, { quiet: true, icon: IconCharacterCardOutline16, title: '当前对话没有使用角色卡', description: '这不会影响查看历史消息或继续对话。' }))
+      : h(ContextEmpty, { quiet: true, icon: IconCharacterCardOutline16, title: '当前对话没有使用角色卡', description: '可以直接继续对话，也可以为后续回复选择一张角色卡。', action: '选择并绑定', onAction: onBind }))
 }
 
-function SessionLorebooksPanel({ profile, connection, available }) {
+function SessionLorebooksPanel({ profile, connection, available, onBind }) {
   const loreIds = (profile?.resources?.lorebooks ?? []).map(binding => binding.id)
-  const [data, setData] = useState({ lorebooks: [], loading: true, error: null })
+  const [data, setData] = useState({ lorebooks: [], unavailable: 0, loading: true, error: null })
   const [selectedId, setSelectedId] = useState(loreIds[0] ?? null)
   useEffect(() => {
-    if (!available) { setData({ lorebooks: [], loading: false, error: null }); return }
+    if (!available) { setData({ lorebooks: [], unavailable: 0, loading: false, error: null }); return }
     let live = true
     setData(current => ({ ...current, loading: true, error: null }))
     Promise.all(loreIds.map(async id => {
       try { return await rpc(connection, 'lorebooks/get', { id }) } catch (error) {
-        if (error?.code === 'ASSET_NOT_FOUND') return undefined
+        if (isUnavailableWikiBinding(error)) return undefined
         throw error
       }
     }))
-      .then(lorebooks => { if (live) setData({ lorebooks: lorebooks.filter(Boolean), loading: false, error: null }) })
-      .catch(error => { if (live) setData({ lorebooks: [], loading: false, error }) })
+      .then(lorebooks => { if (live) setData({ lorebooks: lorebooks.filter(Boolean), unavailable: lorebooks.filter(item => item === undefined).length, loading: false, error: null }) })
+      .catch(error => { if (live) setData({ lorebooks: [], unavailable: 0, loading: false, error }) })
     return () => { live = false }
   }, [available, connection, loreIds.join('\u0000')])
   if (!available) return h(DisabledCapability, { label: '世界书' })
   if (data.loading) return h(StateMessage, { title: '正在加载世界书', description: '正在准备当前会话使用的世界书。' })
   if (data.error) return h(StateMessage, { title: '有些世界书已经找不到了', description: userErrorMessage(data.error, 'detail') })
   return h('section', { className: `${css.contextPanel} ${css.referenceWorkbench} ${css.sessionDocumentWorkbench}`, 'aria-label': '当前会话的世界书' },
+    data.unavailable > 0 && data.lorebooks.length > 0
+      ? h(InlineNotice, { message: `${data.unavailable} 本已绑定世界书不可用，后续回复会跳过。`, action: '重新选择', onAction: onBind })
+      : null,
     data.lorebooks.length
       ? h(SessionDocumentBrowser, {
         items: data.lorebooks,
@@ -688,22 +703,27 @@ function SessionLorebooksPanel({ profile, connection, available }) {
           }),
           h(LoreWikiDetail, { detail: book })),
       })
-      : h(ContextEmpty, { quiet: true, icon: IconLinkOutline16, title: '当前对话没有使用世界书', description: '这里会按实际使用顺序展示世界书。' }))
+      : h(ContextEmpty, { quiet: true, icon: IconLinkOutline16, title: loreIds.length > 0 ? '已绑定的世界书不可用' : '当前对话没有使用世界书', description: loreIds.length > 0 ? '不可用的世界书会从后续回复资料中跳过，不会阻止继续对话。' : '可以直接继续对话，也可以为后续回复选择一本或多本世界书。', action: loreIds.length > 0 ? '重新选择世界书' : '选择并绑定', onAction: onBind }))
 }
 
-function SessionSharedAssetPanel({ kind, profile, connection, available }) {
+function SessionSharedAssetPanel({ kind, profile, connection, available, onBind }) {
   const ids = kind === 'writingStyle'
     ? (profile?.resources?.writingStyles ?? []).map(binding => binding.id)
     : [kind === 'persona' ? profile?.resources?.persona?.id : profile?.resources?.preset?.id].filter(Boolean)
-  const [data, setData] = useState({ items: [], loading: true, error: null })
+  const [data, setData] = useState({ items: [], unavailable: 0, loading: true, error: null })
   const [selectedId, setSelectedId] = useState(ids[0] ?? null)
   useEffect(() => {
-    if (!available) { setData({ items: [], loading: false, error: null }); return }
+    if (!available) { setData({ items: [], unavailable: 0, loading: false, error: null }); return }
     let live = true
     setData(current => ({ ...current, loading: true, error: null }))
-    Promise.all(ids.map(id => rpc(connection, `${assetRoutePrefix(kind)}/get`, { id })))
-      .then(items => { if (live) setData({ items, loading: false, error: null }) })
-      .catch(error => { if (live) setData({ items: [], loading: false, error }) })
+    Promise.all(ids.map(async id => {
+      try { return await rpc(connection, `${assetRoutePrefix(kind)}/get`, { id }) } catch (error) {
+        if (isUnavailableWikiBinding(error)) return undefined
+        throw error
+      }
+    }))
+      .then(items => { if (live) setData({ items: items.filter(Boolean), unavailable: items.filter(item => item === undefined).length, loading: false, error: null }) })
+      .catch(error => { if (live) setData({ items: [], unavailable: 0, loading: false, error }) })
     return () => { live = false }
   }, [available, connection, ids.join('\u0000'), kind])
   const label = assetKindLabel(kind)
@@ -711,6 +731,9 @@ function SessionSharedAssetPanel({ kind, profile, connection, available }) {
   if (data.loading) return h(StateMessage, { title: `正在加载${label}`, description: '正在准备当前对话使用的资料。' })
   if (data.error) return h(StateMessage, { title: `当前${label}已经找不到了`, description: userErrorMessage(data.error, 'detail') })
   return h('section', { className: `${css.contextPanel} ${css.referenceWorkbench} ${css.sessionDocumentWorkbench}`, 'aria-label': `当前对话的${label}` },
+    data.unavailable > 0 && data.items.length > 0
+      ? h(InlineNotice, { message: `${data.unavailable} 项已绑定${label}不可用，后续回复会跳过。`, action: '重新选择', onAction: onBind })
+      : null,
     data.items.length
       ? h(SessionDocumentBrowser, {
         items: data.items,
@@ -728,7 +751,131 @@ function SessionSharedAssetPanel({ kind, profile, connection, available }) {
           }),
           h(SharedAssetDetail, { kind, detail: item })),
       })
-      : h(ContextEmpty, { quiet: true, icon: kind === 'writingStyle' ? IconEditOutline16 : IconAgentPresetOutline16, title: `当前对话没有使用${label}`, description: `这里会展示当前对话实际采用的${label}。` }))
+      : h(ContextEmpty, { quiet: true, icon: kind === 'writingStyle' ? IconEditOutline16 : IconAgentPresetOutline16, title: ids.length > 0 ? `当前${label}已不可用` : `当前对话没有使用${label}`, description: ids.length > 0 ? `它会从后续回复资料中跳过，不会阻止继续对话。` : `可以直接继续对话，也可以为后续回复选择${label}。`, action: ids.length > 0 ? `重新选择${label}` : '选择并绑定', onAction: onBind }))
+}
+
+function SessionWikiBindingPanel({ kind, profile, connection, sessionId, onCancel, onBound }) {
+  const spec = sessionBindingSpec(kind)
+  const [items, setItems] = useState([])
+  const [selectedIds, setSelectedIds] = useState([])
+  const [query, setQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [savedRevision, setSavedRevision] = useState(null)
+  const [error, setError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  useEffect(() => {
+    let live = true
+    setLoading(true)
+    setError(null)
+    setItems([])
+    setSelectedIds([])
+    void rpc(connection, spec.listEndpoint, { limit: 100 }).then(value => {
+      if (!live) return
+      const ready = readyBindingItems(value?.items)
+      const availableIds = new Set(ready.map(item => item.id))
+      setItems(ready)
+      setSelectedIds(currentSessionBindingIds(profile, kind).filter(id => availableIds.has(id)))
+      setLoading(false)
+    }, reason => {
+      if (!live) return
+      setError({ reason, intent: 'load' })
+      setLoading(false)
+    })
+    return () => { live = false }
+  }, [connection, kind, reloadKey, spec.listEndpoint])
+  useEffect(() => {
+    if (savedRevision === null || Number(profile?.revision) < savedRevision) return
+    onBound()
+  }, [onBound, profile?.revision, savedRevision])
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const visibleItems = normalizedQuery.length === 0
+    ? items
+    : items.filter(item => `${item.name ?? ''}\n${item.description ?? ''}`.toLocaleLowerCase().includes(normalizedQuery))
+  const toggle = id => {
+    if (saving || savedRevision !== null) return
+    if (!spec.multi) { setSelectedIds([id]); return }
+    setSelectedIds(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])
+  }
+  const save = async () => {
+    if (selectedIds.length === 0 || saving || savedRevision !== null) return
+    setSaving(true)
+    setError(null)
+    try {
+      const next = await rpc(connection, 'session/bind', {
+        sessionId,
+        expectedRevision: profile?.revision ?? 0,
+        ...sessionBindingRequest(kind, selectedIds),
+      })
+      if (!Number.isSafeInteger(next?.revision)) onBound()
+      else setSavedRevision(next.revision)
+    } catch (reason) {
+      setError({ reason, intent: 'save' })
+      setSaving(false)
+    }
+  }
+  return h('section', { className: css.sessionBindingPanel, 'aria-label': `绑定${spec.label}` },
+    h('header', { className: css.sessionBindingHeader },
+      h(m.button, { ...gestures, type: 'button', className: css.sessionBindingBack, disabled: saving || savedRevision !== null, onClick: onCancel }, '← 返回'),
+      h('span', null,
+        h('small', { className: css.eyebrow }, '会话 Wiki'),
+        h('h3', null, `选择并绑定${spec.label}`),
+        h('p', null, spec.multi ? '可选择多项；保存后仅更新这一类资料，其他会话资料保持不变。' : '保存后仅更新这项资料，其他会话资料保持不变。'))),
+    error ? h(InlineNotice, { message: userErrorMessage(error.reason, error.intent), action: error.intent === 'load' ? '重新加载' : undefined, onAction: error.intent === 'load' ? () => setReloadKey(value => value + 1) : undefined }) : null,
+    loading
+      ? h(StateMessage, { title: `正在加载${spec.label}`, description: '正在读取资料库中的可用内容。' })
+      : error?.intent === 'load'
+        ? h(ContextEmpty, { quiet: true, icon: bindingIcon(kind), title: `暂时无法读取${spec.label}`, description: '当前对话仍可继续；重新加载后再选择资料。' })
+      : items.length === 0
+        ? h(ContextEmpty, { quiet: true, icon: bindingIcon(kind), title: spec.emptyTitle, description: spec.emptyDescription })
+        : h(React.Fragment, null,
+          h('label', { className: css.sessionBindingSearch },
+            h('span', { className: css.srOnly }, `搜索${spec.label}`),
+            h('input', { value: query, disabled: saving || savedRevision !== null, onChange: event => setQuery(event.target.value), placeholder: `搜索${spec.label}` })),
+          visibleItems.length === 0
+            ? h(ContextEmpty, { quiet: true, icon: bindingIcon(kind), title: '没有匹配的资料', description: '换一个名称或关键词再试。' })
+            : h('div', { className: css.sessionBindingList, role: 'listbox', 'aria-label': `可绑定的${spec.label}`, 'aria-multiselectable': spec.multi ? 'true' : undefined },
+              ...visibleItems.map(item => {
+                const selected = selectedIds.includes(item.id)
+                return h(m.button, {
+                  ...gestures,
+                  key: item.id,
+                  type: 'button',
+                  role: 'option',
+                  className: css.sessionBindingOption,
+                  'aria-selected': selected,
+                  disabled: saving || savedRevision !== null,
+                  onClick: () => toggle(item.id),
+                },
+                h('span', { className: css.sessionBindingMark, 'data-selected': selected ? 'true' : 'false', 'aria-hidden': true }, selected ? '✓' : ''),
+                h('span', { className: css.sessionBindingCopy },
+                  h('strong', null, item.name ?? `未命名${spec.label}`),
+                  h('small', null, item.description || bindingItemMeta(kind, item))))
+              }))),
+    items.length > 0 ? h('footer', { className: css.sessionBindingFooter },
+      h('span', null, selectedIds.length > 0 ? `已选择 ${selectedIds.length} 项` : `请选择${spec.label}`),
+      h('span', { className: css.sessionBindingActions },
+        h(Button, { variant: 'outline', disabled: saving || savedRevision !== null, onClick: onCancel }, '取消'),
+        h(Button, { disabled: selectedIds.length === 0 || saving || savedRevision !== null, onClick: () => void save() }, savedRevision !== null ? '已保存，正在更新…' : saving ? '正在绑定…' : `绑定${spec.label}`))) : null)
+}
+
+function bindingIcon(kind) {
+  if (kind === 'character') return IconCharacterCardOutline16
+  if (kind === 'lorebooks') return IconLinkOutline16
+  if (kind === 'preset') return IconListPenOutline16
+  if (kind === 'writingStyles') return IconEditOutline16
+  return IconAgentPresetOutline16
+}
+
+function bindingItemMeta(kind, item) {
+  if (kind === 'character') return item.tags?.length ? item.tags.join(' · ') : '角色卡'
+  if (kind === 'lorebooks') return `${item.entries ?? 0} 条设定`
+  if (kind === 'preset') return `${item.fields ?? 0} 个栏位`
+  return kind === 'writingStyles' ? '文风要求' : '我的人设'
+}
+
+function isUnavailableWikiBinding(error) {
+  return ['ASSET_NOT_FOUND', 'ASSET_CORRUPT', 'UNSUPPORTED_FORMAT', 'UNSUPPORTED_SCHEMA', 'LIMIT_EXCEEDED'].includes(error?.code)
 }
 
 function SharedAssetDetail({ kind, detail }) {
@@ -1071,11 +1218,12 @@ function formatStateValue(value) {
   return String(value)
 }
 
-function ContextEmpty({ icon: Icon, title, description, quiet = false }) {
+function ContextEmpty({ icon: Icon, title, description, quiet = false, action, onAction }) {
   return h('div', { className: quiet ? `${css.contextEmpty} ${css.contextEmptyQuiet}` : css.contextEmpty },
     h('span', null, h(Icon, { size: 22 })),
     h('strong', null, title),
-    h('p', null, description))
+    h('p', null, description),
+    action ? h(m.button, { ...gestures, type: 'button', className: css.contextEmptyAction, onClick: onAction }, action) : null)
 }
 
 function LoadingGlyph() {

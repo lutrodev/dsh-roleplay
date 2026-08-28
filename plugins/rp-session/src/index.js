@@ -716,44 +716,47 @@ async function resolveAssetChanges(ctx, current, changes, requestedOpeningIndex,
   const currentResources = current.resources
   const cardRequested = has(changes, 'cardId')
   const lorebooksRequested = has(changes, 'lorebookIds')
+  const personaRequested = has(changes, 'personaId')
+  const presetRequested = has(changes, 'presetId')
+  const writingStylesRequested = has(changes, 'writingStyleIds')
   const cardId = cardRequested ? nullableId(changes.cardId, 'cardId') : currentResources.card?.id
   const lorebookIds = lorebooksRequested
     ? uniqueIds(changes.lorebookIds, 'lorebookIds')
     : currentResources.lorebooks.map(item => item.id)
-  const personaId = has(changes, 'personaId') ? nullableId(changes.personaId, 'personaId') : currentResources.persona?.id
-  const presetId = has(changes, 'presetId') ? nullableId(changes.presetId, 'presetId') : currentResources.preset?.id
-  const writingStyleIds = has(changes, 'writingStyleIds')
+  const personaId = personaRequested ? nullableId(changes.personaId, 'personaId') : currentResources.persona?.id
+  const presetId = presetRequested ? nullableId(changes.presetId, 'presetId') : currentResources.preset?.id
+  const writingStyleIds = writingStylesRequested
     ? uniqueIds(changes.writingStyleIds, 'writingStyleIds')
     : currentResources.writingStyles.map(item => item.id)
 
-  const cards = service(ctx, 'rpCharacterCards', cardId !== undefined)
-  const lorebooks = service(ctx, 'rpLoreBooks', lorebookIds.length > 0)
-  const personas = service(ctx, 'rpPersonas', personaId !== undefined)
-  const presets = service(ctx, 'rpPresets', presetId !== undefined)
-  const writingStyles = service(ctx, 'rpWritingStyles', has(changes, 'writingStyleIds'))
+  const cardNeedsResolution = cardId !== undefined
+    && (cardRequested || (requestedOpeningIndex !== undefined && !allowEmpty))
+  const cards = service(ctx, 'rpCharacterCards', cardNeedsResolution)
+  const lorebooks = service(ctx, 'rpLoreBooks', lorebooksRequested && lorebookIds.length > 0)
+  const personas = service(ctx, 'rpPersonas', personaRequested && personaId !== undefined)
+  const presets = service(ctx, 'rpPresets', presetRequested && presetId !== undefined)
+  const writingStyles = service(ctx, 'rpWritingStyles', writingStylesRequested && writingStyleIds.length > 0)
   let cardValue
-  if (cardId !== undefined) {
-    try {
-      cardValue = await cards.get(cardId)
-    } catch (error) {
-      if (cardRequested || error?.code !== 'ASSET_NOT_FOUND') throw error
-    }
+  let card = currentResources.card
+  if (cardRequested && cardId === undefined) card = undefined
+  else if (cardNeedsResolution) {
+    cardValue = await cards.get(cardId)
+    card = { id: cardValue.id }
   }
-  const resolvedLorebooks = []
-  for (const id of lorebookIds) {
-    try {
-      resolvedLorebooks.push({ id: (await lorebooks.get(id)).id })
-    } catch (error) {
-      if (lorebooksRequested || error?.code !== 'ASSET_NOT_FOUND') throw error
-    }
+  let resolvedLorebooks = currentResources.lorebooks
+  if (lorebooksRequested) {
+    resolvedLorebooks = []
+    for (const id of lorebookIds) resolvedLorebooks.push({ id: (await lorebooks.get(id)).id })
   }
-  const persona = personaId === undefined ? undefined : { id: (await personas.get(personaId)).id }
-  const preset = presetId === undefined ? undefined : await presets.resolveBinding(presetId)
-  const resolvedStyles = has(changes, 'writingStyleIds')
-    ? await writingStyles.resolveBindings(writingStyleIds)
+  let persona = currentResources.persona
+  if (personaRequested) persona = personaId === undefined ? undefined : { id: (await personas.get(personaId)).id }
+  let preset = currentResources.preset
+  if (presetRequested) preset = presetId === undefined ? undefined : await presets.resolveBinding(presetId)
+  const resolvedStyles = writingStylesRequested
+    ? writingStyleIds.length === 0 ? [] : await writingStyles.resolveBindings(writingStyleIds)
     : currentResources.writingStyles
 
-  const cardChanged = cardId !== currentResources.card?.id
+  const cardChanged = card?.id !== currentResources.card?.id
   const openingIndex = requestedOpeningIndex === undefined
     ? cardChanged ? 0 : current.scene.openingIndex ?? 0
     : normalizeOpeningIndex(requestedOpeningIndex)
@@ -762,7 +765,7 @@ async function resolveAssetChanges(ctx, current, changes, requestedOpeningIndex,
     openingText = openingFromCharacter(cardValue, openingIndex)
   }
   return {
-    ...(cardValue === undefined ? {} : { card: { id: cardValue.id } }),
+    ...(card === undefined ? {} : { card }),
     lorebooks: resolvedLorebooks,
     ...(persona === undefined ? {} : { persona }),
     ...(preset === undefined ? {} : { preset }),

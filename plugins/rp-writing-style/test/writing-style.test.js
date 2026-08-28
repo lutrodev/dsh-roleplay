@@ -203,6 +203,10 @@ test('expands selected live styles in Session order into independently movable p
     assert.equal(source.order, 20)
     assert.deepEqual(await styles.resolveBindings([first.id, second.id]), [{ id: first.id }, { id: second.id }])
     await assert.rejects(styles.resolveBindings([first.id, first.id]), error => error.code === 'INVALID_REQUEST')
+    await styles.delete(second.id, second.revision)
+    const withDeletedBinding = await source.prepare({ agent: {} })
+    assert.deepEqual(withDeletedBinding.sources.map(item => item.id), [`rp.writing-style:${first.id}`])
+    assert.equal(withDeletedBinding.sources[0].diagnostics.selectionOrder, 1)
   } finally {
     await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })

@@ -20,7 +20,7 @@
     "README.md"
   ],
   "scripts": {
-    "check": "node --check src/index.js && node --check src/session-bootstrap.js && node --check src/deletion.js && node --check src/client.js && node --check src/session-wiki.js && node --check src/client-state.js && node --check src/run-marker.js && node --check src/asset-editor-registry.js && node --check src/context-canvas.js && node --check src/prompt-custom-source.js && node --check src/prompt-slot-visibility.js",
+    "check": "node --check src/index.js && node --check src/session-bootstrap.js && node --check src/deletion.js && node --check src/client.js && node --check src/session-wiki.js && node --check src/session-binding.js && node --check src/client-state.js && node --check src/run-marker.js && node --check src/asset-editor-registry.js && node --check src/context-canvas.js && node --check src/prompt-custom-source.js && node --check src/prompt-slot-visibility.js",
     "test": "node --test",
     "generate:styles": "node scripts/generate-styles.mjs",
     "build:client": "pnpm run generate:styles && tsdown --config tsdown.config.js --config-loader native",

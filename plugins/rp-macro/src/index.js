@@ -50,7 +50,7 @@ async function resolveLiveAsset(service, binding) {
   try {
     return await service.get(binding.id)
   } catch (error) {
-    if (error?.code === 'ASSET_NOT_FOUND') return undefined
+    if (error?.code === 'ASSET_NOT_FOUND' || error?.code === 'ASSET_CORRUPT') return undefined
     throw error
   }
 }

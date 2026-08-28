@@ -97,7 +97,7 @@ export class RpLoreBooks extends Service {
       try {
         books.push({ ...(await this.get(binding.id)), priority: index })
       } catch (error) {
-        if (error?.code !== 'ASSET_NOT_FOUND') throw error
+        if (!isUnavailableBinding(error)) throw error
       }
     }
     const cardBinding = profile.resources.card
@@ -108,7 +108,7 @@ export class RpLoreBooks extends Service {
       try {
         character = await cards.get(cardBinding.id)
       } catch (error) {
-        if (error?.code !== 'ASSET_NOT_FOUND') throw error
+        if (!isUnavailableBinding(error)) throw error
       }
       if (character !== undefined) {
         const managedByBoundBook = books.some(book => book.sourceCharacterId === cardBinding.id)
@@ -597,6 +597,12 @@ function success(value) { return { ok: true, value } }
 function failure(code, message) { return { ok: false, error: { code, message } } }
 function transportSuccess(value) { return { ok: true, value } }
 function codeFor(error) { return ['INVALID_REQUEST', 'LIMIT_EXCEEDED', 'UNSUPPORTED_FORMAT', 'DUPLICATE_ASSET', 'ASSET_CORRUPT', 'ASSET_NOT_FOUND', 'REVISION_CONFLICT'].includes(error?.code) ? error.code : 'ASSET_CORRUPT' }
+
+function isUnavailableBinding(error) {
+  return error?.code === 'ASSET_NOT_FOUND'
+    || error?.code === 'ASSET_CORRUPT'
+    || error?.code === 'UNSUPPORTED_SCHEMA'
+}
 
 function messageText(messages, scanDepth) {
   const selected = scanDepth === undefined

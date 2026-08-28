@@ -31,6 +31,7 @@ import {
   updateAssistantActionState,
 } from './client-state.js'
 import { decodeRpMessageActionEvent, rpMessageActionTargetKey } from './protocol.js'
+import { PresetRecoveryDialog, shouldInspectPresetFailure, usePresetFailureDiagnostic } from './preset-recovery.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
 export const inject = ['slots', 'uiConversation', 'rpRemote', 'sessions']
@@ -446,6 +447,7 @@ function AssistantMessageActions(props) {
 
 function FailedTurnRecoveryActions(props) {
   const roleplay = props.useSessions(state => isRoleplaySession(state, props.sessionId))
+  const profile = props.useProjection('rp/session')
   const fallbackNode = {
     kind: 'rp-floor-failed-assistant',
     id: String(props.matched.state.turn),
@@ -457,8 +459,13 @@ function FailedTurnRecoveryActions(props) {
     props.matched.target,
     fallbackNode,
   )
+  const presetRecovery = usePresetFailureDiagnostic({
+    connection: props.connection,
+    profile,
+    enabled: roleplay && detail !== null && shouldInspectPresetFailure(props.matched),
+  })
   if (!roleplay || detail === null) return null
-  const status = failedTurnStatus(props.matched, detail)
+  const status = failedTurnStatus(props.matched, detail, presetRecovery)
   if (props.matched.target.kind === 'message') {
     return status === null ? null : h(FailedTurnStatus, { status })
   }
@@ -470,12 +477,17 @@ function FailedTurnRecoveryActions(props) {
     canEdit: false,
     failedAssistant: true,
     failureStatus: status,
+    presetRecovery: presetRecovery?.kind === 'missing-preset'
+      ? { ...presetRecovery, profile }
+      : presetRecovery?.kind === 'checking-preset'
+        ? presetRecovery
+        : null,
     detail,
   })
 }
 
 /** Prefer DSH's visible interruption and length-limit states; translate the remaining terminal outcomes. */
-export function failedTurnStatus(matched, detail) {
+export function failedTurnStatus(matched, detail, diagnostic = null) {
   const kind = matched.state?.endReasonKind
   if (kind === 'max-tokens' || matched.nativeStatusVisible === true) return null
   const hasPartial = matched.target?.kind === 'message'
@@ -493,6 +505,15 @@ export function failedTurnStatus(matched, detail) {
         '正文已保留，但本次会话变量变化没有生效。',
         '正文已保留，但本次会话变量变化没有生效，可以重新生成这条回复。',
       ),
+    }
+  }
+  if (diagnostic?.kind === 'missing-preset') {
+    return {
+      state: 'warning',
+      title: '已跳过不可用的创作预设',
+      message: diagnostic.cause === 'ASSET_CORRUPT'
+        ? '原绑定预设无法读取，但不会再阻止生成。你可以直接重新生成，或重新选择预设。'
+        : '原绑定预设已被删除，但不会再阻止生成。你可以直接重新生成，或重新选择预设。',
     }
   }
   if (kind === 'error') {
@@ -892,14 +913,26 @@ function removeAttributeOwner(row, name, owner) {
   else row.setAttribute(name, [...owners].join(' '))
 }
 
-function FloorActions({ sessionId, useSessions, turn, target, detail, edited = false, connection, sessions, surface = 'assistant', actionLabel, copyText = '', forkSeq, messageTime, canEdit = true, failedAssistant = false, failureStatus = null, nativeAssistant = false, userHadText = false, userHasNonTextContent = false }) {
+function FloorActions({ sessionId, useSessions, turn, target, detail, edited = false, connection, sessions, surface = 'assistant', actionLabel, copyText = '', forkSeq, messageTime, canEdit = true, failedAssistant = false, failureStatus = null, presetRecovery = null, nativeAssistant = false, userHadText = false, userHasNonTextContent = false }) {
   const roleplay = useSessions(state => isRoleplaySession(state, sessionId))
   const targetKey = rpMessageActionTargetKey(target)
+  const recoveryTurn = Number.isSafeInteger(detail?.turn) ? detail.turn : turn?.turn
   const [dialog, setDialog] = useState(null)
   const [editing, setEditing] = useState(false)
   const [body, setBody] = useState('')
   const [pending, setPending] = useState(null)
   const [error, setError] = useState(null)
+  const [presetDialogOpen, setPresetDialogOpen] = useState(false)
+  const [presetRecoveryApplied, setPresetRecoveryApplied] = useState(null)
+
+  useEffect(() => {
+    setPresetDialogOpen(false)
+    setPresetRecoveryApplied(null)
+  }, [recoveryTurn, sessionId, targetKey])
+
+  useEffect(() => {
+    if (presetRecovery?.kind !== 'missing-preset') setPresetDialogOpen(false)
+  }, [presetRecovery?.kind])
 
   if (!roleplay || detail === null) return null
 
@@ -987,7 +1020,7 @@ function FloorActions({ sessionId, useSessions, turn, target, detail, edited = f
   const userSurface = surface === 'user'
   const failedTurnTarget = failedAssistant && target.kind === 'turn'
   const failedReply = detail?.failed === true
-  const actionTurn = Number.isSafeInteger(detail?.turn) ? detail.turn : turn.turn
+  const actionTurn = recoveryTurn
   const resolvedActionLabel = actionLabel ?? (detail?.opening === true ? '开场白' : undefined)
   const unitLabel = resolvedActionLabel ?? (userSurface ? '消息' : failedReply ? '未完成的回复' : '回复')
   const toolbarLabel = resolvedActionLabel === undefined
@@ -996,6 +1029,16 @@ function FloorActions({ sessionId, useSessions, turn, target, detail, edited = f
   const visibleText = copyText !== '' ? copyText : detail?.content ?? ''
   const branchSeq = detail?.forkSeq ?? forkSeq
   const actionsDisabled = pending !== null || detail.sessionRunning === true
+  const presetMissing = presetRecovery?.kind === 'missing-preset' && presetRecoveryApplied === null
+  const displayedFailureStatus = presetRecoveryApplied === null
+    ? failureStatus
+    : {
+        state: 'done',
+        title: presetRecoveryApplied.presetId === null ? '已移除失效的预设' : '创作预设已更新',
+        message: detail?.canReroll === true
+          ? '现在可以重新生成这条回复。'
+          : '现在可以继续发送消息。',
+      }
   const branchAction = !userSurface && detail !== null && Number.isSafeInteger(branchSeq)
     ? h(FloorActionButton, {
         label: pending === 'branch' ? '正在新建对话…' : '从此处新建对话',
@@ -1046,6 +1089,12 @@ function FloorActions({ sessionId, useSessions, turn, target, detail, edited = f
     disabled: actionsDisabled,
     onClick: () => void reroll(),
   }, pending === 'reroll' ? '正在重新生成…' : '重新生成') : null,
+  presetMissing ? h(Button, {
+    variant: 'outline',
+    size: 'sm',
+    disabled: actionsDisabled,
+    onClick: () => setPresetDialogOpen(true),
+  }, '重新选择预设') : null,
   detail?.canDelete === true ? h(Button, {
     variant: 'ghost',
     size: 'sm',
@@ -1075,10 +1124,10 @@ function FloorActions({ sessionId, useSessions, turn, target, detail, edited = f
           onCancel: closeEditor,
           onSave: () => void edit(false),
           onSaveAndReroll: () => void edit(true),
-        }) : failedTurnTarget ? (failureStatus === null
+        }) : failedTurnTarget ? (displayedFailureStatus === null
           ? failedRecoveryActions
           : h(FailedTurnStatusRow, {
-              status: failureStatus,
+              status: displayedFailureStatus,
               pending: pending === 'reroll',
               actions: failedRecoveryActions,
             })) : nativeAssistant ? h(React.Fragment, null,
@@ -1109,6 +1158,17 @@ function FloorActions({ sessionId, useSessions, turn, target, detail, edited = f
           failed: failedReply,
           sharedAssetMutation: detail?.deleteIncludesSharedAssetMutation === true,
           onConfirm: () => void remove(),
+        }),
+        h(PresetRecoveryDialog, {
+          open: presetDialogOpen,
+          connection,
+          sessionId,
+          profile: presetRecovery?.profile,
+          onClose: () => setPresetDialogOpen(false),
+          onApplied: value => {
+            setPresetDialogOpen(false)
+            setPresetRecoveryApplied(value)
+          },
         }))))
 }
 

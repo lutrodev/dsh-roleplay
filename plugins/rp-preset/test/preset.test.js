@@ -112,6 +112,28 @@ test('browser Remote returns detached templates and can create or select a defau
   }
 })
 
+test('validates a bound preset without depending on library default preferences', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-preset-binding-'))
+  const ctx = new Context()
+  const presets = new RpPresets(ctx, configFor(root))
+  try {
+    const created = await presets.create({ name: '会话使用的预设' })
+    await writeFile(join(root, '.preferences.json'), '{invalid json', 'utf8')
+    assert.deepEqual(
+      await dispatchBrowser(presets, 'validate-binding', { id: created.id }),
+      { id: created.id },
+    )
+    await rm(join(root, `${created.id}.json`))
+    await assert.rejects(
+      dispatchBrowser(presets, 'validate-binding', { id: created.id }),
+      error => error.code === 'ASSET_NOT_FOUND',
+    )
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('deletes presets through revision CAS and promotes another default', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-preset-delete-'))
   const ctx = new Context()

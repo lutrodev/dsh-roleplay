@@ -176,6 +176,32 @@
 .contextEmpty > span { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 13px; color: var(--dsw-alias-brand-primary); background: color-mix(in srgb, var(--dsw-alias-brand-primary) 9%, transparent); }
 .contextEmpty strong { color: var(--dsw-alias-label-secondary); font-size: 13px; font-weight: 550; }
 .contextEmpty p { max-width: 360px; margin: 0; font-size: 11px; line-height: 18px; }
+.contextEmptyAction { min-height: 34px; margin-top: 6px; padding: 7px 14px; border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 34%, var(--dsw-alias-border-l2)); border-radius: 10px; color: var(--dsw-alias-brand-primary); background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, transparent); cursor: pointer; font-family: var(--dsw-font-family); font-size: 11px; font-weight: 590; }
+.contextEmptyAction:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent); }
+.contextEmptyAction:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
+.sessionBindingPanel { display: flex; min-width: 0; min-height: 0; flex: 1; overflow: hidden; flex-direction: column; gap: 12px; padding: 18px 24px 20px; }
+.sessionBindingHeader { display: grid; flex: none; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 14px; }
+.sessionBindingHeader > span { display: flex; min-width: 0; flex-direction: column; }
+.sessionBindingHeader h3 { margin: 2px 0 0; color: var(--dsw-alias-label-primary); font-size: 20px; line-height: 28px; font-weight: 620; letter-spacing: -.015em; }
+.sessionBindingHeader p { margin: 3px 0 0; color: var(--dsw-alias-label-tertiary); font-size: 10px; line-height: 17px; }
+.sessionBindingBack { min-height: 32px; padding: 6px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 9px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-1); cursor: pointer; font-family: var(--dsw-font-family); font-size: 10px; }
+.sessionBindingBack:disabled { cursor: wait; opacity: .52; }
+.sessionBindingSearch { display: flex; flex: none; }
+.sessionBindingSearch input { width: 100%; min-height: 38px; box-sizing: border-box; padding: 8px 11px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 11px; outline: none; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-1); font-family: var(--dsw-font-family); font-size: 12px; }
+.sessionBindingSearch input:focus { border-color: var(--dsw-alias-brand-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 13%, transparent); }
+.sessionBindingList { display: grid; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; align-content: start; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 2px; }
+.sessionBindingOption { display: grid; min-width: 0; min-height: 62px; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-1); text-align: left; cursor: pointer; font-family: var(--dsw-font-family); }
+.sessionBindingOption:hover:not(:disabled) { border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 32%, var(--dsw-alias-border-l2)); background: color-mix(in srgb, var(--dsw-alias-brand-primary) 4%, var(--dsw-alias-bg-layer-1)); }
+.sessionBindingOption[aria-selected="true"] { border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 46%, var(--dsw-alias-border-l2)); color: var(--dsw-alias-label-primary); background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, var(--dsw-alias-bg-layer-1)); }
+.sessionBindingOption:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
+.sessionBindingOption:disabled { cursor: wait; opacity: .58; }
+.sessionBindingMark { display: grid; width: 22px; height: 22px; box-sizing: border-box; place-items: center; border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; color: transparent; background: var(--dsw-specific-selector); font-size: 11px; font-weight: 700; }
+.sessionBindingMark[data-selected="true"] { border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-label-primary-foreground); background: var(--dsw-alias-brand-primary); }
+.sessionBindingCopy { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.sessionBindingCopy strong { overflow: hidden; color: inherit; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 18px; font-weight: 590; }
+.sessionBindingCopy small { display: -webkit-box; overflow: hidden; color: var(--dsw-alias-label-tertiary); font-size: 9px; line-height: 15px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.sessionBindingFooter { display: flex; min-height: 42px; flex: none; align-items: center; justify-content: space-between; gap: 14px; padding-top: 12px; border-top: 1px solid var(--dsw-alias-separator-primary); color: var(--dsw-alias-label-tertiary); font-size: 10px; }
+.sessionBindingActions { display: flex; align-items: center; gap: 8px; }
 .stateBrowser { display: grid; grid-template-columns: minmax(196px, 232px) minmax(360px, 1fr); gap: 14px; min-height: 0; box-sizing: border-box; flex: 1; padding: 12px; }
 .namespaceList { display: flex; min-height: 0; overflow-y: auto; flex-direction: column; gap: 5px; padding: 7px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 16px; background: var(--dsw-alias-bg-layer-1); }
 .namespaceList button { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 10px; border: 1px solid transparent; border-radius: 11px; color: var(--dsw-alias-label-secondary); background: transparent; text-align: left; cursor: pointer; font-family: var(--dsw-font-family); }
@@ -622,6 +648,12 @@ button.slotPlaceholder:hover { border-color: color-mix(in srgb, var(--dsw-alias-
   .workbenchDialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); border-radius: 18px; }
   .sessionWikiOverview { align-items: flex-start; }
   .contextNav { align-items: stretch; flex-direction: column; gap: 9px; }
+  .sessionBindingPanel { min-height: 420px; padding: 14px 12px 16px; }
+  .sessionBindingHeader { grid-template-columns: 1fr; gap: 9px; }
+  .sessionBindingBack { justify-self: start; }
+  .sessionBindingList { grid-template-columns: 1fr; }
+  .sessionBindingFooter { align-items: stretch; flex-direction: column; }
+  .sessionBindingActions { justify-content: flex-end; }
   .stateBrowser { grid-template-columns: 1fr; grid-template-rows: auto minmax(260px, 1fr); }
   .namespaceList { max-height: 150px; }
   .semanticStateTree { padding: 14px 14px 26px; }
