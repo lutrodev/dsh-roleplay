@@ -29,7 +29,7 @@ The preset shapes how to produce the next bounded story beat; it does not overri
 
 - Discuss candidate instructions without saving unless the user explicitly asks to create, update, or apply a preset.
 - Use `rp_asset_read` with `kind: "preset"` and `list`/`get` to inspect. Use the Agent-only `rp_asset` with `create`, or `update` plus `expectedRevision`, to persist the normalized preset body.
-- The canonical `value` is `{ name, description?, fields: [{ id?, name, description?, content?, position: "top" | "bottom" }] }`. Omitting `fields` creates an empty preset; never assume fixed field names or server-supplied fields. When the user wants starter guidance, send the intended complete ordered field array explicitly.
+- The canonical `value` is `{ name, description?, fields: [{ id?, name, description?, content?, position: "top" | "bottom", sectionTag?: boolean }] }`. `sectionTag` defaults to `true` and supplies the field's default grouping-label behavior to conversations; a conversation may later override its own copy. Omitting `fields` creates an empty preset; never assume fixed field names or server-supplied fields. When the user wants starter guidance, send the intended complete ordered field array explicitly.
 - Preset `update` replaces the complete editable body. First use `rp_asset_read` with `get`, preserve unchanged fields and their `id` values, merge the requested changes, then send the full body with the exact revision.
 - Bind through `changes.presetId`, or use `bindToCurrentSession: true` during creation.
 - After a successful mutation, use the refreshed context before continuing the story; if binding fails, stop and report that the preset was saved but not applied.

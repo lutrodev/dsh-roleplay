@@ -18,8 +18,8 @@ test('creates a truly blank preset or copies the example preset', async () => {
 
     const created = await presets.create(PRESET_TEMPLATES[0].preset)
     const initial = await presets.get(created.id)
-    assert.deepEqual(initial.fields.map(field => [field.name, field.position]), [
-      ['声明', 'top'], ['任务描述', 'top'], ['写作指导', 'top'], ['思维链指导', 'bottom'], ['格式要求', 'bottom'],
+    assert.deepEqual(initial.fields.map(field => [field.name, field.position, field.sectionTag]), [
+      ['声明', 'top', true], ['任务描述', 'top', true], ['写作指导', 'top', true], ['思维链指导', 'bottom', true], ['格式要求', 'bottom', true],
     ])
     assert.ok(initial.fields.every(field => field.content.length > 0))
     assert.equal(PRESET_TEMPLATES[0].name, '示例预设')
@@ -148,7 +148,7 @@ test('registers every non-empty field as an independently movable prompt slot', 
   try {
     selected = await presets.create({ name: '测试', description: '仅供资料库展示的预设说明。', fields: [
       { name: '镜头调度', description: '顶部第一项', content: '使用近景。', position: 'top' },
-      { name: '段落收束', description: '底部第一项', content: '两段。', position: 'bottom' },
+      { name: '段落收束', description: '底部第一项', content: '两段。', position: 'bottom', sectionTag: false },
       { name: '连续性自检', description: '底部第二项', content: '检查连续性。', position: 'bottom' },
       { name: '长'.repeat(120), description: '说明'.repeat(500), content: '保留完整正文。', position: 'top' },
     ] })
@@ -158,6 +158,7 @@ test('registers every non-empty field as an independently movable prompt slot', 
     assert.deepEqual(value.sources.filter(item => [...item.label].length < 80).map(item => item.label), ['镜头调度', '段落收束', '连续性自检'])
     assert.deepEqual(value.sources.map(item => item.defaultSlot.id), value.sources.map(item => item.id))
     assert.deepEqual(value.sources.map(item => item.defaultSlot.label), value.sources.map(item => item.label))
+    assert.deepEqual(value.sources.map(item => item.defaultSlot.sectionTag), [true, true, false, true])
     assert.deepEqual(value.sources.map(item => item.diagnostics.positionOrder), [1, 2, 1, 2])
     assert.ok(value.sources.every(item => item.id.startsWith('rp.preset:')))
     assert.equal(new Set(value.sources.map(item => item.defaultSlot.id)).size, 4)
@@ -189,6 +190,7 @@ test('enforces complete preset field and text limits', async () => {
     await assert.rejects(presets.create({ name: '甲', fields: [{ name: '乙', content: '1234567', position: 'top' }] }), error => error.code === 'LIMIT_EXCEEDED')
     await assert.rejects(presets.create({ name: '甲', fields: [{ name: '一', position: 'top' }, { name: '二', position: 'top' }, { name: '三', position: 'bottom' }] }), error => error.code === 'INVALID_REQUEST')
     await assert.rejects(presets.create({ name: '甲', fields: [{ name: '乙', position: 'middle' }] }), error => error.code === 'INVALID_REQUEST')
+    await assert.rejects(presets.create({ name: '甲', fields: [{ name: '乙', position: 'top', sectionTag: 'yes' }] }), error => error.code === 'INVALID_REQUEST')
   } finally {
     await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })
@@ -259,7 +261,7 @@ test('loads stored presets created before field positions were introduced', asyn
       ],
       createdAt: '2026-08-18T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z',
     })}\n`)
-    assert.deepEqual((await presets.get(id)).fields.map(field => field.position), ['top', 'bottom'])
+    assert.deepEqual((await presets.get(id)).fields.map(field => [field.position, field.sectionTag]), [['top', true], ['bottom', true]])
   } finally {
     await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })
@@ -310,6 +312,13 @@ test('preset editor offers templates or a blank draft without client-side fixed 
   assert.match(client, /mergePositionOrder/)
   assert.match(client, /'aria-label': '上移栏位'/)
   assert.match(client, /'aria-label': '下移栏位'/)
+  assert.match(client, /function SectionTagSwitch/)
+  assert.match(client, /role: 'switch'/)
+  assert.match(client, /'分组标签'/)
+  assert.match(client, /className: css\.sectionTagCompact/)
+  assert.match(client, /控制新会话是否默认添加分组标签；会话内仍可单独调整。/)
+  assert.doesNotMatch(client, /className: css\.sectionTagControl/)
+  assert.match(client, /onUpdate\(field\.id, 'sectionTag', value\)/)
   assert.match(client, /reducedMotion: 'user'/)
   assert.match(client, /useWorkbenchModal\(open\)/)
   assert.match(client, /ref: dialogRef, tabIndex: -1, className: css\.shell/)
@@ -334,6 +343,9 @@ test('preset editor offers templates or a blank draft without client-side fixed 
   assert.match(styles, /\.deleteDialog\{/)
   assert.match(styles, /\.deleteSummary\{/)
   assert.match(styles, /\.positionGroup \.fieldGrid\{grid-template-columns:minmax\(92px,\.55fr\) 1fr 1\.5fr\}/)
+  assert.match(styles, /\.sectionTagCompact\{/)
+  assert.match(styles, /\.fieldCardHeader \.sectionTagSwitch\[aria-checked="true"\]/)
+  assert.match(styles, /@media\(prefers-reduced-motion:reduce\)\{\.fieldCardHeader \.sectionTagSwitch\{transition:none\}\}/)
   assert.match(client, /export const inject = \['slots', 'rpRemote', 'rpAssetEditors'\]/)
   assert.match(client, /ctx\.rpAssetEditors\.register\('preset', PresetSessionEditor\)/)
   assert.match(client, /function PresetSessionEditor/)

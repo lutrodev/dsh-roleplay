@@ -94,6 +94,9 @@ export function normalizeContextSource(value) {
   const slot = record(value.defaultSlot) ? value.defaultSlot : {}
   const slotId = typeof slot.id === 'string' && ID_PATTERN.test(slot.id) ? slot.id : value.id
   const slotLabel = text(slot.label, sourceLabel(value.id), 80, 'context source slot label')
+  if (slot.sectionTag !== undefined && typeof slot.sectionTag !== 'boolean') {
+    throw coded('RP_INVALID_REGISTRATION', `context source "${value.id}" default slot sectionTag must be a boolean`)
+  }
   const label = text(value.label, sourceLabel(value.id), 80, 'context source label')
   const description = text(value.description, label, 240, 'context source description')
   const kind = value.kind ?? 'runtime'
@@ -127,7 +130,13 @@ export function normalizeContextSource(value) {
     dependsOn,
     legacySlotIds,
     legacySourceIds,
-    defaultSlot: { id: slotId, label: slotLabel, order: slotOrder, locked: slot.locked === true },
+    defaultSlot: {
+      id: slotId,
+      label: slotLabel,
+      order: slotOrder,
+      locked: slot.locked === true,
+      ...(slot.sectionTag === undefined ? {} : { sectionTag: slot.sectionTag }),
+    },
   }
 }
 
@@ -280,7 +289,7 @@ export function resolveChatContextBuild(value, definitions) {
  * Produce the default layout from source metadata.
  *
  * @param {readonly Record<string, unknown>[]} definitions Registered sources.
- * @returns {{ version: 1, slots: Array<{ id: string, label: string, sourceIds: string[], locked: boolean, sectionTag: true, idle?: true }> }} Default layout.
+ * @returns {{ version: 1, slots: Array<{ id: string, label: string, sourceIds: string[], locked: boolean, sectionTag: boolean, idle?: true }> }} Default layout.
  */
 export function defaultContextBuild(definitions) {
   const slots = []
@@ -288,7 +297,13 @@ export function defaultContextBuild(definitions) {
   for (const definition of ordered) {
     let slot = slots.find(item => item.id === definition.defaultSlot.id)
     if (slot === undefined) {
-      slot = { id: definition.defaultSlot.id, label: definition.defaultSlot.label, sourceIds: [], locked: definition.defaultSlot.locked, sectionTag: true }
+      slot = {
+        id: definition.defaultSlot.id,
+        label: definition.defaultSlot.label,
+        sourceIds: [],
+        locked: definition.defaultSlot.locked,
+        sectionTag: definition.defaultSlot.sectionTag !== false,
+      }
       slots.push(slot)
     }
     slot.sourceIds.push(definition.id)

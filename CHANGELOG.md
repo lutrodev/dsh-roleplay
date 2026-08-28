@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- 创作预设的每个栏位可设置是否默认使用 `<section>`／`<item>` 分组标签；会话首次使用时继承该值，并可在“回复资料”中保存自己的调整。
+
 ## 0.1.7 - 2026-08-28
 
 - 适配 DSH `0.1.2-alpha.1`：切换拆分后的 Session、Workspace、Conversation 与 Renderer 客户端 provider，跟进 `ToolCallId`、第一方 Prompt 顺序和 Harness 身份覆盖接口。

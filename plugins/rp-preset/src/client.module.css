@@ -43,7 +43,14 @@
 .positionGroup .fields:empty{border:1px dashed var(--dsw-alias-border-l2);border-radius:11px}
 .positionGroup .fields:empty::after{display:grid;min-height:36px;place-items:center;color:var(--dsw-alias-label-dimmed);font-size:10px;content:'暂无栏位'}
 .positionGroup .fieldGrid{grid-template-columns:minmax(92px,.55fr) 1fr 1.5fr}
-@media(max-width:720px){.positionGroup .fieldGrid{grid-template-columns:1fr}}
+.sectionTagCompact{display:flex;min-height:32px;flex:none;align-items:center;gap:6px;margin-right:5px;color:var(--dsw-alias-label-tertiary);font-size:10px;white-space:nowrap}
+.fieldCardHeader .sectionTagSwitch{position:relative;width:34px;height:20px;min-height:20px;flex:none;padding:3px;border:0;border-radius:999px;background:var(--dsw-alias-bg-layer-3);cursor:pointer;transition:background-color .16s ease}
+.fieldCardHeader .sectionTagSwitch[aria-checked="true"],.fieldCardHeader .sectionTagSwitch:hover[aria-checked="true"]{background:var(--dsw-alias-brand-primary)}
+.fieldCardHeader .sectionTagSwitch:hover[aria-checked="false"]{background:var(--dsw-alias-bg-layer-3)}
+.sectionTagSwitch:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.sectionTagSwitch:disabled{cursor:not-allowed;opacity:.48}
+.sectionTagSwitch>span{display:block;width:14px;height:14px;border-radius:50%;background:var(--dsw-alias-bg-layer-1);box-shadow:0 1px 3px color-mix(in srgb,black 20%,transparent)}
+@media(max-width:720px){.positionGroup .fieldGrid{grid-template-columns:1fr}.sectionTagCompact>span{display:none}.sectionTagCompact{margin-right:1px}}
 
 /* Creation starts from an explicit blank/example choice; defaults remain user-controlled assets. */
 .rowWrap{display:grid;grid-template-columns:minmax(0,1fr) 36px;align-items:center;box-sizing:border-box;border:1px solid transparent;border-radius:11px}
@@ -75,3 +82,4 @@
 .deleteConfirmAction:not(:disabled){color:var(--dsw-alias-state-error-primary)}
 .deleteError{margin-top:10px;padding:9px 11px;border-radius:9px;background:var(--dsw-alias-state-error-tertiary);color:var(--dsw-alias-state-error-primary);font-size:12px;line-height:18px}
 @media(max-width:720px){.createChooserBody{padding:20px 14px 32px}.templateCard{grid-template-columns:1fr;gap:5px}.templateCard>span{grid-column:1}.editorActions{gap:2px}.editorNav .deleteEditorAction{padding-inline:7px}}
+@media(prefers-reduced-motion:reduce){.fieldCardHeader .sectionTagSwitch{transition:none}}

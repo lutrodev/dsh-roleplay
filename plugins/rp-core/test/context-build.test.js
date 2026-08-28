@@ -38,11 +38,16 @@ test('context sources use two prompt categories and reject unknown categories', 
   assert.equal(normalizeContextSource({ id: 'idle-default', prepare() {} }).idleAllowed, true)
   assert.equal(normalizeContextSource({ id: 'always-active', idleAllowed: false, prepare() {} }).idleAllowed, false)
   assert.deepEqual(normalizeContextSource({ id: 'replacement', legacySourceIds: ['retired'], prepare() {} }).legacySourceIds, ['retired'])
+  assert.equal(normalizeContextSource({ id: 'plain-default', defaultSlot: { sectionTag: false }, prepare() {} }).defaultSlot.sectionTag, false)
   assert.throws(
     () => normalizeContextSource({ id: 'invalid', promptCategory: 'auxiliary', prepare() {} }),
     error => error.code === 'RP_INVALID_REGISTRATION',
   )
   assert.throws(() => normalizeContextSource({ id: 'invalid-legacy', legacySourceIds: ['not stable'], prepare() {} }))
+  assert.throws(
+    () => normalizeContextSource({ id: 'invalid-section-tag', defaultSlot: { sectionTag: 'no' }, prepare() {} }),
+    error => error.code === 'RP_INVALID_REGISTRATION',
+  )
 })
 
 test('idle slots remain in the Session layout but do not participate in assembly', () => {
@@ -302,6 +307,25 @@ test('each slot controls its own section and item tags', () => {
   assert.deepEqual(build.slots.map(slot => [slot.id, slot.sectionTag]), [['continuity', false], ['facts', true], ['frame', true]])
   assert.match(build.contextText, /^第一段<\/section>\n<section name="事实">/)
   assert.match(build.contextText, /<item name="引用事实">\n&lt;item&gt;第二段&lt;\/item&gt;\n<\/item>/)
+})
+
+test('source defaults seed new Session slots without replacing saved Session choices', () => {
+  const plain = normalizeContextSource({
+    id: 'rp.preset:plain', label: '原文栏位',
+    defaultSlot: { id: 'rp.preset:plain', label: '原文栏位', order: 30, sectionTag: false },
+    prepare() {},
+  })
+  assert.equal(resolveChatContextBuild(undefined, [plain]).slots[0].sectionTag, false)
+
+  const inherited = reconcileChatContextBuild({ version: 1, slots: [
+    { id: 'facts', label: '事实', sourceIds: ['facts'], sectionTag: true },
+  ] }, [definitions[1], plain])
+  assert.equal(inherited.slots.find(slot => slot.id === 'rp.preset:plain').sectionTag, false)
+
+  const adjusted = reconcileChatContextBuild({ version: 1, slots: [
+    { id: 'rp.preset:plain', label: '原文栏位', sourceIds: ['rp.preset:plain'], sectionTag: true },
+  ] }, [plain])
+  assert.equal(adjusted.slots[0].sectionTag, true)
 })
 
 test('context build migrates the former global tag setting and rejects invalid booleans', () => {

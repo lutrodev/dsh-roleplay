@@ -69,7 +69,7 @@ function assetMutationTool(ctx) {
       expectedRevision: { type: 'integer', description: 'For update only: exact positive revision returned by the latest rp_asset_read get. Omit for other actions.' },
       value: {
         type: 'json',
-        description: 'For create/update only. character: {name,description?,personality?,scenario?,firstMessage?,messageExample?,alternateGreetings?,creatorNotes?,tags?}; lorebook: {name,entries} or update patch; persona: complete {name,description?,personality?,scenario?,firstMessage?,tags?}; preset: {name,description?,fields?}, where omitted fields creates an empty preset and update sends the complete desired field array; writingStyle: complete {name,description?,content}.',
+        description: 'For create/update only. character: {name,description?,personality?,scenario?,firstMessage?,messageExample?,alternateGreetings?,creatorNotes?,tags?}; lorebook: {name,entries} or update patch; persona: complete {name,description?,personality?,scenario?,firstMessage?,tags?}; preset: {name,description?,fields?: [{id?,name,description?,content?,position,sectionTag?}]}, where sectionTag defaults true, omitted fields creates an empty preset, and update sends the complete desired field array; writingStyle: complete {name,description?,content}.',
       },
       bindToCurrentSession: { type: 'boolean', description: 'For create only. true also applies the new asset to this conversation; omit or false to create without binding.' },
       changes: { type: 'json', description: 'For bind only. Partial fields: cardId, lorebookIds, personaId, presetId, writingStyleIds. Null clears a singleton; arrays replace ordered bindings. Omitted fields stay unchanged.' },

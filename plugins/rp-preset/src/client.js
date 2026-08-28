@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Button, IconChecklistOutline14, IconChevronLeftOutline14, IconEllipsisOutline16, IconPlusOutline16, IconTrashOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import { domMax, LazyMotion, m, MotionConfig, Reorder } from 'motion/react'
+import { domMax, LazyMotion, m, MotionConfig, Reorder, useReducedMotion } from 'motion/react'
 import { useWorkbenchModal } from 'dsh-roleplay-rp-ui'
 import { css, ensureStyles } from './client-styles.generated.js'
 
@@ -207,7 +207,7 @@ function PresetCreateChooser({ templates, onBack, onBlank, onTemplate }) {
 
 function PresetEditor({ draft, onDraft, onBack, onSave, onDelete, saving, disabled = false }) {
   const updateField = (id, key, value) => onDraft(current => ({ ...current, fields: current.fields.map(field => field.id === id ? { ...field, [key]: value } : field) }))
-  const addField = () => onDraft(current => ({ ...current, fields: insertAtPositionEnd(current.fields, { id: crypto.randomUUID(), name: '', description: '', content: '', position: 'top' }, 'top') }))
+  const addField = () => onDraft(current => ({ ...current, fields: insertAtPositionEnd(current.fields, { id: crypto.randomUUID(), name: '', description: '', content: '', position: 'top', sectionTag: true }, 'top') }))
   const removeField = id => onDraft(current => ({ ...current, fields: current.fields.filter(field => field.id !== id) }))
   const move = (position, index, offset) => onDraft(current => ({ ...current, fields: mergePositionOrder(current.fields, position, moveItem(current.fields.filter(field => field.position === position), index, index + offset)) }))
   const changePosition = (id, position) => onDraft(current => {
@@ -263,7 +263,17 @@ function PresetPositionGroup({ position, fields, disabled, onReorder, onUpdate, 
     h('header', { className: css.positionHeader }, h('div', null, h('strong', { id: `preset-position-${position.id}` }, position.label), h('small', null, position.description)), h('span', null, `${fields.length} 项`)),
     h(Reorder.Group, { axis: 'y', values: fields, onReorder, className: css.fields },
       ...fields.map((field, index) => h(Reorder.Item, { key: field.id, value: field, className: css.fieldCard, layout: true },
-        h('div', { className: css.fieldCardHeader }, h('button', { type: 'button', disabled, className: css.drag, 'aria-label': `拖动${field.name || '新栏位'}调整${position.label}顺序` }, '⠿'), h('strong', null, field.name || '新栏位'), h('span', null, `${index + 1}/${fields.length}`),
+        h('div', { className: css.fieldCardHeader }, h('button', { type: 'button', disabled, className: css.drag, 'aria-label': `拖动${field.name || '新栏位'}调整${position.label}顺序` }, '⠿'), h('strong', null, field.name || '新栏位'),
+          h('div', { className: css.sectionTagCompact },
+            h('span', null, '分组标签'),
+            h(SectionTagSwitch, {
+              checked: field.sectionTag !== false,
+              disabled,
+              label: `${field.name || '新栏位'}默认使用分组标签`,
+              title: '控制新会话是否默认添加分组标签；会话内仍可单独调整。',
+              onChange: value => onUpdate(field.id, 'sectionTag', value),
+            })),
+          h('span', null, `${index + 1}/${fields.length}`),
           h('button', { type: 'button', disabled: disabled || index === 0, onClick: () => onMove(position.id, index, -1), 'aria-label': '上移栏位' }, '↑'),
           h('button', { type: 'button', disabled: disabled || index === fields.length - 1, onClick: () => onMove(position.id, index, 1), 'aria-label': '下移栏位' }, '↓'),
           h('button', { type: 'button', disabled, onClick: () => onRemove(field.id), 'aria-label': '删除栏位' }, '删除')),
@@ -274,13 +284,32 @@ function PresetPositionGroup({ position, fields, disabled, onReorder, onUpdate, 
         h('label', { className: css.field }, h('span', null, '内容'), h('textarea', { rows: 5, value: field.content, disabled, placeholder: '填写要在回复前参考的具体内容', onChange: event => onUpdate(field.id, 'content', event.target.value) }))))))
 }
 
+function SectionTagSwitch({ checked, disabled, label, title, onChange }) {
+  const reducedMotion = useReducedMotion()
+  return h(m.button, {
+    type: 'button',
+    className: css.sectionTagSwitch,
+    role: 'switch',
+    'aria-checked': checked,
+    'aria-label': label,
+    title,
+    disabled,
+    onClick: () => onChange(!checked),
+    whileTap: reducedMotion || disabled ? undefined : { scale: 0.97 },
+  }, h(m.span, {
+    'aria-hidden': true,
+    animate: { x: checked ? 14 : 0 },
+    transition: reducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 34 },
+  }))
+}
+
 function newPresetDraft(preset) {
   return {
     id: null,
     revision: 0,
     name: preset?.name ?? '',
     description: preset?.description ?? '',
-    fields: (preset?.fields ?? []).map(field => ({ ...field, id: crypto.randomUUID() })),
+    fields: (preset?.fields ?? []).map(field => ({ ...field, id: crypto.randomUUID(), sectionTag: field.sectionTag !== false })),
   }
 }
 

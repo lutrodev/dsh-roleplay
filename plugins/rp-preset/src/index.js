@@ -138,7 +138,7 @@ export class RpPresets extends Service {
                 description: clipCharacters(field.description || `预设「${preset.name}」中的独立栏位。`, 240),
                 order,
                 budgetPriority: -40 + preset.fields.indexOf(field) / 1000,
-                defaultSlot: { id, label, order },
+                defaultSlot: { id, label, order, sectionTag: field.sectionTag },
                 revision: `${preset.id}:${preset.revision}:${field.id}`,
                 text: field.content,
                 diagnostics: { binding: { id: preset.id }, revision: preset.revision, fieldId: field.id, position, positionOrder: index + 1 },
@@ -384,6 +384,7 @@ function normalizeField(value, index, requireFieldId, allowLegacyPosition) {
     description: optionalText(value.description, `field ${index + 1} description`, 1000),
     content: optionalText(value.content, `field ${index + 1} content`, 100000),
     position,
+    sectionTag: defaultBoolean(value.sectionTag, `Preset field ${index + 1} sectionTag`),
   }
 }
 
@@ -399,6 +400,7 @@ function clipCharacters(value, limit) { const characters = [...value]; return ch
 function requiredText(value, field, limit) { if (typeof value !== 'string' || value.trim().length === 0) throw coded('INVALID_REQUEST', `Preset ${field} must be a non-empty string.`); const text = value.trim(); if ([...text].length > limit) throw coded('LIMIT_EXCEEDED', `Preset ${field} exceeds ${limit} characters.`); return text }
 function optionalText(value, field, limit) { if (value === undefined || value === null || value === '') return ''; if (typeof value !== 'string') throw coded('INVALID_REQUEST', `Preset ${field} must be a string.`); const text = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim(); if ([...text].length > limit) throw coded('LIMIT_EXCEEDED', `Preset ${field} exceeds ${limit} characters.`); return text }
 function optionalBoolean(value, field) { if (value === undefined) return false; if (typeof value !== 'boolean') throw coded('INVALID_REQUEST', `${field} must be a boolean.`); return value }
+function defaultBoolean(value, field) { if (value === undefined) return true; if (typeof value !== 'boolean') throw coded('INVALID_REQUEST', `${field} must be a boolean.`); return value }
 function cloneTemplates(templates) { return templates.map(template => ({ ...template, preset: { ...template.preset, fields: template.preset.fields.map(field => ({ ...field })) } })) }
 function pageOptions(query, cursor, limit) { if (typeof query !== 'string') throw coded('INVALID_REQUEST', 'query must be a string'); if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw coded('INVALID_REQUEST', 'limit must be between 1 and 100'); const offset = cursor == null ? 0 : Number(cursor); if (!Number.isSafeInteger(offset) || offset < 0 || (cursor != null && String(offset) !== String(cursor))) throw coded('INVALID_REQUEST', 'cursor is invalid'); return { query: query.trim().toLocaleLowerCase(), limit, offset } }
 function compareAssets(left, right) { return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id) }
