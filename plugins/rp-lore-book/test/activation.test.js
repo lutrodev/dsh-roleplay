@@ -71,8 +71,23 @@ test('serializes normalized entries into the required CCv3 lorebook fields', () 
     id: 'gate',
     selective: true,
     secondary_keys: ['夜晚'],
-    position: 'after_char',
+    position: 'in_chat',
   })
+})
+
+test('round-trips canonical secondaryKeys and gives insertionPosition precedence over legacy position', () => {
+  const first = normalizeLoreBook({ id: 'canonical', entries: [{
+    id: 'gate', name: '潮门', level: 'importantRules', keys: ['潮门'], secondaryKeys: ['夜晚'],
+    content: '潮门只在夜晚开启。', position: 4, insertionPosition: 'before_char',
+  }] })
+  assert.deepEqual(first.entries[0].secondaryKeys, ['夜晚'])
+  assert.equal(first.entries[0].insertionPosition, 'before_char')
+  assert.equal(first.entries[0].position, 0)
+
+  const second = normalizeLoreBook(first)
+  assert.deepEqual(second.entries[0].secondaryKeys, ['夜晚'])
+  assert.equal(second.entries[0].insertionPosition, 'before_char')
+  assert.equal(second.entries[0].position, 0)
 })
 
 test('activates constant, keyword and recursive entries deterministically', () => {

@@ -35,7 +35,7 @@ export const Config = Schema.object({
   exposeBrowser: Schema.boolean().default(true),
 })
 
-/** Versioned global Writer and isolated task-subagent catalog. */
+/** Versioned global Writer default and isolated task-subagent catalog. */
 export class RpSubagentManager extends Service {
   /** @param {import('@deepseek-ai/cordis').Context} ctx @param {Record<string, unknown>} config */
   constructor(ctx, config) {
@@ -148,8 +148,7 @@ export class RpSubagentManager extends Service {
   }
 
   async updateWriter(routeInput, expectedRevision, signal) {
-    const route = normalizeRoute(routeInput)
-    await validateRouteModel(this.ctx, route, signal)
+    const route = await this.validateWriterRoute(routeInput, signal)
     return withCatalogMutation(this.catalogPath, async () => {
       const catalog = await this.readCatalog()
       assertRevision(expectedRevision, catalog.writer.revision)
@@ -159,12 +158,37 @@ export class RpSubagentManager extends Service {
     })
   }
 
-  /** Read once for one runtime preparation and project immutable child definitions. */
-  async prepareRuntimeProfile() {
+  async validateWriterRoute(routeInput, signal) {
+    const route = normalizeRoute(routeInput)
+    await validateRouteModel(this.ctx, route, signal)
+    return route
+  }
+
+  /** Persist one current-conversation Writer override through the Session profile service. */
+  async updateSessionWriterRoute(input, signal) {
+    if (!objectLike(input)) throw coded('INVALID_REQUEST', 'Session Writer request must be an object.')
+    if (typeof input.sessionId !== 'string' || input.sessionId.length === 0) throw coded('INVALID_REQUEST', 'sessionId is required.')
+    if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) throw coded('INVALID_REQUEST', 'expectedRevision must be a non-negative integer.')
+    if (!Object.prototype.hasOwnProperty.call(input, 'route')) throw coded('INVALID_REQUEST', 'route is required.')
+    const route = input.route === null ? null : await this.validateWriterRoute(input.route, signal)
+    const agent = await resolveSessionAgent(this.ctx, input.sessionId)
+    const presets = optionalService(this.ctx, 'agentPresets')
+    const sessions = presets?.serviceFor?.(agent, 'rpSessions')
+    if (sessions?.setWriterRoute === undefined) throw coded('NOT_RP_SESSION', 'The selected session has no Roleplay session service.')
+    return sessions.setWriterRoute(agent, { expectedRevision: input.expectedRevision, route })
+  }
+
+  /** Resolve the Session Writer override or live global default, then project immutable child definitions. */
+  async prepareRuntimeProfile(profile) {
     const catalog = await this.readCatalog()
     const enabledSubagents = catalog.subagents.filter(subagent => subagent.enabled)
+    const hasSessionWriterRoute = objectLike(profile?.runtime)
+      && Object.prototype.hasOwnProperty.call(profile.runtime, 'writerRoute')
+    const writerRoute = hasSessionWriterRoute
+      ? normalizeRoute(profile.runtime.writerRoute)
+      : catalog.writer.route
     return detached({
-      writer: fixedRoute(catalog.writer.route),
+      writer: fixedRoute(writerRoute),
       subagents: enabledSubagents.map((subagent, order) => ({
         id: subagent.id,
         label: subagent.name,
@@ -176,7 +200,7 @@ export class RpSubagentManager extends Service {
         order,
       })),
       revisions: {
-        writer: catalog.writer.revision,
+        writer: hasSessionWriterRoute && Number.isSafeInteger(profile?.revision) ? profile.revision : catalog.writer.revision,
         subagents: Object.fromEntries(enabledSubagents.map(subagent => [subagent.id, subagent.revision])),
       },
     })
@@ -219,9 +243,9 @@ export async function apply(ctx, config) {
   const ready = manager.initialize()
   ctx.inject(['rpRuntime'], runtimeCtx => runtimeCtx.rpRuntime.registerSubagentProfileProvider({
     id: 'rp-subagent-manager',
-    prepare: async () => {
+    prepare: async context => {
       await ready
-      return manager.prepareRuntimeProfile()
+      return manager.prepareRuntimeProfile(context?.profile)
     },
   }))
   if (config.exposeBrowser !== false) {
@@ -231,7 +255,7 @@ export async function apply(ctx, config) {
 }
 
 function registerBrowser(ctx, manager, ready) {
-  const endpoints = new Set(['list', 'get', 'create', 'update', 'delete', 'set-enabled', 'writer/update'])
+  const endpoints = new Set(['list', 'get', 'create', 'update', 'delete', 'set-enabled', 'writer/update', 'writer/session-update'])
   const dispose = ctx.rpRemote.register('/rp-subagents', async (endpoint, payload, signal) => {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown subagent endpoint: ${endpoint}`))
     try {
@@ -254,6 +278,7 @@ export async function dispatchBrowser(manager, endpoint, payload, signal) {
     case 'delete': return manager.delete(requiredId(input.id), input.expectedRevision)
     case 'set-enabled': return manager.setEnabled(requiredId(input.id), input.enabled, input.expectedRevision)
     case 'writer/update': return manager.updateWriter(input.route, input.expectedRevision, signal)
+    case 'writer/session-update': return manager.updateSessionWriterRoute(input, signal)
     default: throw coded('INVALID_REQUEST', `Unknown subagent endpoint: ${endpoint}`)
   }
 }
@@ -417,12 +442,19 @@ function requiredId(id) { assertSubagentId(id); return id }
 function maxCatalogBytes(config) { return 16384 + config.maxSubagents * (4096 + 4 * (config.maxNameCharacters + config.maxDescriptionCharacters + config.maxInstructionsCharacters)) }
 function object(value) { if (!objectLike(value)) throw coded('INVALID_REQUEST', 'Request payload must be an object.'); return value }
 function objectLike(value) { return typeof value === 'object' && value !== null && !Array.isArray(value) }
+function optionalService(ctx, name) { return typeof ctx.get === 'function' ? ctx.get(name) : ctx[name] }
+async function resolveSessionAgent(ctx, sessionId) {
+  const provider = optionalService(ctx, 'typert')?.lookups?.get?.('agent')
+  if (provider === undefined) throw coded('NOT_RP_SESSION', 'Agent lookup is unavailable.')
+  try { return await provider.resolve(sessionId) }
+  catch (error) { throw coded('ASSET_NOT_FOUND', `Session ${sessionId} was not found.`, error) }
+}
 function detached(value) { return JSON.parse(JSON.stringify(value)) }
 function success(value) { return { ok: true, value } }
 function failure(code, message) { return { ok: false, error: { code, message } } }
 function transportSuccess(value) { return { ok: true, value } }
 function coded(code, message, cause) { const error = new Error(message, { cause }); error.code = code; return error }
-function codeFor(error) { return ['INVALID_REQUEST', 'LIMIT_EXCEEDED', 'ASSET_CORRUPT', 'SUBAGENT_NOT_FOUND', 'REVISION_CONFLICT', 'NAME_CONFLICT', 'WRITER_FIXED', 'MODEL_UNAVAILABLE'].includes(error?.code) ? error.code : 'ASSET_CORRUPT' }
+function codeFor(error) { return ['INVALID_REQUEST', 'LIMIT_EXCEEDED', 'ASSET_CORRUPT', 'ASSET_NOT_FOUND', 'NOT_RP_SESSION', 'SESSION_RUNNING', 'SUBAGENT_NOT_FOUND', 'REVISION_CONFLICT', 'NAME_CONFLICT', 'WRITER_FIXED', 'MODEL_UNAVAILABLE'].includes(error?.code) ? error.code : 'ASSET_CORRUPT' }
 function validateConfig(config) {
   if (typeof config.catalogDir !== 'string' || config.catalogDir.trim().length === 0) throw new Error('rp-subagent-manager: catalogDir must be a non-empty path')
   for (const field of ['maxSubagents', 'maxNameCharacters', 'maxDescriptionCharacters', 'maxInstructionsCharacters']) {

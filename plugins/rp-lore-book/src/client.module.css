@@ -191,6 +191,25 @@
 .field { display:flex; flex-direction:column; gap:6px; color:var(--dsw-alias-label-secondary); font-size:12px; font-weight:550; }
 .field input,.field textarea,.field select { width:100%; box-sizing:border-box; padding:9px 10px; resize:vertical; border:1px solid var(--dsw-alias-border-l2); border-radius:9px; outline:0; background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); font:13px/20px var(--dsw-font-family); }
 .field input:focus,.field textarea:focus,.field select:focus { border-color:var(--dsw-alias-brand-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent); }
+.field small { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:17px; font-weight:400; }
+.conditionEditor { display:flex; flex-direction:column; gap:11px; min-width:0; margin:0; padding:12px; border:0; border-radius:11px; background:var(--dsw-alias-bg-layer-1); }
+.conditionHeading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.conditionHeading>div { display:flex; min-width:0; flex-direction:column; gap:2px; }
+.conditionHeading strong { color:var(--dsw-alias-label-secondary); font-size:12px; line-height:18px; font-weight:600; }
+.conditionHeading span { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:17px; }
+.conditionEditor .conditionHeading button,.conditionEditor .conditionFooter button,.conditionEditor .conditionReturn { flex:0 0 auto; min-height:30px; padding:0 8px; border:0; border-radius:7px; background:transparent; color:var(--dsw-alias-brand-primary); cursor:pointer; font:550 11px/17px var(--dsw-font-family); }
+.conditionEditor .conditionHeading button:hover,.conditionEditor .conditionFooter button:hover,.conditionEditor .conditionReturn:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.conditionEditor .conditionHeading button:focus-visible,.conditionEditor .conditionFooter button:focus-visible,.conditionEditor .conditionReturn:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:1px; }
+.conditionAddressFields,.conditionCompareFields { display:grid; gap:8px; }
+.conditionAddressFields { grid-template-columns:minmax(100px,.72fr) minmax(0,1.45fr); }
+.conditionCompareFields { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+.conditionAddressFields .field,.conditionCompareFields .field { gap:5px; font-size:11px; }
+.conditionAddressFields .field input,.conditionCompareFields .field input,.conditionCompareFields .field select { min-height:38px; padding:7px 9px; background:var(--dsw-alias-bg-layer-2); font-size:12px; }
+.conditionAddressHint { margin:0; color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:17px; }
+.conditionIssue { color:var(--dsw-alias-state-error-primary); }
+.conditionFooter { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.conditionFooter small { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:17px; }
+.conditionReturn { align-self:flex-start; }
 .toggleGrid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
 .toggleGrid label { display:flex; min-height:32px; align-items:center; gap:8px; font-size:12px; }
 .toggleGrid input { width:16px; height:16px; accent-color:var(--dsw-alias-brand-primary); }
@@ -224,5 +243,7 @@
   .editEntryButton { display:none; }
   .entryMain { grid-template-columns:minmax(0,1fr); gap:5px; }
   .entryStatus { width:max-content; padding:2px 0; background:transparent; }
+  .conditionAddressFields,.conditionCompareFields { grid-template-columns:1fr; }
+  .conditionFooter { flex-direction:column; gap:4px; }
   .toggleGrid { grid-template-columns:1fr; }
 }

@@ -19,6 +19,7 @@ test('imports, rejects duplicates, searches, pages and reads lorebook details', 
     assert.equal((await books.list({ query: '海港', limit: 1 })).items[0].id, imported.id)
     const detail = await books.detail(imported.id)
     assert.equal(detail.entries.length, 1)
+    assert.equal(detail.entries[0].name, 'Entry 1')
     assert.equal(detail.source.originalName, 'harbor.json')
     await assert.rejects(books.importBytes(bytes), error => error.code === 'DUPLICATE_ASSET')
     await assert.rejects(books.importBytes(new Uint8Array(257)), error => error.code === 'LIMIT_EXCEEDED')
@@ -131,7 +132,7 @@ test('keeps available lorebooks when sibling bindings are missing or corrupt', a
   try {
     const available = await books.create({
       name: '仍然可用的世界书',
-      entries: [{ id: 'harbor', name: '港口', keys: ['港口'], content: '港口终年有雾。' }],
+      entries: [{ id: 'harbor', name: '港口', level: 'worldDescription', keys: ['港口'], content: '港口终年有雾。' }],
     })
     await writeFile(join(root, `${corruptBookId}.json`), '{')
     bindings = [{ id: missingBookId }, { id: corruptBookId }, { id: available.created.id }]
@@ -406,7 +407,75 @@ test('creates an empty native world book and edits it through the existing CAS b
     const entry = { id: 'harbor', name: '港口', level: 'worldDescription', keys: ['港口'], content: '港口终年有雾。' }
     const updated = await books.update(result.detail.id, { name: '新世界', entries: [entry] }, 1)
     assert.equal(updated.revision, 2)
+    assert.equal(updated.entries[0].name, '港口')
     assert.equal(updated.entries[0].content, '港口终年有雾。')
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('requires a non-empty display name for every natively written world-book entry', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-lore-entry-name-'))
+  const ctx = new Context()
+  const books = new RpLoreBooks(ctx, { libraryDir: root, maxInputBytes: 4096, maxTokens: 128, maxEntries: 16, maxRecursiveDepth: 2 })
+  try {
+    await assert.rejects(
+      books.create({ name: '无名称世界', entries: [{ id: 'harbor', content: '港口终年有雾。', constant: true }] }),
+      error => error.code === 'INVALID_REQUEST' && /requires a non-empty name/.test(error.message),
+    )
+    const created = await books.create({
+      name: '有名称世界',
+      entries: [{ id: 'harbor', name: '雾港', level: 'worldDescription', content: '港口终年有雾。', constant: true }],
+    })
+    await assert.rejects(
+      books.update(created.created.id, {
+        entries: [{ ...created.detail.entries[0], name: '   ' }],
+      }, 1),
+      error => error.code === 'INVALID_REQUEST' && /requires a non-empty name/.test(error.message),
+    )
+    assert.equal((await books.detail(created.created.id)).revision, 1)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('agent world-book guidance requires semantic display names in create and update payloads', async () => {
+  const guidance = await readFile(new URL('../skills/rp-guide-lorebook/SKILL.md', import.meta.url), 'utf8')
+  assert.match(guidance, /non-empty human-readable string `name`/)
+  assert.match(guidance, /explicit `level`/)
+  assert.match(guidance, /unknown or invalid native fields are rejected/)
+  assert.match(guidance, /including the non-empty human-readable `name`, explicit `level`, activation fields, and stable `id`/)
+})
+
+test('round-trips every canonical native entry field and rejects lossy payloads', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-lore-native-schema-'))
+  const ctx = new Context()
+  const books = new RpLoreBooks(ctx, { libraryDir: root, maxInputBytes: 8192, maxTokens: 128, maxEntries: 16, maxRecursiveDepth: 2 })
+  const entry = {
+    id: 'tide-gate', name: '潮门', semanticKey: 'tide_gate', level: 'importantRules',
+    keys: ['潮门'], secondaryKeys: ['夜晚'], content: '潮门只在夜晚开启。',
+    enabled: true, constant: false, caseSensitive: true, recursive: false,
+    order: 7, position: 5, insertionPosition: 'before_an', depth: 1, probability: 0.5,
+  }
+  try {
+    const created = await books.create({ name: '完整字段', entries: [entry] })
+    assert.deepEqual(created.detail.entries[0], entry)
+
+    const invalidCases = [
+      [{ ...entry, always: true }, /unknown field "always"/],
+      [{ ...entry, level: undefined }, /level must be/],
+      [{ ...entry, content: '   ' }, /non-empty string content/],
+      [{ ...entry, keys: [], secondaryKeys: [], constant: false }, /must be constant or have at least one primary key/],
+      [{ ...entry, keys: [], secondaryKeys: ['夜晚'], constant: true }, /secondaryKeys require at least one primary key/],
+      [{ ...entry, probability: 50 }, /between 0 and 1/],
+    ]
+    for (const [invalid, message] of invalidCases) {
+      await assert.rejects(books.create({ name: '无效字段', entries: [invalid] }), error => error.code === 'INVALID_REQUEST' && message.test(error.message))
+    }
+    await assert.rejects(books.update(created.created.id, { name: '   ' }, 1), error => error.code === 'INVALID_REQUEST' && /name must be a non-empty string/.test(error.message))
+    assert.equal((await books.detail(created.created.id)).revision, 1)
   } finally {
     await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })
@@ -423,7 +492,7 @@ test('persists State conditions in schema v3 and rejects them through the generi
   })
   try {
     const created = await books.create({ name: '条件世界书', entries: [{
-      id: 'stage', name: '关系阶段', content: '关系已经改变。', constant: true,
+      id: 'stage', name: '关系阶段', level: 'roleplayGuide', content: '关系已经改变。', constant: true,
       stateCondition: 'state("story", "/affection") > 50',
     }] })
     assert.equal(created.detail.schemaVersion, undefined)

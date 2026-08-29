@@ -37,6 +37,7 @@ test('normalizes actor profiles with one user-controlled character', () => {
     runtime: {
       executionMode: 'agent', provider: 'deepseek-official', model: 'deepseek-chat', maxSteps: 6,
       writer: { provider: 'writer-provider', model: 'writer-model', maxTokens: 8192 },
+      writerRoute: { kind: 'fixed', provider: 'writer-provider', model: 'writer-model', reasoningEffort: 'high' },
     },
   }, 0)
   assert.equal(profile.revision, 1)
@@ -47,8 +48,12 @@ test('normalizes actor profiles with one user-controlled character', () => {
   assert.equal(profile.runtime.maxSteps, 6)
   assert.equal(profile.runtime.executionMode, 'agent')
   assert.equal(profile.runtime.provider, 'deepseek-official')
+  assert.deepEqual(profile.runtime.writerRoute, { kind: 'fixed', provider: 'writer-provider', model: 'writer-model', reasoningEffort: 'high' })
   assert.equal(Object.hasOwn(profile.runtime, 'writer'), false)
   assert.deepEqual(normalizeProfile({ mode: 'director', runtime: { writer: { maxTokens: 4096 } } }, 0).runtime, { executionMode: 'chat' })
+  assert.deepEqual(normalizeProfile({ mode: 'director', runtime: { writerRoute: { kind: 'inherit' } } }, 0).runtime, { executionMode: 'chat', writerRoute: { kind: 'inherit' } })
+  assert.throws(() => normalizeProfile({ mode: 'director', runtime: { writerRoute: { kind: 'fixed', provider: 'writer-only' } } }, 0), /requires provider and model/)
+  assert.throws(() => normalizeProfile({ mode: 'director', runtime: { writerRoute: { kind: 'inherit', model: 'unexpected' } } }, 0), /cannot contain fixed model fields/)
   assert.throws(() => normalizeProfile({ mode: 'director', runtime: { model: 'orphan' } }, 0), /configured together/)
   assert.throws(() => normalizeProfile({ mode: 'director', resources: { card: { id: 'pinned', revision: 1 } } }, 0), /only a live asset id/)
   assert.throws(() => normalizeProfile({ mode: 'director', resources: { characters: [] } }, 0), /no longer supported/)
@@ -660,6 +665,44 @@ test('switches execution mode with CAS while preserving the roleplay profile', a
   harness.agent.status = 'running'
   await assert.rejects(
     harness.sessions.setExecutionMode(harness.agent, { expectedRevision: switched.revision, executionMode: 'chat' }),
+    error => error.code === 'SESSION_RUNNING',
+  )
+  await harness.ctx.fiber.dispose()
+})
+
+test('stores a Writer-only Session override with CAS and can resume the global default', async () => {
+  const harness = createSessionHarness(262144)
+  const configured = await harness.sessions.configure(harness.agent, { mode: 'director', runtime: { executionMode: 'chat' } })
+  const fixed = await harness.sessions.setWriterRoute(harness.agent, {
+    expectedRevision: configured.revision,
+    route: { kind: 'fixed', provider: 'openai', model: 'gpt-writer', reasoningEffort: 'high' },
+  })
+  assert.deepEqual(fixed.runtime, {
+    executionMode: 'chat',
+    writerRoute: { kind: 'fixed', provider: 'openai', model: 'gpt-writer', reasoningEffort: 'high' },
+  })
+  const followsParent = await harness.sessions.setWriterRoute(harness.agent, {
+    expectedRevision: fixed.revision,
+    route: { kind: 'inherit' },
+  })
+  assert.deepEqual(followsParent.runtime.writerRoute, { kind: 'inherit' })
+  const globalDefault = await harness.sessions.setWriterRoute(harness.agent, {
+    expectedRevision: followsParent.revision,
+    route: null,
+  })
+  assert.equal(Object.hasOwn(globalDefault.runtime, 'writerRoute'), false)
+  assert.equal(globalDefault.runtime.executionMode, 'chat')
+  assert.equal((await harness.sessions.setWriterRoute(harness.agent, {
+    expectedRevision: globalDefault.revision,
+    route: null,
+  })).revision, globalDefault.revision)
+  await assert.rejects(
+    harness.sessions.setWriterRoute(harness.agent, { expectedRevision: fixed.revision, route: { kind: 'inherit' } }),
+    error => error.code === 'REVISION_CONFLICT',
+  )
+  harness.agent.status = 'running'
+  await assert.rejects(
+    harness.sessions.setWriterRoute(harness.agent, { expectedRevision: globalDefault.revision, route: { kind: 'inherit' } }),
     error => error.code === 'SESSION_RUNNING',
   )
   await harness.ctx.fiber.dispose()

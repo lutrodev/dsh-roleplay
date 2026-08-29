@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 const source = (await Promise.all([
   new URL('../src/client.module.css', import.meta.url),
   new URL('../src/client-availability.module.css', import.meta.url),
+  new URL('../src/client-session.module.css', import.meta.url),
 ].map(url => readFile(url, 'utf8')))).join('\n')
 const names = [...new Set([...source.matchAll(/\.([A-Za-z_][\w-]*)/g)].map(match => match[1]))].sort()
 const scoped = source.replace(/\.([A-Za-z_][\w-]*)/g, (_match, name) => `.rp-subagent-manager-${name}`)

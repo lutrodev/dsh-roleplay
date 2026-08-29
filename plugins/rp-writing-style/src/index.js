@@ -16,6 +16,7 @@ export const Config = Schema.object({
 const PREFERENCES_FILE = '.preferences.json'
 const WRITING_STYLE_SOURCE_ID = 'rp.writing-style'
 const WRITING_STYLE_SOURCE_PREFIX = `${WRITING_STYLE_SOURCE_ID}:`
+const WRITING_STYLE_EDITABLE_FIELDS = new Set(['name', 'description', 'content'])
 const WRITING_STYLE_SLOT_ORDER = 20
 // Exact fingerprints of retired managed seeds let untouched defaults migrate
 // without retaining their obsolete prompt text or replacing user edits.
@@ -105,6 +106,7 @@ export class RpWritingStyles extends Service {
 
   /** @param {unknown} input @returns {Promise<Record<string, unknown>>} */
   async create(input) {
+    validateEditableStyle(input)
     const value = normalizeStyle(input, this.config)
     return withLibraryMutation(this.config.libraryDir, async () => {
       await mkdir(this.config.libraryDir, { recursive: true })
@@ -160,6 +162,7 @@ export class RpWritingStyles extends Service {
     return withLibraryMutation(this.config.libraryDir, async () => {
       const current = await this.get(id)
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== current.revision) throw coded('REVISION_CONFLICT', `Writing style revision conflict: expected ${String(expectedRevision)}, current ${current.revision}.`)
+      validateEditableStyle(input)
       const value = normalizeStyle(input, this.config)
       const record = { ...current, ...value, revision: current.revision + 1, updatedAt: new Date().toISOString() }
       await writeRecord(this.config.libraryDir, record)
@@ -332,6 +335,12 @@ function normalizeStyle(value, config) {
   const total = [name, description, content].reduce((sum, text) => sum + [...text].length, 0)
   if (total > config.maxTextCharacters) throw coded('LIMIT_EXCEEDED', `Writing style text exceeds the ${config.maxTextCharacters} character limit.`)
   return { name, description, content }
+}
+
+function validateEditableStyle(value) {
+  if (!objectLike(value)) throw coded('INVALID_REQUEST', 'Writing style must be an object.')
+  const unknownField = Object.keys(value).find(key => !WRITING_STYLE_EDITABLE_FIELDS.has(key))
+  if (unknownField !== undefined) throw coded('INVALID_REQUEST', `Writing style contains unknown field "${unknownField}".`)
 }
 
 function normalizeStored(value, id, config) {

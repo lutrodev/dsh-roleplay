@@ -2103,7 +2103,7 @@ function normalizeProviderWriterRoute(value) {
   if (value === undefined) return undefined
   const route = normalizeTaskSubagentRoute(value, 'writer')
   if (route?.maxTokens !== undefined) {
-    throw new RpRuntimeError('RP_INVALID_SUBAGENT_PROFILE', 'global Writer route cannot override maxTokens')
+    throw new RpRuntimeError('RP_INVALID_SUBAGENT_PROFILE', 'prepared Writer route cannot override maxTokens')
   }
   return route
 }

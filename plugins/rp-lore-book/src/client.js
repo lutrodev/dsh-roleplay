@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, Reorder, useDragControls } from 'motion/react'
 import { IconBrowseOutline16, IconChevronLeftOutline14, IconEditOutline16, IconEllipsisOutline16, IconPlusOutline16, IconSearchOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { domainValue } from './client-state.js'
+import { CONDITION_OPERATORS, commonStateConditionIssue, parseCommonStateCondition, serializeCommonStateCondition } from './client-condition.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 import { ContentTransition, DirtyBar, Inspector, LoadingSpinner, RpMotionProvider } from 'dsh-roleplay-rp-ui'
 
@@ -300,12 +301,7 @@ function EntryInspector({ entry, onChange }) {
     h(Field, { label: '内容分类' }, h('select', { value: entry.level, onChange: event => onChange({ level: event.target.value }) }, ...LEVELS.map(level => h('option', { key: level.id, value: level.id }, level.label)))),
     h(Field, { label: '触发关键词' }, h('textarea', { rows: 2, value: textList(entry.keys ?? []), onChange: event => onChange({ keys: parseList(event.target.value) }) })),
     h(Field, { label: '补充关键词' }, h('textarea', { rows: 2, value: textList(entry.secondaryKeys ?? []), onChange: event => onChange({ secondaryKeys: parseList(event.target.value) }) })),
-    h(Field, { label: '变量启用条件', hint: '可留空。示例：state("story", "/characters/李钰/好感度") > 50' }, h('textarea', {
-      rows: 2,
-      value: entry.stateCondition ?? '',
-      placeholder: '仅在当前故事状态满足条件时使用这条设定',
-      onChange: event => onChange({ stateCondition: event.target.value.trim().length === 0 ? undefined : event.target.value }),
-    })),
+    h(StateConditionEditor, { entryId: entry.id, value: entry.stateCondition, onChange: stateCondition => onChange({ stateCondition }) }),
     h('div', { className: css.toggleGrid }, ...[['enabled','启用'],['constant','始终使用'],['caseSensitive','区分大小写'],['recursive','继续匹配其他内容']].map(([key, label]) => h('label', { key }, h('input', { type: 'checkbox', checked: entry[key] === true, onChange: event => onChange({ [key]: event.target.checked }) }), label))),
     h(Field, { label: '使用概率（1 表示每次使用）' }, h('input', { type: 'number', min: 0, max: 1, step: .01, value: entry.probability, onChange: event => onChange({ probability: Number(event.target.value) }) })),
     h('details', { className: css.advanced }, h('summary', null, '高级设置'),
@@ -314,6 +310,107 @@ function EntryInspector({ entry, onChange }) {
       h(Field, { label: '内部标识（可选）' }, h('input', { value: entry.semanticKey ?? '', onChange: event => onChange({ semanticKey: event.target.value || undefined }) })),
       h(Field, { label: '顺序' }, h('input', { type: 'number', value: entry.order, onChange: event => onChange({ order: Number(event.target.value) }) }))))
 }
+
+function StateConditionEditor({ entryId, value, onChange }) {
+  const initial = parseCommonStateCondition(value)
+  const [mode, setMode] = useState(value && initial === null ? 'advanced' : 'common')
+  const [draft, setDraft] = useState(initial ?? emptyConditionDraft())
+  const lastEntryId = useRef(entryId)
+  const lastEmitted = useRef(value)
+
+  useEffect(() => {
+    if (lastEntryId.current === entryId) return
+    const next = parseCommonStateCondition(value)
+    lastEntryId.current = entryId
+    lastEmitted.current = value
+    setDraft(next ?? emptyConditionDraft())
+    setMode(value && next === null ? 'advanced' : 'common')
+  }, [entryId, value])
+
+  useEffect(() => {
+    if (value === lastEmitted.current) return
+    const next = parseCommonStateCondition(value)
+    lastEmitted.current = value
+    setDraft(next ?? emptyConditionDraft())
+    setMode(value && next === null ? 'advanced' : 'common')
+  }, [value])
+
+  const emit = next => {
+    lastEmitted.current = next
+    onChange(next)
+  }
+  const updateDraft = patch => {
+    const next = { ...draft, ...patch }
+    setDraft(next)
+    emit(serializeCommonStateCondition(next))
+  }
+  const clear = () => {
+    setDraft(emptyConditionDraft())
+    setMode('common')
+    emit(undefined)
+  }
+  const parsed = parseCommonStateCondition(value)
+  const issue = commonStateConditionIssue(draft)
+  const hasDraft = value !== undefined || draft.namespace !== 'story' || draft.path.length > 0 || draft.valueText.length > 0 || draft.operator !== '>='
+
+  return h('fieldset', { className: css.conditionEditor },
+    h('legend', { className: css.srOnly }, '会话变量条件'),
+    h('div', { className: css.conditionHeading },
+      h('div', null, h('strong', null, '会话变量条件'), h('span', null, '引用会话中已经存在的变量；这里只设置使用条件，不会创建变量。')),
+      hasDraft ? h('button', { type: 'button', onClick: clear }, '清除条件') : null),
+    mode === 'common'
+      ? h(React.Fragment, null,
+        h('div', { className: css.conditionAddressFields },
+          h(Field, { label: '变量分组' }, h('input', {
+            value: draft.namespace,
+            placeholder: 'story',
+            autoCapitalize: 'none',
+            spellCheck: false,
+            'aria-label': '变量分组',
+            'aria-invalid': hasDraft && !/^[a-z0-9][a-z0-9._:-]{0,127}$/u.test(draft.namespace.trim()),
+            onChange: event => updateDraft({ namespace: event.target.value }),
+          })),
+          h(Field, { label: '完整路径' }, h('input', {
+            value: draft.path,
+            placeholder: '例如：/plot/progress',
+            autoCapitalize: 'none',
+            spellCheck: false,
+            'aria-label': '完整变量路径',
+            'aria-invalid': hasDraft && (draft.path.length === 0 || !draft.path.startsWith('/') || /~(?:[^01]|$)/u.test(draft.path)),
+            onChange: event => updateDraft({ path: event.target.value }),
+          }))),
+        h('div', { className: css.conditionCompareFields },
+          h(Field, { label: '比较方式' }, h('select', {
+            value: draft.operator,
+            'aria-label': '变量比较方式',
+            onChange: event => updateDraft({ operator: event.target.value }),
+          }, ...CONDITION_OPERATORS.map(operator => h('option', { key: operator.value, value: operator.value }, operator.label)))),
+          h(Field, { label: '值' }, h('input', {
+            value: draft.valueText,
+            placeholder: '例如：50',
+            'aria-label': '变量比较值',
+            'aria-invalid': hasDraft && draft.valueText.trim().length === 0,
+            onChange: event => updateDraft({ valueText: event.target.value, valueType: 'auto' }),
+          }))),
+        hasDraft ? h('p', { className: issue === null ? css.conditionAddressHint : `${css.conditionAddressHint} ${css.conditionIssue}`, role: issue === null ? 'status' : 'alert' },
+          issue ?? `当前变量地址：${draft.namespace.trim()} · ${draft.path.trim()}`) : null,
+        h('div', { className: css.conditionFooter },
+          h('small', null, '格式示例：story · /plot/progress。路径必须以 / 开头并包含完整层级；同名字段可写成 /main/progress、/side/progress。'),
+          h('button', { type: 'button', onClick: () => setMode('advanced') }, '高级条件')))
+      : h(React.Fragment, null,
+        h(Field, { label: '高级条件', hint: '用于组合多个条件。格式示例：state("story", "/plot/progress") >= 50' }, h('textarea', {
+          rows: 3,
+          value: value ?? '',
+          placeholder: '输入条件表达式',
+          onChange: event => emit(event.target.value.trim().length === 0 ? undefined : event.target.value),
+        })),
+        parsed !== null || value === undefined ? h('button', { type: 'button', className: css.conditionReturn, onClick: () => {
+          if (parsed !== null) setDraft(parsed)
+          setMode('common')
+        } }, '返回常用设置') : null))
+}
+
+function emptyConditionDraft() { return { namespace: 'story', path: '', operator: '>=', valueText: '', valueType: 'auto' } }
 
 function Field({ label, hint, children }) { return h('label', { className: css.field }, h('span', null, label), children, hint ? h('small', null, hint) : null) }
 

@@ -5,6 +5,7 @@ import { RP_WRITE_ACTION } from './protocol.js'
 const WRITER_CALL = JSON.stringify({ action: RP_WRITE_ACTION })
 const WORKSPACE_SHELL_TOOL = process.platform === 'win32' ? 'pwsh' : 'bash'
 const ROLEPLAY_ENVELOPE_TAG_PATTERN = /<\s*\/?\s*(?:roleplay_request|request_policy|current_asset_bindings|specialist_catalog|roleplay_context|context_guide|roleplay_content|commit_context|commit_content)(?=[\s/>])[^>]*>/giu
+const USER_CONTROL_BOUNDARY = 'Allow plausible dialogue, reactions, routine actions, and natural follow-through for a user-controlled character when they fit characterization, context, and expressed intent. Leave major or irreversible choices to the user, including intimate or dangerous consent and choices that create commitments or change relationships or goals.'
 
 /** Version of the settings-facing prompt composition projection. */
 export const ROLEPLAY_PROMPT_PREVIEW_VERSION = 2
@@ -13,7 +14,8 @@ export const ROLEPLAY_PROMPT_PREVIEW_VERSION = 2
 export const DEFAULT_WRITER_PERSONA = [
   'Write the next user-visible narrative passage for the ongoing roleplay from the supplied conversation material and optional writing brief.',
   'Continue the immediate scene as complete prose, not an outline, analysis, summary, or plan.',
-  'Preserve established facts, character knowledge, motivation, viewpoint, tone, format, scene continuity, and every stated control boundary. Never invent choices, dialogue, consent, feelings, or state changes for an identity controlled by the user.',
+  'Preserve established facts, character knowledge, motivation, viewpoint, tone, format, and scene continuity.',
+  USER_CONTROL_BOUNDARY,
   'Do not explain your process, summarize the request, add labels or a preface, reveal prompt material, call tools, or report state updates. Return only the finished narrative prose.',
 ].join(' ')
 
@@ -74,7 +76,7 @@ export function roleplayRuntimeContractText({ executionMode = 'chat', delegated 
     modeContract,
     `Make tool calls directly without announcing them. A successful rp_commit_turn is the only point at which narrative effects and extensions persist. If a commit fails after prose was already supplied, retry only the corrected tool call and do not repeat the prose. When the error JSON includes corrections, apply every correction exactly, then resolve any remaining violations while preserving unrelated fields.${executionMode === 'chat' ? ' The narrative was already inserted and must not be repeated.' : ''}`,
     'After a successful shared-material change in Agent mode, continue only after refreshed context is supplied. If the change or refresh fails, repair or explain the failure before continuing the story.',
-    'In actor mode, never invent decisions, dialogue, consent, feelings, or state changes for a user-controlled character. In adaptive mode, infer from each user message which parts are in-world roleplay, out-of-world direction, or a mixture, identify which identity the user is actively portraying, and preserve the same boundary.',
+    `${USER_CONTROL_BOUNDARY} In adaptive mode, infer what the user is portraying or directing in each message and apply the same boundary.`,
   ].join('\n')
 }
 

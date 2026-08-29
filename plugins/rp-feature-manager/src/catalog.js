@@ -76,7 +76,7 @@ export const FEATURE_CATALOG = Object.freeze([
   }),
   feature({
     id: 'subagent-manager', category: 'creation', label: '子代理',
-    description: '配置固定 Writer，以及按各自调用契约运行的可插拔独立任务子代理。',
+    description: '配置 Writer 的全局默认模型，以及按各自调用契约运行的可插拔独立任务子代理；当前会话可单独覆盖 Writer。',
     packageName: 'dsh-roleplay-rp-subagent-manager',
     hostEntryIds: ['rp-subagent-manager'], runtimeKey: 'subagentManager',
   }),

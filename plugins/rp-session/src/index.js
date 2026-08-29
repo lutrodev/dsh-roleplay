@@ -354,6 +354,32 @@ export class RpSessions extends Service {
     })
   }
 
+  /** Change only this conversation's Writer route, or resume the live global default. */
+  async setWriterRoute(agent, request) {
+    if (!record(request)) throw new RpSessionError('INVALID_REQUEST', 'session/writer-route payload must be an object')
+    if (agent.status !== 'idle') throw new RpSessionError('SESSION_RUNNING', 'The Writer model can only be changed while the Agent is idle.')
+    const current = this.get(agent)
+    if (request.expectedRevision !== current.revision) {
+      throw new RpSessionError('REVISION_CONFLICT', `Roleplay session revision conflict: expected ${String(request.expectedRevision)}, current ${current.revision}.`)
+    }
+    if (!has(request, 'route')) throw new RpSessionError('INVALID_REQUEST', 'session/writer-route requires route')
+    const writerRoute = request.route === null ? undefined : normalizeWriterRoute(request.route)
+    if (sameWriterRoute(current.runtime.writerRoute, writerRoute)) return current
+    const runtime = { ...current.runtime }
+    if (writerRoute === undefined) delete runtime.writerRoute
+    else runtime.writerRoute = writerRoute
+    return this.configure(agent, {
+      expectedRevision: current.revision,
+      mode: current.mode,
+      ...(current.playerCharacterId === undefined ? {} : { playerCharacterId: current.playerCharacterId }),
+      cast: current.cast,
+      scene: current.scene,
+      resources: current.resources,
+      runtime,
+      ...(current.contextBuild === undefined ? {} : { contextBuild: current.contextBuild }),
+    })
+  }
+
   /** Replace the deterministic Chat Slot layout while keeping every other Session setting. */
   async setContextBuild(agent, request) {
     if (!record(request)) throw new RpSessionError('INVALID_REQUEST', 'session/context-build payload must be an object')
@@ -672,11 +698,41 @@ function normalizeRuntime(value, defaultExecutionMode) {
   const model = optionalString(value.model)
   if ((provider === undefined) !== (model === undefined)) throw new Error('runtime.provider and runtime.model must be configured together')
   const maxSteps = optionalPositiveInteger(value.maxSteps, 'runtime.maxSteps')
+  const writerRoute = value.writerRoute === undefined ? undefined : normalizeWriterRoute(value.writerRoute)
   return {
     executionMode,
     ...(model === undefined ? {} : { provider, model }),
     ...(maxSteps === undefined ? {} : { maxSteps }),
+    ...(writerRoute === undefined ? {} : { writerRoute }),
   }
+}
+
+function normalizeWriterRoute(value) {
+  if (!record(value)) throw new Error('runtime.writerRoute must be an object')
+  if (value.kind === 'inherit') {
+    if (Object.keys(value).some(key => key !== 'kind')) throw new Error('runtime.writerRoute inherit mode cannot contain fixed model fields')
+    return { kind: 'inherit' }
+  }
+  if (value.kind !== 'fixed') throw new Error('runtime.writerRoute kind must be inherit or fixed')
+  const provider = optionalString(value.provider)
+  const model = optionalString(value.model)
+  const reasoningEffort = optionalString(value.reasoningEffort)
+  if (provider === undefined || model === undefined) throw new Error('runtime.writerRoute fixed mode requires provider and model')
+  if (Object.keys(value).some(key => !['kind', 'provider', 'model', 'reasoningEffort'].includes(key))) {
+    throw new Error('runtime.writerRoute contains unsupported fields')
+  }
+  return {
+    kind: 'fixed', provider, model,
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+  }
+}
+
+function sameWriterRoute(left, right) {
+  if (left === undefined || right === undefined) return left === right
+  return left.kind === right.kind
+    && left.provider === right.provider
+    && left.model === right.model
+    && left.reasoningEffort === right.reasoningEffort
 }
 
 /** @param {Record<string, unknown>} profile */

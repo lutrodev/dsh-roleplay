@@ -220,7 +220,7 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     const gatedLorebook = await ctx.rpLoreBooks.detail(linkedLorebookId)
     await ctx.rpLoreBooks.update(linkedLorebookId, {
       entries: [...gatedLorebook.entries, {
-        id: 'low-stamina', name: '低体力医务室', content: 'Low stamina unlocks the cliff infirmary.',
+        id: 'low-stamina', name: '低体力医务室', level: 'worldDescription', content: 'Low stamina unlocks the cliff infirmary.',
         enabled: true, constant: true, keys: [], secondaryKeys: [], position: 0,
         stateCondition: 'state("story", "/hp") <= 6',
       }],
@@ -288,15 +288,21 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     assert.match(customPreview.contextText, /雾气让所有远处灯火都显得模糊。/)
     assert.equal(customPreview.sources.some(source => source.id === 'rp.session'), false)
     await ctx.rpSessions.setExecutionMode(agent, { expectedRevision: ctx.rpSessions.get(agent).revision, executionMode: 'agent' })
+    await ctx.rpSessions.setWriterRoute(agent, {
+      expectedRevision: ctx.rpSessions.get(agent).revision,
+      route: { kind: 'fixed', provider: 'writer-provider', model: 'writer-model', reasoningEffort: 'high' },
+    })
     assert.equal(agentTools.registered, undefined)
 
     agent.session.append('turn/start', { turn: 2 })
     const run = await ctx.rpRuntime.prepareRun(agent, 2, [{ role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'I listen at the harbor.' }] }])
     const stateRevisionBeforeCommit = ctx.rpState.get(agent).revision
+    assert.deepEqual(run.writerRouteOverride, { provider: 'writer-provider', model: 'writer-model', reasoningEffort: 'high' })
     assert.equal(run.taskSubagents.size, 2)
     assert.deepEqual([...run.taskSubagents.values()].map(subagent => subagent.label), ['规划', '润色'])
     assert.equal(run.taskSubagents.get(outlineSubagent.id)?.toolFilter.allow.includes('rp_run_subagent'), false)
     assert.deepEqual(run.taskSubagents.get(outlineSubagent.id).toolFilter.allow, [])
+    assert.equal(run.taskSubagents.get(outlineSubagent.id).route, undefined)
     assert.equal(run.taskSubagents.get(outlineSubagent.id).inputSchema.additionalProperties, true)
     const firstCardFragment = run.fragments.find(fragment => fragment.id === 'rp.card')
     assert.ok(firstCardFragment?.text.includes('Harbor Hero'))

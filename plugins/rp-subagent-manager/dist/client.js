@@ -9968,7 +9968,6 @@ get: (_target, key) => {
 			"error": "rp-subagent-manager-error",
 			"field": "rp-subagent-manager-field",
 			"fieldWarning": "rp-subagent-manager-fieldWarning",
-			"fixedNotice": "rp-subagent-manager-fixedNotice",
 			"list": "rp-subagent-manager-list",
 			"listToolbar": "rp-subagent-manager-listToolbar",
 			"modelTag": "rp-subagent-manager-modelTag",
@@ -9976,6 +9975,12 @@ get: (_target, key) => {
 			"rail": "rp-subagent-manager-rail",
 			"section": "rp-subagent-manager-section",
 			"sectionHeading": "rp-subagent-manager-sectionHeading",
+			"sessionDialog": "rp-subagent-manager-sessionDialog",
+			"sessionEditor": "rp-subagent-manager-sessionEditor",
+			"sessionError": "rp-subagent-manager-sessionError",
+			"sessionNotice": "rp-subagent-manager-sessionNotice",
+			"sessionState": "rp-subagent-manager-sessionState",
+			"sessionTrigger": "rp-subagent-manager-sessionTrigger",
 			"shell": "rp-subagent-manager-shell",
 			"srOnly": "rp-subagent-manager-srOnly",
 			"state": "rp-subagent-manager-state",
@@ -9999,7 +10004,7 @@ get: (_target, key) => {
 		};
 		const STYLE_ID = "dsh-roleplay-rp-subagent-manager-styles";
 		const STYLE_OWNER = "dsh-roleplay-rp-subagent-manager";
-		const STYLE_TEXT = ".rp-subagent-manager-trigger{flex:none;display:flex;align-items:center;gap:8px;width:calc(100% + 8px);height:34px;margin:0 -4px 2px;padding:6px 2px 6px 10px;box-sizing:border-box;border:0;border-radius:12px;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer;overflow:hidden;font:14px/22px var(--dsw-font-family);text-align:left}.rp-subagent-manager-trigger:hover{background:var(--dsw-alias-interactive-bg-hover)}.rp-subagent-manager-trigger:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.rp-subagent-manager-trigger>svg{flex:0 0 auto}.rp-subagent-manager-trigger.rp-subagent-manager-rail{justify-content:center;width:36px;height:36px;margin:8px 0 10px;gap:0;padding:0;border-radius:50%}[data-slot^=\"sidebar\"][data-slot*=\"footer\"][data-slot*=\"action\"]:has(>.rp-subagent-manager-trigger){display:flex!important;min-width:0;width:100%;flex-direction:column}.rp-subagent-manager-triggerLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rp-subagent-manager-toolRoot{width:100%;min-width:0;font-family:var(--dsw-font-family)}.rp-subagent-manager-toolRow{overflow:hidden}.rp-subagent-manager-toolLeading{color:var(--dsw-alias-brand-primary)}.rp-subagent-manager-toolTitle{font-weight:400}.rp-subagent-manager-toolChevron{color:var(--dsw-alias-label-secondary)}.rp-subagent-manager-toolSeparator{flex:none;width:2px;height:2px;margin:0 8px;border-radius:50%;background:var(--dsw-alias-label-caption)}.rp-subagent-manager-toolSummary{min-width:0;overflow:hidden;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:24px;text-overflow:ellipsis;white-space:nowrap}.rp-subagent-manager-toolSummary[data-error]{color:var(--dsw-alias-state-error-primary)}.rp-subagent-manager-toolBody{display:flex;max-height:260px;flex-direction:column;overflow:auto;margin:4px 0 4px 22px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-markdown-code-block)}.rp-subagent-manager-toolSection{display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:start;gap:14px;padding:11px 14px}.rp-subagent-manager-toolSection+.rp-subagent-manager-toolSection{border-top:1px solid var(--dsw-alias-border-l2)}.rp-subagent-manager-toolSection>span{position:sticky;top:0;color:var(--dsw-alias-label-caption);font:var(--dsw-font-markdown-code-block-small)}.rp-subagent-manager-toolSection>pre{min-width:0;margin:0;color:var(--dsw-alias-label-secondary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap;overflow-wrap:anywhere}.rp-subagent-manager-toolSection>pre[data-error]{color:var(--dsw-alias-state-error-primary)}.rp-subagent-manager-toolInspect{align-self:flex-start;margin:0 14px 12px;padding:3px 9px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-secondary);cursor:pointer;font:11px/16px var(--dsw-font-family)}.rp-subagent-manager-toolInspect:hover{background:var(--dsw-alias-interactive-bg-hover-solid);color:var(--dsw-alias-label-primary)}.rp-subagent-manager-toolInspect:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.rp-subagent-manager-srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.rp-subagent-manager-dialog{box-sizing:border-box;width:min(920px,calc(100vw - 32px));height:calc(100dvh - 32px);max-height:860px}.rp-subagent-manager-content{flex:1;height:100%;min-height:0;overflow:hidden;padding:0!important}.rp-subagent-manager-content>:first-child{box-sizing:border-box;min-height:66px;padding:12px 18px 10px 24px;border-bottom:1px solid var(--dsw-alias-separator-primary)}.rp-subagent-manager-content>:last-child{flex:1;min-width:0;min-height:0;overflow:hidden;margin-top:0;padding:0}.rp-subagent-manager-shell,.rp-subagent-manager-view{display:flex;height:100%;min-height:0;flex-direction:column;overflow:hidden}.rp-subagent-manager-error{flex:0 0 auto;margin:10px 18px 0;padding:9px 11px;border-radius:9px;background:var(--dsw-alias-state-error-tertiary);color:var(--dsw-alias-state-error-primary);font-size:12px;line-height:18px}.rp-subagent-manager-state{display:flex;height:100%;align-items:center;justify-content:center;padding:32px;color:var(--dsw-alias-label-tertiary);font-size:13px}.rp-subagent-manager-list{width:min(760px,100%);box-sizing:border-box;overflow-y:auto;margin:0 auto;padding:24px 28px 38px}.rp-subagent-manager-listToolbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:26px}.rp-subagent-manager-listToolbar>div{display:flex;flex-direction:column;gap:3px}.rp-subagent-manager-listToolbar strong{font-size:18px;line-height:26px}.rp-subagent-manager-listToolbar span{color:var(--dsw-alias-label-tertiary);font-size:12px}.rp-subagent-manager-primaryButton{display:inline-flex;min-height:34px;align-items:center;justify-content:center;gap:6px;padding:0 13px;border:0;border-radius:9px;background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);cursor:pointer;font:600 12px/18px var(--dsw-font-family)}.rp-subagent-manager-primaryButton:disabled{cursor:not-allowed;opacity:.5}.rp-subagent-manager-primaryButton:focus-visible,.rp-subagent-manager-editorNav button:focus-visible,.rp-subagent-manager-cardMain:focus-visible,.rp-subagent-manager-deleteButton:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.rp-subagent-manager-section{display:flex;flex-direction:column;gap:8px;margin-top:22px}.rp-subagent-manager-section>h3,.rp-subagent-manager-sectionHeading h3{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;font-weight:600}.rp-subagent-manager-sectionHeading{display:flex;align-items:center;justify-content:space-between}.rp-subagent-manager-sectionHeading>span{color:var(--dsw-alias-label-tertiary);font-size:11px}.rp-subagent-manager-card{display:grid;grid-template-columns:minmax(0,1fr) 42px;align-items:center;border:1px solid var(--dsw-alias-border-l2);border-radius:14px;background:var(--dsw-alias-bg-layer-1);overflow:hidden}.rp-subagent-manager-cardMain{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:12px;min-height:88px;padding:12px 8px 12px 14px;border:0;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer;text-align:left}.rp-subagent-manager-cardIcon,.rp-subagent-manager-editorMark{display:flex;align-items:center;justify-content:center;background:var(--dsw-specific-tip);color:var(--dsw-alias-brand-primary)}.rp-subagent-manager-cardIcon{width:42px;height:42px;border-radius:12px}.rp-subagent-manager-cardCopy{display:flex;min-width:0;flex-direction:column;gap:5px}.rp-subagent-manager-cardTitle{display:flex;align-items:center;gap:7px}.rp-subagent-manager-cardTitle strong{font-size:14px}.rp-subagent-manager-cardDescription{overflow:hidden;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;text-overflow:ellipsis;white-space:nowrap}.rp-subagent-manager-tags{display:flex;flex-wrap:wrap;gap:5px}.rp-subagent-manager-modelTag,.rp-subagent-manager-toolTag{display:inline-flex;align-items:center;min-height:20px;padding:0 7px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:16px}.rp-subagent-manager-modelTag.rp-subagent-manager-unavailable{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-primary)}.rp-subagent-manager-deleteButton{display:flex;width:32px;height:32px;align-items:center;justify-content:center;justify-self:center;padding:0;border:0;border-radius:9px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer}.rp-subagent-manager-deleteButton:hover{background:var(--dsw-alias-interactive-bg-hover-danger);color:var(--dsw-alias-state-error-primary)}.rp-subagent-manager-empty{display:flex;min-height:112px;flex-direction:column;align-items:center;justify-content:center;gap:5px;border:1px dashed var(--dsw-alias-border-l2);border-radius:14px;color:var(--dsw-alias-label-tertiary);text-align:center}.rp-subagent-manager-empty strong{margin-top:3px;color:var(--dsw-alias-label-secondary);font-size:13px}.rp-subagent-manager-empty span{font-size:11px}.rp-subagent-manager-editor{display:flex;height:100%;min-height:0;flex-direction:column}.rp-subagent-manager-editorNav{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;padding:9px 16px;border-bottom:1px solid var(--dsw-alias-separator-primary)}.rp-subagent-manager-editorNav button{display:inline-flex;min-height:32px;align-items:center;gap:4px;padding:0 9px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:12px/18px var(--dsw-font-family)}.rp-subagent-manager-editorNav button:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.rp-subagent-manager-editorNav .rp-subagent-manager-primaryButton{padding:0 14px;background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);font-weight:600}.rp-subagent-manager-editorActions{display:flex;align-items:center;gap:4px}.rp-subagent-manager-editorNav .rp-subagent-manager-deleteEditorAction{color:var(--dsw-alias-state-error-primary)}.rp-subagent-manager-editorBody{width:min(720px,100%);box-sizing:border-box;overflow-y:auto;margin:0 auto;padding:28px 26px 44px}.rp-subagent-manager-editorBody>header{display:flex;align-items:center;gap:13px;margin-bottom:8px}.rp-subagent-manager-editorMark{width:50px;height:50px;flex:0 0 auto;border-radius:14px}.rp-subagent-manager-editorBody header small{color:var(--dsw-alias-brand-primary);font-size:10px;font-weight:600}.rp-subagent-manager-editorBody h3{margin:1px 0 0;font-size:20px;line-height:27px}.rp-subagent-manager-editorBody header p{margin:3px 0 0;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}.rp-subagent-manager-fixedNotice{display:flex;flex-direction:column;gap:4px;margin-top:20px;padding:13px 14px;border-radius:12px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}.rp-subagent-manager-fixedNotice strong{color:var(--dsw-alias-label-primary);font-size:12px}.rp-subagent-manager-fixedNotice span{font-size:11px;line-height:17px}.rp-subagent-manager-field{display:flex;flex-direction:column;gap:6px;margin-top:18px;color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:600}.rp-subagent-manager-field>small{margin-top:-2px;color:var(--dsw-alias-label-tertiary);font-weight:400;line-height:17px}.rp-subagent-manager-field input,.rp-subagent-manager-field textarea,.rp-subagent-manager-field select{box-sizing:border-box;width:100%;padding:9px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;outline:0;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:13px/20px var(--dsw-font-family)}.rp-subagent-manager-field textarea{resize:vertical}.rp-subagent-manager-field select{min-height:40px}.rp-subagent-manager-field input:focus,.rp-subagent-manager-field textarea:focus,.rp-subagent-manager-field select:focus{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}.rp-subagent-manager-fieldWarning,.rp-subagent-manager-catalogFailure{font-weight:400;line-height:17px}.rp-subagent-manager-fieldWarning{color:var(--dsw-alias-state-warn-primary)}.rp-subagent-manager-catalogFailure{color:var(--dsw-alias-label-tertiary)}.rp-subagent-manager-capabilities{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0 0;padding:0;border:0}.rp-subagent-manager-capabilities legend{grid-column:1/-1;padding:0;color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:600}.rp-subagent-manager-capabilities>p{grid-column:1/-1;margin:0 0 2px;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}.rp-subagent-manager-capabilities>label{display:grid;grid-template-columns:16px 18px minmax(0,1fr);align-items:center;gap:7px;padding:11px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;cursor:pointer}.rp-subagent-manager-capabilities>label:has(input:checked){border-color:color-mix(in srgb,var(--dsw-alias-brand-primary) 45%,var(--dsw-alias-border-l2));background:var(--dsw-specific-tip)}.rp-subagent-manager-capabilities>label>span{display:flex;min-width:0;flex-direction:column}.rp-subagent-manager-capabilities strong{font-size:12px}.rp-subagent-manager-capabilities small{color:var(--dsw-alias-label-tertiary);font-size:10px}.rp-subagent-manager-deleteDialog{width:min(470px,calc(100vw - 32px))}.rp-subagent-manager-deleteSummary{display:flex;flex-direction:column;gap:5px;padding:13px 14px;border:1px solid color-mix(in srgb,var(--dsw-alias-state-error-primary) 18%,var(--dsw-alias-border-l2));border-radius:12px;background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 4%,var(--dsw-alias-bg-layer-1));color:var(--dsw-alias-label-secondary)}.rp-subagent-manager-deleteSummary strong{color:var(--dsw-alias-label-primary);font-size:13px}.rp-subagent-manager-deleteSummary span{font-size:12px;line-height:19px}.rp-subagent-manager-deleteConfirmAction:not(:disabled){color:var(--dsw-alias-state-error-primary)}.rp-subagent-manager-deleteError{margin-top:10px;padding:9px 11px;border-radius:9px;background:var(--dsw-alias-state-error-tertiary);color:var(--dsw-alias-state-error-primary);font-size:12px}@media(max-width:720px){.rp-subagent-manager-dialog{width:calc(100vw - 12px);height:calc(100dvh - 12px)}.rp-subagent-manager-list{padding:18px 12px 28px}.rp-subagent-manager-listToolbar{align-items:flex-end}.rp-subagent-manager-card{grid-template-columns:minmax(0,1fr) 38px}.rp-subagent-manager-cardMain{grid-template-columns:38px minmax(0,1fr);gap:9px;min-height:82px;padding:10px 4px 10px 10px}.rp-subagent-manager-cardIcon{width:38px;height:38px}.rp-subagent-manager-cardDescription{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.rp-subagent-manager-editorBody{padding:22px 14px 36px}.rp-subagent-manager-capabilities{grid-template-columns:1fr}.rp-subagent-manager-content>:first-child{padding-left:18px}}\n\n.rp-subagent-manager-primaryButton:focus-visible,\n.rp-subagent-manager-editorNav button:focus-visible,\n.rp-subagent-manager-cardMain:focus-visible,\n.rp-subagent-manager-deleteButton:focus-visible,\n.rp-subagent-manager-availabilitySwitch:focus-visible {\n  outline: 2px solid var(--dsw-alias-brand-primary);\n  outline-offset: 2px;\n}\n\n.rp-subagent-manager-card {\n  grid-template-columns: minmax(0, 1fr) auto;\n}\n\n.rp-subagent-manager-card[data-enabled='false'] {\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-subagent-manager-card[data-enabled='false'] .rp-subagent-manager-cardIcon {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-subagent-manager-cardTitle {\n  min-width: 0;\n}\n\n.rp-subagent-manager-cardTitle strong {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-subagent-manager-statusTag {\n  flex: none;\n  border-radius: 999px;\n  padding: 1px 6px;\n  background: var(--dsw-specific-tip);\n  color: var(--dsw-alias-brand-primary);\n  font-size: 9px;\n  line-height: 15px;\n}\n\n.rp-subagent-manager-statusTag[data-enabled='false'] {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-subagent-manager-card[data-enabled='false'] .rp-subagent-manager-cardDescription {\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-subagent-manager-cardActions {\n  display: flex;\n  align-items: center;\n  gap: 3px;\n  padding-right: 8px;\n}\n\n.rp-subagent-manager-availabilitySwitch {\n  position: relative;\n  width: 38px;\n  height: 22px;\n  flex: none;\n  border: 0;\n  border-radius: 999px;\n  padding: 0;\n  background: var(--dsw-alias-border-l1);\n  cursor: pointer;\n}\n\n.rp-subagent-manager-availabilitySwitch[aria-checked='true'] {\n  background: var(--dsw-alias-brand-primary);\n}\n\n.rp-subagent-manager-availabilitySwitch:disabled {\n  cursor: wait;\n  opacity: 0.55;\n}\n\n.rp-subagent-manager-availabilitySwitch > span {\n  position: absolute;\n  top: 2px;\n  left: 0;\n  width: 18px;\n  height: 18px;\n  border-radius: 50%;\n  background: white;\n  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);\n}\n\n@media (max-width: 720px) {\n  .rp-subagent-manager-sectionHeading {\n    align-items: flex-start;\n    flex-direction: column;\n    gap: 2px;\n  }\n\n  .rp-subagent-manager-card {\n    grid-template-columns: minmax(0, 1fr) auto;\n  }\n\n  .rp-subagent-manager-cardActions {\n    flex-direction: column;\n    gap: 1px;\n    padding-right: 6px;\n  }\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .rp-subagent-manager-availabilitySwitch {\n    transition: none;\n  }\n}\n";
+		const STYLE_TEXT = ".rp-subagent-manager-trigger{flex:none;display:flex;align-items:center;gap:8px;width:calc(100% + 8px);height:34px;margin:0 -4px 2px;padding:6px 2px 6px 10px;box-sizing:border-box;border:0;border-radius:12px;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer;overflow:hidden;font:14px/22px var(--dsw-font-family);text-align:left}.rp-subagent-manager-trigger:hover{background:var(--dsw-alias-interactive-bg-hover)}.rp-subagent-manager-trigger:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.rp-subagent-manager-trigger>svg{flex:0 0 auto}.rp-subagent-manager-trigger.rp-subagent-manager-rail{justify-content:center;width:36px;height:36px;margin:8px 0 10px;gap:0;padding:0;border-radius:50%}[data-slot^=\"sidebar\"][data-slot*=\"footer\"][data-slot*=\"action\"]:has(>.rp-subagent-manager-trigger){display:flex!important;min-width:0;width:100%;flex-direction:column}.rp-subagent-manager-triggerLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rp-subagent-manager-toolRoot{width:100%;min-width:0;font-family:var(--dsw-font-family)}.rp-subagent-manager-toolRow{overflow:hidden}.rp-subagent-manager-toolLeading{color:var(--dsw-alias-brand-primary)}.rp-subagent-manager-toolTitle{font-weight:400}.rp-subagent-manager-toolChevron{color:var(--dsw-alias-label-secondary)}.rp-subagent-manager-toolSeparator{flex:none;width:2px;height:2px;margin:0 8px;border-radius:50%;background:var(--dsw-alias-label-caption)}.rp-subagent-manager-toolSummary{min-width:0;overflow:hidden;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:24px;text-overflow:ellipsis;white-space:nowrap}.rp-subagent-manager-toolSummary[data-error]{color:var(--dsw-alias-state-error-primary)}.rp-subagent-manager-toolBody{display:flex;max-height:260px;flex-direction:column;overflow:auto;margin:4px 0 4px 22px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-markdown-code-block)}.rp-subagent-manager-toolSection{display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:start;gap:14px;padding:11px 14px}.rp-subagent-manager-toolSection+.rp-subagent-manager-toolSection{border-top:1px solid var(--dsw-alias-border-l2)}.rp-subagent-manager-toolSection>span{position:sticky;top:0;color:var(--dsw-alias-label-caption);font:var(--dsw-font-markdown-code-block-small)}.rp-subagent-manager-toolSection>pre{min-width:0;margin:0;color:var(--dsw-alias-label-secondary);font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap;overflow-wrap:anywhere}.rp-subagent-manager-toolSection>pre[data-error]{color:var(--dsw-alias-state-error-primary)}.rp-subagent-manager-toolInspect{align-self:flex-start;margin:0 14px 12px;padding:3px 9px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-secondary);cursor:pointer;font:11px/16px var(--dsw-font-family)}.rp-subagent-manager-toolInspect:hover{background:var(--dsw-alias-interactive-bg-hover-solid);color:var(--dsw-alias-label-primary)}.rp-subagent-manager-toolInspect:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.rp-subagent-manager-srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.rp-subagent-manager-dialog{box-sizing:border-box;width:min(920px,calc(100vw - 32px));height:calc(100dvh - 32px);max-height:860px}.rp-subagent-manager-content{flex:1;height:100%;min-height:0;overflow:hidden;padding:0!important}.rp-subagent-manager-content>:first-child{box-sizing:border-box;min-height:66px;padding:12px 18px 10px 24px;border-bottom:1px solid var(--dsw-alias-separator-primary)}.rp-subagent-manager-content>:last-child{flex:1;min-width:0;min-height:0;overflow:hidden;margin-top:0;padding:0}.rp-subagent-manager-shell,.rp-subagent-manager-view{display:flex;height:100%;min-height:0;flex-direction:column;overflow:hidden}.rp-subagent-manager-error{flex:0 0 auto;margin:10px 18px 0;padding:9px 11px;border-radius:9px;background:var(--dsw-alias-state-error-tertiary);color:var(--dsw-alias-state-error-primary);font-size:12px;line-height:18px}.rp-subagent-manager-state{display:flex;height:100%;align-items:center;justify-content:center;padding:32px;color:var(--dsw-alias-label-tertiary);font-size:13px}.rp-subagent-manager-list{width:min(760px,100%);box-sizing:border-box;overflow-y:auto;margin:0 auto;padding:24px 28px 38px}.rp-subagent-manager-listToolbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:26px}.rp-subagent-manager-listToolbar>div{display:flex;flex-direction:column;gap:3px}.rp-subagent-manager-listToolbar strong{font-size:18px;line-height:26px}.rp-subagent-manager-listToolbar span{color:var(--dsw-alias-label-tertiary);font-size:12px}.rp-subagent-manager-primaryButton{display:inline-flex;min-height:34px;align-items:center;justify-content:center;gap:6px;padding:0 13px;border:0;border-radius:9px;background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);cursor:pointer;font:600 12px/18px var(--dsw-font-family)}.rp-subagent-manager-primaryButton:disabled{cursor:not-allowed;opacity:.5}.rp-subagent-manager-primaryButton:focus-visible,.rp-subagent-manager-editorNav button:focus-visible,.rp-subagent-manager-cardMain:focus-visible,.rp-subagent-manager-deleteButton:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.rp-subagent-manager-section{display:flex;flex-direction:column;gap:8px;margin-top:22px}.rp-subagent-manager-section>h3,.rp-subagent-manager-sectionHeading h3{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;font-weight:600}.rp-subagent-manager-sectionHeading{display:flex;align-items:center;justify-content:space-between}.rp-subagent-manager-sectionHeading>span{color:var(--dsw-alias-label-tertiary);font-size:11px}.rp-subagent-manager-card{display:grid;grid-template-columns:minmax(0,1fr) 42px;align-items:center;border:1px solid var(--dsw-alias-border-l2);border-radius:14px;background:var(--dsw-alias-bg-layer-1);overflow:hidden}.rp-subagent-manager-cardMain{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:12px;min-height:88px;padding:12px 8px 12px 14px;border:0;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer;text-align:left}.rp-subagent-manager-cardIcon,.rp-subagent-manager-editorMark{display:flex;align-items:center;justify-content:center;background:var(--dsw-specific-tip);color:var(--dsw-alias-brand-primary)}.rp-subagent-manager-cardIcon{width:42px;height:42px;border-radius:12px}.rp-subagent-manager-cardCopy{display:flex;min-width:0;flex-direction:column;gap:5px}.rp-subagent-manager-cardTitle{display:flex;align-items:center;gap:7px}.rp-subagent-manager-cardTitle strong{font-size:14px}.rp-subagent-manager-cardDescription{overflow:hidden;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;text-overflow:ellipsis;white-space:nowrap}.rp-subagent-manager-tags{display:flex;flex-wrap:wrap;gap:5px}.rp-subagent-manager-modelTag,.rp-subagent-manager-toolTag{display:inline-flex;align-items:center;min-height:20px;padding:0 7px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:16px}.rp-subagent-manager-modelTag.rp-subagent-manager-unavailable{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-primary)}.rp-subagent-manager-deleteButton{display:flex;width:32px;height:32px;align-items:center;justify-content:center;justify-self:center;padding:0;border:0;border-radius:9px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer}.rp-subagent-manager-deleteButton:hover{background:var(--dsw-alias-interactive-bg-hover-danger);color:var(--dsw-alias-state-error-primary)}.rp-subagent-manager-empty{display:flex;min-height:112px;flex-direction:column;align-items:center;justify-content:center;gap:5px;border:1px dashed var(--dsw-alias-border-l2);border-radius:14px;color:var(--dsw-alias-label-tertiary);text-align:center}.rp-subagent-manager-empty strong{margin-top:3px;color:var(--dsw-alias-label-secondary);font-size:13px}.rp-subagent-manager-empty span{font-size:11px}.rp-subagent-manager-editor{display:flex;height:100%;min-height:0;flex-direction:column}.rp-subagent-manager-editorNav{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;padding:9px 16px;border-bottom:1px solid var(--dsw-alias-separator-primary)}.rp-subagent-manager-editorNav button{display:inline-flex;min-height:32px;align-items:center;gap:4px;padding:0 9px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:12px/18px var(--dsw-font-family)}.rp-subagent-manager-editorNav button:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.rp-subagent-manager-editorNav .rp-subagent-manager-primaryButton{padding:0 14px;background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);font-weight:600}.rp-subagent-manager-editorActions{display:flex;align-items:center;gap:4px}.rp-subagent-manager-editorNav .rp-subagent-manager-deleteEditorAction{color:var(--dsw-alias-state-error-primary)}.rp-subagent-manager-editorBody{width:min(720px,100%);box-sizing:border-box;overflow-y:auto;margin:0 auto;padding:28px 26px 44px}.rp-subagent-manager-editorBody>header{display:flex;align-items:center;gap:13px;margin-bottom:8px}.rp-subagent-manager-editorMark{width:50px;height:50px;flex:0 0 auto;border-radius:14px}.rp-subagent-manager-editorBody header small{color:var(--dsw-alias-brand-primary);font-size:10px;font-weight:600}.rp-subagent-manager-editorBody h3{margin:1px 0 0;font-size:20px;line-height:27px}.rp-subagent-manager-editorBody header p{margin:3px 0 0;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}.rp-subagent-manager-field{display:flex;flex-direction:column;gap:6px;margin-top:18px;color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:600}.rp-subagent-manager-field>small{margin-top:-2px;color:var(--dsw-alias-label-tertiary);font-weight:400;line-height:17px}.rp-subagent-manager-field input,.rp-subagent-manager-field textarea,.rp-subagent-manager-field select{box-sizing:border-box;width:100%;padding:9px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;outline:0;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:13px/20px var(--dsw-font-family)}.rp-subagent-manager-field textarea{resize:vertical}.rp-subagent-manager-field select{min-height:40px}.rp-subagent-manager-field input:focus,.rp-subagent-manager-field textarea:focus,.rp-subagent-manager-field select:focus{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 16%,transparent)}.rp-subagent-manager-fieldWarning,.rp-subagent-manager-catalogFailure{font-weight:400;line-height:17px}.rp-subagent-manager-fieldWarning{color:var(--dsw-alias-state-warn-primary)}.rp-subagent-manager-catalogFailure{color:var(--dsw-alias-label-tertiary)}.rp-subagent-manager-capabilities{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0 0;padding:0;border:0}.rp-subagent-manager-capabilities legend{grid-column:1/-1;padding:0;color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:600}.rp-subagent-manager-capabilities>p{grid-column:1/-1;margin:0 0 2px;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}.rp-subagent-manager-capabilities>label{display:grid;grid-template-columns:16px 18px minmax(0,1fr);align-items:center;gap:7px;padding:11px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;cursor:pointer}.rp-subagent-manager-capabilities>label:has(input:checked){border-color:color-mix(in srgb,var(--dsw-alias-brand-primary) 45%,var(--dsw-alias-border-l2));background:var(--dsw-specific-tip)}.rp-subagent-manager-capabilities>label>span{display:flex;min-width:0;flex-direction:column}.rp-subagent-manager-capabilities strong{font-size:12px}.rp-subagent-manager-capabilities small{color:var(--dsw-alias-label-tertiary);font-size:10px}.rp-subagent-manager-deleteDialog{width:min(470px,calc(100vw - 32px))}.rp-subagent-manager-deleteSummary{display:flex;flex-direction:column;gap:5px;padding:13px 14px;border:1px solid color-mix(in srgb,var(--dsw-alias-state-error-primary) 18%,var(--dsw-alias-border-l2));border-radius:12px;background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 4%,var(--dsw-alias-bg-layer-1));color:var(--dsw-alias-label-secondary)}.rp-subagent-manager-deleteSummary strong{color:var(--dsw-alias-label-primary);font-size:13px}.rp-subagent-manager-deleteSummary span{font-size:12px;line-height:19px}.rp-subagent-manager-deleteConfirmAction:not(:disabled){color:var(--dsw-alias-state-error-primary)}.rp-subagent-manager-deleteError{margin-top:10px;padding:9px 11px;border-radius:9px;background:var(--dsw-alias-state-error-tertiary);color:var(--dsw-alias-state-error-primary);font-size:12px}@media(max-width:720px){.rp-subagent-manager-dialog{width:calc(100vw - 12px);height:calc(100dvh - 12px)}.rp-subagent-manager-list{padding:18px 12px 28px}.rp-subagent-manager-listToolbar{align-items:flex-end}.rp-subagent-manager-card{grid-template-columns:minmax(0,1fr) 38px}.rp-subagent-manager-cardMain{grid-template-columns:38px minmax(0,1fr);gap:9px;min-height:82px;padding:10px 4px 10px 10px}.rp-subagent-manager-cardIcon{width:38px;height:38px}.rp-subagent-manager-cardDescription{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.rp-subagent-manager-editorBody{padding:22px 14px 36px}.rp-subagent-manager-capabilities{grid-template-columns:1fr}.rp-subagent-manager-content>:first-child{padding-left:18px}}\n\n.rp-subagent-manager-primaryButton:focus-visible,\n.rp-subagent-manager-editorNav button:focus-visible,\n.rp-subagent-manager-cardMain:focus-visible,\n.rp-subagent-manager-deleteButton:focus-visible,\n.rp-subagent-manager-availabilitySwitch:focus-visible {\n  outline: 2px solid var(--dsw-alias-brand-primary);\n  outline-offset: 2px;\n}\n\n.rp-subagent-manager-card {\n  grid-template-columns: minmax(0, 1fr) auto;\n}\n\n.rp-subagent-manager-card[data-enabled='false'] {\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-subagent-manager-card[data-enabled='false'] .rp-subagent-manager-cardIcon {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-subagent-manager-cardTitle {\n  min-width: 0;\n}\n\n.rp-subagent-manager-cardTitle strong {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-subagent-manager-statusTag {\n  flex: none;\n  border-radius: 999px;\n  padding: 1px 6px;\n  background: var(--dsw-specific-tip);\n  color: var(--dsw-alias-brand-primary);\n  font-size: 9px;\n  line-height: 15px;\n}\n\n.rp-subagent-manager-statusTag[data-enabled='false'] {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-subagent-manager-card[data-enabled='false'] .rp-subagent-manager-cardDescription {\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-subagent-manager-cardActions {\n  display: flex;\n  align-items: center;\n  gap: 3px;\n  padding-right: 8px;\n}\n\n.rp-subagent-manager-availabilitySwitch {\n  position: relative;\n  width: 38px;\n  height: 22px;\n  flex: none;\n  border: 0;\n  border-radius: 999px;\n  padding: 0;\n  background: var(--dsw-alias-border-l1);\n  cursor: pointer;\n}\n\n.rp-subagent-manager-availabilitySwitch[aria-checked='true'] {\n  background: var(--dsw-alias-brand-primary);\n}\n\n.rp-subagent-manager-availabilitySwitch:disabled {\n  cursor: wait;\n  opacity: 0.55;\n}\n\n.rp-subagent-manager-availabilitySwitch > span {\n  position: absolute;\n  top: 2px;\n  left: 0;\n  width: 18px;\n  height: 18px;\n  border-radius: 50%;\n  background: white;\n  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);\n}\n\n@media (max-width: 720px) {\n  .rp-subagent-manager-sectionHeading {\n    align-items: flex-start;\n    flex-direction: column;\n    gap: 2px;\n  }\n\n  .rp-subagent-manager-card {\n    grid-template-columns: minmax(0, 1fr) auto;\n  }\n\n  .rp-subagent-manager-cardActions {\n    flex-direction: column;\n    gap: 1px;\n    padding-right: 6px;\n  }\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .rp-subagent-manager-availabilitySwitch {\n    transition: none;\n  }\n}\n\n.rp-subagent-manager-sessionTrigger {\n  display: inline-flex;\n  min-height: 28px;\n  align-items: center;\n  gap: 6px;\n  padding: 4px 9px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 999px;\n  color: var(--dsw-alias-label-primary);\n  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 92%, transparent);\n  box-shadow: var(--dsw-shadow-lv1);\n  cursor: pointer;\n  font: 11px/18px var(--dsw-font-family);\n}\n\n.rp-subagent-manager-sessionTrigger > svg { color: #8b5cf6; }\n.rp-subagent-manager-sessionTrigger > strong { font-weight: 560; }\n.rp-subagent-manager-sessionTrigger:hover { border-color: color-mix(in srgb, #8b5cf6 34%, var(--dsw-alias-border-l2)); }\n.rp-subagent-manager-sessionTrigger:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }\n.rp-subagent-manager-sessionDialog { width: min(560px, calc(100vw - 32px)); }\n.rp-subagent-manager-sessionEditor { display: flex; flex-direction: column; padding: 2px 2px 8px; }\n.rp-subagent-manager-sessionNotice {\n  display: flex;\n  flex-direction: column;\n  gap: 3px;\n  padding: 12px 13px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 11px;\n  color: var(--dsw-alias-label-secondary);\n  background: var(--dsw-alias-bg-layer-2);\n}\n.rp-subagent-manager-sessionNotice strong { color: var(--dsw-alias-label-primary); font-size: 12px; line-height: 18px; }\n.rp-subagent-manager-sessionNotice span { font-size: 11px; line-height: 17px; }\n.rp-subagent-manager-sessionError {\n  margin-bottom: 10px;\n  padding: 9px 11px;\n  border-radius: 9px;\n  color: var(--dsw-alias-state-error-primary);\n  background: var(--dsw-alias-state-error-tertiary);\n  font-size: 12px;\n  line-height: 18px;\n}\n.rp-subagent-manager-sessionState {\n  display: flex;\n  min-height: 160px;\n  align-items: center;\n  justify-content: center;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n}\n\n@media (max-width: 720px) {\n  .rp-subagent-manager-sessionTrigger { width: 32px; height: 32px; justify-content: center; padding: 0; }\n  .rp-subagent-manager-sessionTrigger > strong { display: none; }\n}\n";
 		function ensureStyles() {
 			document.getElementById(STYLE_ID)?.remove();
 			const style = document.createElement("style");
@@ -10077,6 +10082,15 @@ get: (_target, key) => {
 		}
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
+			ctx.slots.inject("conversation.session.header.utilities", () => ctx.slots.register({
+				name: "conversation.session.header.utilities",
+				id: "rp-session-writer-settings",
+				order: 100,
+				inject: () => ({
+					connection: ctx.rpRemote,
+					modelCatalog: ctx.remote.session
+				})
+			}, SessionWriterSettingsEntry));
 			ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({
 				name: "sidebar.footer.action",
 				id: "rp-subagents-navigation",
@@ -10243,6 +10257,134 @@ get: (_target, key) => {
 				connection,
 				modelCatalog
 			}))));
+		}
+		function SessionWriterSettingsEntry({ sessionId, useProjection, useSession, connection, modelCatalog }) {
+			const profile = useProjection("rp/session");
+			const session = useSession((state) => ({ running: state.running }));
+			const [open, setOpen] = (0, react.useState)(false);
+			if (profile === null || profile === void 0) return null;
+			return h(MotionConfig, {
+				reducedMotion: "user",
+				transition
+			}, h(LazyMotion, {
+				features: domMax,
+				strict: true
+			}, h(react.default.Fragment, null, h(m.button, {
+				type: "button",
+				className: css.sessionTrigger,
+				whileHover: { y: -1 },
+				whileTap: { scale: .98 },
+				onClick: () => setOpen(true),
+				"aria-label": "设置当前对话的 Writer 模型",
+				title: "设置当前对话的 Writer 模型与推理强度"
+			}, h(IconSubagentRobotOutline16, { size: 15 }), h("strong", null, "Writer")), h(SessionWriterSettingsModal, {
+				open,
+				onClose: () => setOpen(false),
+				connection,
+				modelCatalog,
+				sessionId,
+				profile,
+				running: session.running
+			}))));
+		}
+		function SessionWriterSettingsModal({ open, onClose, connection, modelCatalog, sessionId, profile, running = false }) {
+			const [catalog, setCatalog] = (0, react.useState)(null);
+			const [models, setModels] = (0, react.useState)({
+				groups: [],
+				failures: []
+			});
+			const [route, setRoute] = (0, react.useState)(null);
+			const [loading, setLoading] = (0, react.useState)(false);
+			const [modelLoadFailed, setModelLoadFailed] = (0, react.useState)(false);
+			const [saving, setSaving] = (0, react.useState)(false);
+			const [error, setError] = (0, react.useState)(null);
+			(0, react.useEffect)(() => {
+				if (!open) return;
+				let active = true;
+				setCatalog(null);
+				setRoute(profile?.runtime?.writerRoute ?? null);
+				setLoading(true);
+				setSaving(false);
+				setError(null);
+				setModelLoadFailed(false);
+				rpc(connection, "list", {}).then((value) => {
+					if (active) setCatalog(value);
+				}).catch((reason) => {
+					if (active) setError(sessionUserMessage(reason, "load"));
+				}).finally(() => {
+					if (active) setLoading(false);
+				});
+				modelCatalog.modelCatalog().then((value) => {
+					if (active) setModels(modelCatalogValue(value));
+				}).catch(() => {
+					if (active) {
+						setModelLoadFailed(true);
+						setModels({
+							groups: [],
+							failures: []
+						});
+					}
+				});
+				return () => {
+					active = false;
+				};
+			}, [
+				connection,
+				modelCatalog,
+				open
+			]);
+			const save = async () => {
+				if (saving || loading || profile == null || catalog === null || running) return;
+				setSaving(true);
+				setError(null);
+				try {
+					await rpc(connection, "writer/session-update", {
+						sessionId,
+						expectedRevision: profile.revision,
+						route
+					});
+					onClose();
+				} catch (reason) {
+					setError(sessionUserMessage(reason));
+				} finally {
+					setSaving(false);
+				}
+			};
+			const close = () => {
+				if (!saving) onClose();
+			};
+			const disabled = saving || loading || catalog === null || running;
+			return h(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+				open,
+				onClose: close,
+				closeLabel: "关闭当前对话 Writer 设置",
+				title: "Writer 设置",
+				description: "仅影响当前对话，从下一次回复开始生效。",
+				className: css.sessionDialog,
+				footer: h(react.default.Fragment, null, h(_deepseek_ai_dsh_client_ui_primitives.Button, {
+					variant: "outline",
+					disabled: saving,
+					onClick: close
+				}, "取消"), h(_deepseek_ai_dsh_client_ui_primitives.Button, {
+					disabled,
+					onClick: () => void save()
+				}, saving ? "保存中…" : "保存"))
+			}, error === null ? null : h("div", {
+				className: css.sessionError,
+				role: "alert"
+			}, error), running ? h("div", {
+				className: css.sessionNotice,
+				role: "status"
+			}, h("strong", null, "当前回复正在生成"), h("span", null, "回复结束后即可修改 Writer 设置。")) : null, loading && catalog === null ? h("div", {
+				className: css.sessionState,
+				role: "status"
+			}, "正在加载…") : catalog === null ? h("div", { className: css.sessionState }, "暂时无法加载设置。") : h("div", { className: css.sessionEditor }, h(SessionModelField, {
+				route,
+				defaultRoute: catalog.writer.route,
+				onChange: setRoute,
+				models,
+				modelLoadFailed
+			})));
 		}
 		function SubagentManagerModal({ open, onClose, connection, modelCatalog }) {
 			const reduced = useReducedMotion();
@@ -10459,7 +10601,7 @@ get: (_target, key) => {
 				open,
 				onClose: deleteTarget === null ? onClose : () => {},
 				title: "子代理",
-				description: "Writer 保持固定；这里管理可插拔的独立任务子代理。只有启用项会提供给 Agent，修改从下一次回复开始生效。",
+				description: "设置 Writer 默认模型，管理任务子代理。",
 				closeLabel: "关闭子代理管理",
 				className: css.dialog,
 				contentClassName: css.content
@@ -10525,7 +10667,7 @@ get: (_target, key) => {
 			}, "正在读取子代理配置…");
 			if (catalog === null) return h("div", { className: css.state }, "暂时没有可显示的子代理配置。");
 			const enabledCount = catalog.subagents.filter((subagent) => subagent.enabled !== false).length;
-			return h("div", { className: css.list }, h("div", { className: css.listToolbar }, h("div", null, h("strong", null, "全局子代理"), h("span", null, `固定 Writer + ${catalog.subagents.length} 个独立任务子代理，其中 ${enabledCount} 个已启用`)), h(m.button, {
+			return h("div", { className: css.list }, h("div", { className: css.listToolbar }, h("div", null, h("strong", null, "Writer 与任务子代理"), h("span", null, `${catalog.subagents.length} 个任务子代理 · ${enabledCount} 个已启用`)), h(m.button, {
 				type: "button",
 				className: css.primaryButton,
 				whileTap: { scale: .98 },
@@ -10534,11 +10676,11 @@ get: (_target, key) => {
 			}, h(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 16 }), "新增子代理")), h("section", {
 				className: css.section,
 				"aria-labelledby": "rp-subagent-writer-heading"
-			}, h("h3", { id: "rp-subagent-writer-heading" }, "写作"), h(SubagentCard, {
+			}, h("h3", { id: "rp-subagent-writer-heading" }, "Writer 默认设置"), h(SubagentCard, {
 				subagent: {
 					...catalog.writer,
 					name: "Writer",
-					description: "使用完整 RP 上下文生成唯一的故事初稿，不可被用户子代理替换。",
+					description: "所有对话默认使用此设置，也可在对话中单独调整。",
 					tools: []
 				},
 				fixed: true,
@@ -10547,7 +10689,7 @@ get: (_target, key) => {
 			})), h("section", {
 				className: css.section,
 				"aria-labelledby": "rp-subagent-tasks-heading"
-			}, h("div", { className: css.sectionHeading }, h("h3", { id: "rp-subagent-tasks-heading" }, "独立任务子代理"), h("span", null, "仅启用项会进入 Agent 的本轮目录")), catalog.subagents.length === 0 ? h("div", { className: css.empty }, h(IconSubagentRobotOutline16, { size: 24 }), h("strong", null, "还没有独立任务子代理"), h("span", null, "适合需要干净上下文或独立模型的大纲、润色等任务。")) : catalog.subagents.map((subagent) => h(SubagentCard, {
+			}, h("div", { className: css.sectionHeading }, h("h3", { id: "rp-subagent-tasks-heading" }, "任务子代理"), h("span", null, "启用后可在 Agent 模式中使用")), catalog.subagents.length === 0 ? h("div", { className: css.empty }, h(IconSubagentRobotOutline16, { size: 24 }), h("strong", null, "还没有任务子代理"), h("span", null, "可用于大纲、润色等独立任务。")) : catalog.subagents.map((subagent) => h(SubagentCard, {
 				key: subagent.id,
 				subagent,
 				models,
@@ -10562,6 +10704,7 @@ get: (_target, key) => {
 		function SubagentCard({ subagent, fixed = false, models, reduced = false, pending = false, toggleDisabled = false, onEdit, onToggle, onDelete }) {
 			const available = routeAvailable(subagent.route, models.groups);
 			const enabled = fixed || subagent.enabled !== false;
+			const modelLabel = fixed && subagent.route?.kind !== "fixed" ? "跟随当前对话" : routeLabel(subagent.route, models.groups);
 			return h(m.article, {
 				className: css.card,
 				layout: true,
@@ -10573,10 +10716,10 @@ get: (_target, key) => {
 				className: css.cardMain,
 				onClick: onEdit,
 				"aria-label": `编辑${subagent.name}`
-			}, h("span", { className: css.cardIcon }, h(IconSubagentRobotOutline16, { size: 18 })), h("span", { className: css.cardCopy }, h("span", { className: css.cardTitle }, h("strong", null, subagent.name), fixed ? h(_deepseek_ai_dsh_client_ui_primitives.Pill, null, "固定") : h("span", {
+			}, h("span", { className: css.cardIcon }, h(IconSubagentRobotOutline16, { size: 18 })), h("span", { className: css.cardCopy }, h("span", { className: css.cardTitle }, h("strong", null, subagent.name), fixed ? h(_deepseek_ai_dsh_client_ui_primitives.Pill, null, "全局默认") : h("span", {
 				className: css.statusTag,
 				"data-enabled": enabled ? "true" : "false"
-			}, pending ? "正在更新" : enabled ? "已启用" : "已停用")), h("span", { className: css.cardDescription }, subagent.description), h("span", { className: css.tags }, h("span", { className: available ? css.modelTag : `${css.modelTag} ${css.unavailable}` }, available ? routeLabel(subagent.route, models.groups) : `${routeLabel(subagent.route, models.groups)} · 当前不可用`), ...(subagent.tools ?? []).map((tool) => h("span", {
+			}, pending ? "正在更新" : enabled ? "已启用" : "已停用")), h("span", { className: css.cardDescription }, subagent.description), h("span", { className: css.tags }, h("span", { className: available ? css.modelTag : `${css.modelTag} ${css.unavailable}` }, available ? modelLabel : `${modelLabel} · 当前不可用`), ...(subagent.tools ?? []).map((tool) => h("span", {
 				className: css.toolTag,
 				key: tool
 			}, tool === "web_search" ? "Web 搜索" : "Skills"))))), fixed ? null : h("span", { className: css.cardActions }, h(AvailabilitySwitch, {
@@ -10617,19 +10760,21 @@ get: (_target, key) => {
 		function WriterEditor({ draft, onDraft, models, modelLoadFailed, saving, onBack, onSave }) {
 			return h(EditorShell, {
 				title: "Writer",
-				subtitle: "固定写作子代理",
+				subtitle: "默认设置",
+				description: "未单独设置的对话将使用此配置。",
 				saving,
 				onBack,
 				onSave,
-				saveLabel: "保存 Writer 模型"
-			}, h("div", { className: css.fixedNotice }, h("strong", null, "Writer 的职责与上下文由 Roleplay 固定"), h("span", null, "Chat 与 Agent 都必须使用这个 Writer 生成故事初稿；用户子代理不能替换它。")), h(ModelField, {
+				saveLabel: "保存"
+			}, h(ModelField, {
 				route: draft.route,
 				onChange: (route) => onDraft((current) => ({
 					...current,
 					route
 				})),
 				models,
-				modelLoadFailed
+				modelLoadFailed,
+				writer: true
 			}));
 		}
 		function SubagentEditor({ draft, onDraft, limits, models, modelLoadFailed, saving, onBack, onSave, onDelete }) {
@@ -10694,7 +10839,7 @@ get: (_target, key) => {
 				onChange: () => toggleTool("skill")
 			}), h(_deepseek_ai_dsh_client_ui_primitives.IconSkillOutline16, { size: 14 }), h("span", null, h("strong", null, "Skills"), h("small", null, "读取并执行已安装的只读工作指南")))));
 		}
-		function EditorShell({ title, subtitle, saving, onBack, onSave, saveLabel, onDelete, children }) {
+		function EditorShell({ title, subtitle, description = "更改从下一次回复开始生效。", saving, onBack, onSave, saveLabel, onDelete, children }) {
 			return h("div", { className: css.editor }, h("div", { className: css.editorNav }, h("button", {
 				type: "button",
 				disabled: saving,
@@ -10709,9 +10854,9 @@ get: (_target, key) => {
 				className: css.primaryButton,
 				disabled: saving,
 				onClick: onSave
-			}, saving ? "保存中…" : saveLabel))), h("div", { className: css.editorBody }, h("header", null, h("span", { className: css.editorMark }, h(IconSubagentRobotOutline16, { size: 22 })), h("div", null, h("small", null, subtitle), h("h3", null, title), h("p", null, "保存后，从下一次 Roleplay 回复开始使用新配置；已经开始的任务不受影响。"))), children));
+			}, saving ? "保存中…" : saveLabel))), h("div", { className: css.editorBody }, h("header", null, h("span", { className: css.editorMark }, h(IconSubagentRobotOutline16, { size: 22 })), h("div", null, h("small", null, subtitle), h("h3", null, title), h("p", null, description))), children));
 		}
-		function ModelField({ route, onChange, models, modelLoadFailed }) {
+		function ModelField({ route, onChange, models, modelLoadFailed, writer = false }) {
 			const key = routeKey(route);
 			const available = routeAvailable(route, models.groups);
 			const selectedModel = route.kind === "fixed" ? models.groups.find((group) => group.id === route.provider)?.models?.find((model) => model.id === route.model) : void 0;
@@ -10721,11 +10866,11 @@ get: (_target, key) => {
 			const effortAvailable = explicitEffort === "" || efforts.some((effort) => effort.id === explicitEffort);
 			const defaultEffortName = efforts.find((effort) => effort.id === defaultEffort)?.name;
 			const failures = models.failures ?? [];
-			return h(react.default.Fragment, null, h("label", { className: css.field }, h("span", null, "模型"), h("small", null, "跟随父代理会使用当前对话的完整模型路由，包括已显式选择的推理强度与输出上限。"), h("select", {
+			return h(react.default.Fragment, null, h("label", { className: css.field }, h("span", null, "模型"), h("small", null, writer ? "选择“跟随当前对话”时，使用对话当前的模型设置。" : "跟随父代理时，使用当前对话的模型设置。"), h("select", {
 				value: key,
 				onChange: (event) => onChange(routeFromKey(event.target.value)),
-				"aria-label": "子代理模型"
-			}, h("option", { value: "inherit" }, "跟随父代理"), !available && route.kind === "fixed" && selectedModel === void 0 ? h("option", {
+				"aria-label": writer ? "Writer 全局默认模型" : "子代理模型"
+			}, h("option", { value: "inherit" }, writer ? "跟随当前对话" : "跟随父代理"), !available && route.kind === "fixed" && selectedModel === void 0 ? h("option", {
 				value: key,
 				disabled: true
 			}, `${route.provider} · ${route.model}（当前不可用）`) : null, ...models.groups.map((group) => h("optgroup", {
@@ -10737,13 +10882,13 @@ get: (_target, key) => {
 			}, model.name))))), !available && route.kind === "fixed" && selectedModel === void 0 ? h("span", {
 				className: css.fieldWarning,
 				role: "status"
-			}, "已保存的模型当前不在可用目录中。请选择其他模型或改为跟随父代理后再保存。") : null, modelLoadFailed ? h("span", {
+			}, `已保存的模型当前不可用。请选择其他模型或${writer ? "跟随当前对话" : "跟随父代理"}。`) : null, modelLoadFailed ? h("span", {
 				className: css.fieldWarning,
 				role: "status"
 			}, "模型目录暂时无法读取。稍后重新打开即可重试。") : null, ...failures.map((failure) => h("span", {
 				className: css.catalogFailure,
 				key: failure.id
-			}, `${failure.name} 的模型目录暂时不可用，其他提供方仍可选择。`))), route.kind !== "fixed" || selectedModel === void 0 || efforts.length === 0 ? null : h("label", { className: css.field }, h("span", null, "推理强度"), h("small", null, "不显式指定时使用该模型的默认推理强度；切换模型会自动恢复默认。"), h("select", {
+			}, `${failure.name} 的模型目录暂时不可用，其他提供方仍可选择。`))), route.kind !== "fixed" || selectedModel === void 0 || efforts.length === 0 ? null : h("label", { className: css.field }, h("span", null, "推理强度"), h("small", null, "默认使用模型推荐值。"), h("select", {
 				value: explicitEffort,
 				onChange: (event) => onChange({
 					kind: "fixed",
@@ -10751,7 +10896,7 @@ get: (_target, key) => {
 					model: route.model,
 					...event.target.value === "" ? {} : { reasoningEffort: event.target.value }
 				}),
-				"aria-label": "子代理推理强度"
+				"aria-label": writer ? "Writer 全局默认推理强度" : "子代理推理强度"
 			}, h("option", { value: "" }, defaultEffortName === void 0 ? "使用模型默认值" : `使用模型默认值（${defaultEffortName}）`), !effortAvailable ? h("option", {
 				value: explicitEffort,
 				disabled: true
@@ -10762,6 +10907,86 @@ get: (_target, key) => {
 				className: css.fieldWarning,
 				role: "status"
 			}, "已保存的推理强度不再受此模型支持。请选择其他强度或使用模型默认值。") : null));
+		}
+		function SessionModelField({ route, defaultRoute, onChange, models, modelLoadFailed }) {
+			const key = route === null ? "default" : routeKey(route);
+			const available = route === null || routeAvailable(route, models.groups);
+			const defaultAvailable = routeAvailable(defaultRoute, models.groups);
+			const selectedModel = route?.kind === "fixed" ? models.groups.find((group) => group.id === route.provider)?.models?.find((model) => model.id === route.model) : void 0;
+			const efforts = selectedModel?.reasoning?.efforts ?? [];
+			const defaultEffort = selectedModel?.reasoning?.defaultEffort;
+			const explicitEffort = typeof route?.reasoningEffort === "string" ? route.reasoningEffort : "";
+			const effortAvailable = explicitEffort === "" || efforts.some((effort) => effort.id === explicitEffort);
+			const defaultEffortName = efforts.find((effort) => effort.id === defaultEffort)?.name;
+			const failures = models.failures ?? [];
+			const globalLabel = defaultRoute?.kind === "fixed" ? routeLabel(defaultRoute, models.groups) : "跟随当前对话";
+			const modelOptions = [
+				h("option", {
+					key: "default",
+					value: "default"
+				}, `使用全局默认（${globalLabel}）`),
+				h("option", {
+					key: "inherit",
+					value: "inherit"
+				}, "跟随当前对话"),
+				!available && route?.kind === "fixed" && selectedModel === void 0 ? h("option", {
+					key: "unavailable",
+					value: key,
+					disabled: true
+				}, `${route.provider} · ${route.model}（当前不可用）`) : null,
+				...models.groups.map((group) => h("optgroup", {
+					key: group.id,
+					label: group.name
+				}, ...group.models.map((model) => h("option", {
+					key: model.id,
+					value: JSON.stringify([group.id, model.id])
+				}, model.name))))
+			];
+			const modelField = h("label", { className: css.field }, h("span", null, "模型"), h("small", null, "使用全局默认会自动同步；其他选择只影响当前对话。"), h("select", {
+				value: key,
+				onChange: (event) => onChange(event.target.value === "default" ? null : routeFromKey(event.target.value)),
+				"aria-label": "当前对话 Writer 模型"
+			}, ...modelOptions), route === null && !defaultAvailable ? h("span", {
+				className: css.fieldWarning,
+				role: "status"
+			}, "全局默认模型当前不可用。可以为当前对话选择其他模型，或稍后修改全局默认值。") : null, !available && route?.kind === "fixed" && selectedModel === void 0 ? h("span", {
+				className: css.fieldWarning,
+				role: "status"
+			}, "当前对话保存的模型已不可用。请选择其他模型、跟随当前对话或恢复全局默认。") : null, modelLoadFailed ? h("span", {
+				className: css.fieldWarning,
+				role: "status"
+			}, "模型目录暂时无法读取。稍后重新打开即可重试。") : null, ...failures.map((failure) => h("span", {
+				className: css.catalogFailure,
+				key: failure.id
+			}, `${failure.name} 的模型目录暂时不可用，其他提供方仍可选择。`)));
+			const effortField = route?.kind !== "fixed" || selectedModel === void 0 || efforts.length === 0 ? null : h("label", { className: css.field }, h("span", null, "推理强度"), h("small", null, "默认使用模型推荐值。"), h("select", {
+				value: explicitEffort,
+				onChange: (event) => onChange({
+					kind: "fixed",
+					provider: route.provider,
+					model: route.model,
+					...event.target.value === "" ? {} : { reasoningEffort: event.target.value }
+				}),
+				"aria-label": "当前对话 Writer 推理强度"
+			}, h("option", { value: "" }, defaultEffortName === void 0 ? "使用模型默认值" : `使用模型默认值（${defaultEffortName}）`), !effortAvailable ? h("option", {
+				value: explicitEffort,
+				disabled: true
+			}, `${explicitEffort}（当前不可用）`) : null, ...efforts.map((effort) => h("option", {
+				key: effort.id,
+				value: effort.id
+			}, effort.name))), !effortAvailable ? h("span", {
+				className: css.fieldWarning,
+				role: "status"
+			}, "当前对话保存的推理强度已不受此模型支持。请选择其他强度或使用模型默认值。") : null);
+			return h(react.default.Fragment, null, modelField, effortField);
+		}
+		function sessionUserMessage(error, action = "save") {
+			if (error?.code === "REVISION_CONFLICT") return "当前对话的设置刚刚发生了变化，请关闭并重新打开后再保存。";
+			if (error?.code === "SESSION_RUNNING") return "当前回复正在生成，结束后再修改 Writer 设置。";
+			if (error?.code === "MODEL_UNAVAILABLE") return "所选模型当前不可用，请选择其他模型、跟随当前对话或恢复全局默认。";
+			if (error?.code === "NOT_RP_SESSION" || error?.code === "ASSET_NOT_FOUND") return "当前对话已经不可用，请刷新页面后重试。";
+			if (action === "load") return "暂时无法读取 Writer 的全局默认值，请稍后重试。";
+			return "暂时无法保存当前对话的 Writer 设置，请检查选择后重试。";
 		}
 		function DeleteSubagentDialog({ target, pending, error, onCancel, onConfirm }) {
 			return h(_deepseek_ai_dsh_client_ui_primitives.Modal, {
@@ -10789,6 +11014,8 @@ get: (_target, key) => {
 		}
 		//#endregion
 		exports.IconSubagentRobotOutline16 = IconSubagentRobotOutline16;
+		exports.SessionWriterSettingsEntry = SessionWriterSettingsEntry;
+		exports.SessionWriterSettingsModal = SessionWriterSettingsModal;
 		exports.SubagentManagerEntry = SubagentManagerEntry;
 		exports.SubagentManagerModal = SubagentManagerModal;
 		exports.SubagentToolView = SubagentToolView;

@@ -21,7 +21,7 @@
     "README.md"
   ],
   "scripts": {
-    "check": "node --check src/index.js && node --check src/activation.js && node --check src/client.js && node --check src/client-state.js",
+    "check": "node --check src/index.js && node --check src/activation.js && node --check src/client.js && node --check src/client-state.js && node --check src/client-condition.js",
     "test": "node --test",
     "generate:styles": "node scripts/generate-styles.mjs",
     "build:client": "pnpm run generate:styles && tsdown --config tsdown.config.js --config-loader native",

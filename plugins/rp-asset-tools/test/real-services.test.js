@@ -81,9 +81,16 @@ test('rp_asset_read and rp_asset use all five real owning services', async () =>
       assert.ok(listed.page.items.some(asset => asset.id === created.asset.id))
       assert.equal((await readTool.execute({ action: 'get', kind: item.kind, id: created.asset.id }, exec)).asset.id, created.asset.id)
 
+      const updateValue = item.kind === 'preset'
+        ? {
+            name: item.update.name,
+            description: stored.description,
+            fields: item.update.fields.map((field, index) => ({ ...stored.fields[index], ...field })),
+          }
+        : item.update
       const updated = await tool.execute({
         action: 'update', kind: item.kind, id: created.asset.id,
-        expectedRevision: 1, value: item.update,
+        expectedRevision: 1, value: updateValue,
       }, exec)
       assert.equal(updated.asset.id, created.asset.id)
       assert.equal(updated.asset.revision, 2)

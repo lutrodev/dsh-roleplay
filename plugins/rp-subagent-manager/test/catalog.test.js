@@ -392,7 +392,7 @@ test('damaged catalog fails closed and is never replaced by initialization', asy
   } finally { await f.close() }
 })
 
-test('runtime projection uses the user-defined instructions as the complete System persona and stays detached', async () => {
+test('runtime projection uses the live global Writer default unless the current Session overrides only Writer', async () => {
   const f = await fixture()
   try {
     await f.manager.updateWriter({ kind: 'fixed', provider: 'p', model: 'writer', reasoningEffort: 'high' }, 1)
@@ -404,5 +404,50 @@ test('runtime projection uses the user-defined instructions as the complete Syst
     assert.deepEqual(snapshot.subagents[0].toolFilter, { allow: ['web_search', 'skill'] })
     snapshot.subagents[0].toolFilter.allow.length = 0
     assert.deepEqual((await f.manager.prepareRuntimeProfile()).subagents[0].toolFilter, { allow: ['web_search', 'skill'] })
+
+    const sessionFixed = await f.manager.prepareRuntimeProfile({
+      revision: 7,
+      runtime: { writerRoute: { kind: 'fixed', provider: 'session-provider', model: 'session-writer', reasoningEffort: 'low' } },
+    })
+    assert.deepEqual(sessionFixed.writer, { provider: 'session-provider', model: 'session-writer', reasoningEffort: 'low' })
+    assert.equal(sessionFixed.revisions.writer, 7)
+    assert.deepEqual(sessionFixed.subagents, (await f.manager.prepareRuntimeProfile()).subagents)
+
+    const sessionParent = await f.manager.prepareRuntimeProfile({ revision: 8, runtime: { writerRoute: { kind: 'inherit' } } })
+    assert.equal(sessionParent.writer, undefined)
+    assert.equal(sessionParent.revisions.writer, 8)
+    assert.deepEqual((await f.manager.prepareRuntimeProfile({ revision: 9, runtime: {} })).writer, snapshot.writer)
+  } finally { await f.close() }
+})
+
+test('Session Writer updates validate the selected model and delegate only the Writer route to rp-session', async () => {
+  const f = await fixture()
+  try {
+    const agent = { status: 'idle', session: { id: 'story-session' } }
+    const writes = []
+    f.ctx.provide('typert', { lookups: new Map([['agent', { async resolve(id) { assert.equal(id, 'story-session'); return agent } }]]) })
+    f.ctx.provide('agentPresets', {
+      serviceFor(candidate, service) {
+        assert.equal(candidate, agent)
+        assert.equal(service, 'rpSessions')
+        return { async setWriterRoute(_agent, request) { writes.push(request); return { revision: request.expectedRevision + 1, runtime: request.route === null ? {} : { writerRoute: request.route } } } }
+      },
+    })
+
+    const fixed = await f.manager.updateSessionWriterRoute({
+      sessionId: 'story-session', expectedRevision: 4,
+      route: { kind: 'fixed', provider: 'openai', model: 'writer-model', reasoningEffort: 'high' },
+    })
+    assert.deepEqual(fixed.runtime.writerRoute, { kind: 'fixed', provider: 'openai', model: 'writer-model', reasoningEffort: 'high' })
+    assert.deepEqual(writes[0], {
+      expectedRevision: 4,
+      route: { kind: 'fixed', provider: 'openai', model: 'writer-model', reasoningEffort: 'high' },
+    })
+    assert.deepEqual(f.resolutions.at(-1), { provider: 'openai', model: 'writer-model' })
+
+    const resolutionCount = f.resolutions.length
+    await f.manager.updateSessionWriterRoute({ sessionId: 'story-session', expectedRevision: 5, route: null })
+    assert.deepEqual(writes[1], { expectedRevision: 5, route: null })
+    assert.equal(f.resolutions.length, resolutionCount)
   } finally { await f.close() }
 })

@@ -4,3 +4,4 @@
 
 插件提供文风的创建、编辑、默认选择和删除功能。一个对话可以组合多条文风并调整顺序；文风只控制表达方式，剧情规则、连续性和角色行为由创作预设负责。
 
+Agent 模式只接受 `name`、`description` 和 `content`，实际规则必须写入非空 `content`；`instructions`、`requirements` 等别名会明确报错，不会被静默忽略。

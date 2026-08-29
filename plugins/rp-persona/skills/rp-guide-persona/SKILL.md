@@ -19,8 +19,8 @@ Use `rp.persona` to understand who the user is playing or how they enter the sce
 
 - Treat brainstorming as discussion. Ask before writing if “make me like this” could mean either temporary direction or a saved persona.
 - Use `rp_asset_read` with `kind: "persona"` and `list`/`get` to inspect. Use the Agent-only `rp_asset` with `create` to save or `update` with the exact `expectedRevision` to edit.
-- For `create`, pass `value: { name, description?, personality?, scenario?, firstMessage?, tags?: string[] }`.
-- Persona `update` replaces the complete editable body. First use `rp_asset_read` with `get`, merge only the requested change, then pass all retained fields in `value` with the exact revision; omitted optional fields are cleared.
+- For `create`, pass only `value: { name, description?, personality?, scenario?, firstMessage?, tags?: string[] }`. Put identity, history, appearance, capabilities, and other background facts in `description`; aliases such as `background`, `bio`, or `instructions` are not persona fields and are rejected instead of being silently ignored.
+- Persona `update` replaces the complete editable body. First use `rp_asset_read` with `get`, merge only the requested change, then pass all retained canonical fields in `value` with the exact revision; omitted optional fields are cleared, and unlisted fields are rejected.
 - Bind through `changes.personaId`, or use `bindToCurrentSession: true` during creation, only when the user asks to apply it here.
 - If saving succeeds but applying fails, report the saved persona id and do not pretend the conversation uses it.
 

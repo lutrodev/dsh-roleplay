@@ -21,6 +21,6 @@ Use the ordered `rp.writing-style:<asset-id>` context sources as the prose speci
 - A one-turn style request is ordinary direction, not automatically a saved asset. Ask if persistence is ambiguous.
 - Use `rp_asset_read` with `kind: "writingStyle"` and `list`/`get` to inspect. Use the Agent-only `rp_asset` with `create`, or `update` plus the exact `expectedRevision`, to persist changes.
 - For `create`, pass exactly `value: { name, description?, content }`; put the actual prose rules in the non-empty `content` string, not in an `instructions`, `requirements`, or `style` field.
-- Writing-style `update` replaces the complete editable body. First use `rp_asset_read` with `get`, merge the requested change, then pass every retained `name`, `description`, and `content` field with the exact revision.
+- Writing-style `update` replaces the complete editable body. First use `rp_asset_read` with `get`, merge the requested change, then pass exactly every retained `name`, `description`, and `content` field with the exact revision. Unlisted fields such as `instructions`, `requirements`, or `style` are rejected on both create and update instead of being silently ignored.
 - Bind or reorder with the complete ordered `changes.writingStyleIds` array. Creating with `bindToCurrentSession: true` appends without duplicates.
 - If a write or bind fails, do not continue prose under an unapplied style; explain what was saved and what still needs attention.

@@ -76,7 +76,9 @@ export function serializeLoreBookV3(book) {
       ...(entry.id === undefined ? {} : { id: String(entry.id) }),
       selective: secondaryKeys.length > 0,
       ...(secondaryKeys.length === 0 ? {} : { secondary_keys: secondaryKeys }),
-      position: entry.level === LORE_LEVELS.worldDescription ? 'before_char' : 'after_char',
+      position: typeof entry.insertionPosition === 'string'
+        ? entry.insertionPosition
+        : entry.level === LORE_LEVELS.worldDescription ? 'before_char' : 'after_char',
     }
   })
   return {
@@ -187,8 +189,8 @@ function normalizeEntry(value, index) {
   const content = typeof contentValue === 'string' ? contentValue.trim() : undefined
   if (content === undefined) return undefined
   const keys = strings(field('keys', 'key'))
-  const secondaryKeys = strings(field('secondary_keys', 'keysecondary'))
-  const rawPosition = field('position', 'insertion_position') ?? field('insertionPosition')
+  const secondaryKeys = strings(field('secondary_keys', 'secondaryKeys') ?? field('keysecondary'))
+  const rawPosition = field('insertionPosition') ?? field('position', 'insertion_position')
   const position = positionInteger(rawPosition)
   const depth = integer(field('depth'), 4)
   const originalOrder = integer(field('insertion_order', 'order') ?? field('priority'), index)

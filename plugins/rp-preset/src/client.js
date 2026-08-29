@@ -30,7 +30,6 @@ function PresetLibraryEntry({ wide, connection }) {
 
 function PresetLibrary({ open, onClose, connection }) {
   const [items, setItems] = useState([])
-  const [templates, setTemplates] = useState([])
   const [view, setView] = useState('list')
   const [draft, setDraft] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -51,12 +50,7 @@ function PresetLibrary({ open, onClose, connection }) {
     setView('list'); setDraft(null); setDeleteTarget(null); setDeleteError(null); void reload()
   }, [connection, open])
 
-  const create = async () => {
-    setLoading(true); setError(null)
-    try { setTemplates((await rpc(connection, 'templates', {})).items); setView('create') }
-    catch (reason) { setError(userMessage(reason, 'load')) } finally { setLoading(false) }
-  }
-  const startCreate = preset => { setDraft(newPresetDraft(preset)); setView('edit'); setError(null) }
+  const create = () => { setDraft(newPresetDraft()); setView('edit'); setError(null) }
   const edit = async id => {
     setLoading(true); setError(null)
     try { setDraft(await rpc(connection, 'get', { id })); setView('edit') }
@@ -98,9 +92,7 @@ function PresetLibrary({ open, onClose, connection }) {
 
   const body = view === 'edit' && draft !== null
     ? h(PresetEditor, { draft, onDraft: setDraft, onBack: () => { setView('list'); setError(null) }, onSave: () => void save(), onDelete: draft.id === null ? undefined : () => requestDelete(draft), saving })
-    : view === 'create'
-      ? h(PresetCreateChooser, { templates, onBack: () => setView('list'), onBlank: () => startCreate(), onTemplate: template => startCreate(template.preset) })
-      : h(PresetList, { items, loading, onCreate: () => void create(), onEdit: id => void edit(id), onSetDefault: id => void setDefault(id), onDelete: requestDelete })
+    : h(PresetList, { items, loading, onCreate: create, onEdit: id => void edit(id), onSetDefault: id => void setDefault(id), onDelete: requestDelete })
   const compact = view === 'list' && items.length > 0
   return h(React.Fragment, null,
     h(Modal, { open, onClose: deleteTarget === null ? onClose : () => {}, title: '预设', closeLabel: '关闭预设资料库', className: compact ? `${css.dialog} ${css.compactDialog}` : css.dialog, contentClassName: css.content },
@@ -109,21 +101,12 @@ function PresetLibrary({ open, onClose, connection }) {
 }
 
 function PresetSessionEditor({ mode, id, connection, disabled, onCancel, onSaved }) {
-  const [draft, setDraft] = useState(null)
-  const [templates, setTemplates] = useState([])
-  const [view, setView] = useState(mode === 'create' ? 'create' : 'edit')
-  const [loading, setLoading] = useState(true)
+  const [draft, setDraft] = useState(() => mode === 'create' ? newPresetDraft() : null)
+  const [loading, setLoading] = useState(mode === 'edit')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   useEffect(() => {
-    if (mode === 'create') {
-      let live = true
-      setLoading(true); setError(null); setDraft(null); setView('create')
-      void rpc(connection, 'templates', {})
-        .then(value => { if (live) { setTemplates(value.items); setLoading(false) } })
-        .catch(reason => { if (live) { setError(userMessage(reason, 'load')); setLoading(false) } })
-      return () => { live = false }
-    }
+    if (mode !== 'edit') return
     let live = true
     setLoading(true); setError(null); setDraft(null)
     void rpc(connection, 'get', { id })
@@ -145,14 +128,11 @@ function PresetSessionEditor({ mode, id, connection, disabled, onCancel, onSaved
       await onSaved(value)
     } catch (reason) { setError(userMessage(reason)) } finally { setSaving(false) }
   }
-  if (loading) return h('div', { className: css.state }, mode === 'create' ? '正在准备预设模板…' : '正在读取预设…')
-  if (view === 'create') return h('div', { className: css.shell },
-    error ? h('div', { className: css.error, role: 'alert' }, error) : null,
-    h(PresetCreateChooser, { templates, onBack: onCancel, onBlank: () => { setDraft(newPresetDraft()); setView('edit') }, onTemplate: template => { setDraft(newPresetDraft(template.preset)); setView('edit') } }))
+  if (loading) return h('div', { className: css.state }, '正在读取预设…')
   if (draft === null) return h('div', { className: css.state }, error ?? '暂时无法打开预设。', h('button', { type: 'button', onClick: onCancel }, '返回'))
   return h('div', { className: css.shell },
     error ? h('div', { className: css.error, role: 'alert' }, error) : null,
-    h(PresetEditor, { draft, onDraft: setDraft, onBack: mode === 'create' ? () => { setDraft(null); setView('create'); setError(null) } : onCancel, onSave: () => void save(), saving, disabled }))
+    h(PresetEditor, { draft, onDraft: setDraft, onBack: onCancel, onSave: () => void save(), saving, disabled }))
 }
 
 function PresetList({ items, loading, onCreate, onEdit, onSetDefault, onDelete }) {
@@ -160,7 +140,7 @@ function PresetList({ items, loading, onCreate, onEdit, onSetDefault, onDelete }
   if (items.length === 0) return h('div', { className: css.empty },
     h('div', { className: css.emptyIcon }, h(IconChecklistOutline14, { size: 24 })),
     h('h3', null, '创建你的第一个预设'),
-    h('p', null, '可以从模板开始，也可以创建一个没有预设栏位的空白预设。'),
+    h('p', null, '写下创作任务、叙事原则和输出要求，开始故事时可以选择其中一个预设。'),
     h('button', { type: 'button', className: css.primaryButton, onClick: onCreate }, h(IconPlusOutline16, { size: 16 }), '新建预设'))
   return h('div', { className: css.list },
     h('div', { className: css.listToolbar }, h('span', null, `${items.length} 个预设`), h(m.button, { type: 'button', className: css.createRow, whileTap: { scale: 0.98 }, onClick: onCreate }, h(IconPlusOutline16, { size: 16 }), '新建预设')),
@@ -192,17 +172,6 @@ function PresetRow({ item, onEdit, onSetDefault, onDelete }) {
       },
       anchor: h('button', { type: 'button', className: css.moreAction, 'aria-label': `${item.name}的更多操作`, 'aria-expanded': menuOpen, onClick: event => { event.stopPropagation(); setMenuOpen(value => !value) } }, h(IconEllipsisOutline16, { size: 18 })),
     }))
-}
-
-function PresetCreateChooser({ templates, onBack, onBlank, onTemplate }) {
-  return h('div', { className: css.createChooser },
-    h('div', { className: css.editorNav }, h('button', { type: 'button', onClick: onBack }, h(IconChevronLeftOutline14, { size: 14 }), '返回')),
-    h('div', { className: css.createChooserBody },
-      h('header', null, h('h3', null, '新建预设'), h('p', null, '选择一个起点，进入编辑后可以修改全部内容。')),
-      h('button', { type: 'button', className: css.templateCard, onClick: onBlank },
-        h('strong', null, '空白预设'), h('span', null, '从空白创建 →')),
-      ...templates.map(template => h('button', { key: template.id, type: 'button', className: css.templateCard, onClick: () => onTemplate(template) },
-        h('strong', null, template.name), h('span', null, `${template.preset.fields.length} 个示例栏位 →`)))))
 }
 
 function PresetEditor({ draft, onDraft, onBack, onSave, onDelete, saving, disabled = false }) {

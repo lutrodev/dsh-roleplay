@@ -154,6 +154,33 @@ test('creates, updates and lists reusable writing styles', async () => {
   }
 })
 
+test('rejects non-canonical writing-style fields instead of silently discarding them', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-native-schema-'))
+  const ctx = new Context()
+  const styles = new RpWritingStyles(ctx, configFor(root))
+  try {
+    await assert.rejects(
+      styles.create({ name: '冷峻', instructions: '使用短句。', content: '使用短句。' }),
+      error => error.code === 'INVALID_REQUEST' && /unknown field "instructions"/.test(error.message),
+    )
+    const created = await styles.create({ name: '冷峻', content: '使用短句。' })
+    await assert.rejects(
+      styles.update(created.id, { name: '冷峻', content: '使用短句。', requirements: ['克制'] }, created.revision),
+      error => error.code === 'INVALID_REQUEST' && /unknown field "requirements"/.test(error.message),
+    )
+    assert.equal((await styles.get(created.id)).revision, created.revision)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('agent writing-style guidance requires the exact canonical body', async () => {
+  const guidance = await readFile(new URL('../skills/rp-guide-writing-style/SKILL.md', import.meta.url), 'utf8')
+  assert.match(guidance, /pass exactly `value: \{ name, description\?, content \}`/)
+  assert.match(guidance, /Unlisted fields such as `instructions`, `requirements`, or `style` are rejected/)
+})
+
 test('deletes a writing style through the service and browser Remote', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-delete-'))
   const ctx = new Context()

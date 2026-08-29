@@ -37,7 +37,7 @@ vi.mock('motion/react', async () => {
   }
 })
 
-import { apply, SubagentManagerModal, SubagentToolView } from '../src/client.js'
+import { apply, SessionWriterSettingsModal, SubagentManagerModal, SubagentToolView } from '../src/client.js'
 import { ensureStyles } from '../src/client-styles.generated.js'
 
 afterEach(cleanup)
@@ -102,6 +102,9 @@ describe('全局子代理管理界面', () => {
     }))
     expect(registrations).toContainEqual(expect.objectContaining({
       name: 'tool.call.toolview', key: 'rp_run_subagent',
+    }))
+    expect(registrations).toContainEqual(expect.objectContaining({
+      name: 'conversation.session.header.utilities', id: 'rp-session-writer-settings', order: 100,
     }))
   })
 
@@ -198,9 +201,11 @@ describe('全局子代理管理界面', () => {
   it('固定展示 Writer、任务子代理能力与 provider 局部目录失败', async () => {
     const c = connection()
     render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c, modelCatalog: c.modelCatalog }))
+    expect(screen.getByText('设置 Writer 默认模型，管理任务子代理。')).toBeTruthy()
+    expect(screen.queryByText('可插拔', { exact: false })).toBeNull()
     expect(await screen.findByRole('button', { name: '编辑Writer' })).toBeTruthy()
     expect(document.querySelector('[data-icon="subagent-robot"]')).toBeTruthy()
-    expect(screen.getByText('固定')).toBeTruthy()
+    expect(screen.getByText('全局默认')).toBeTruthy()
     expect(screen.getByText('Web 搜索')).toBeTruthy()
     expect(screen.getByText('Skills')).toBeTruthy()
     expect(screen.getByRole('switch', { name: '停用事实核对' })).toBeTruthy()
@@ -216,7 +221,7 @@ describe('全局子代理管理界面', () => {
     render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c, modelCatalog: c.modelCatalog }))
     const toggle = await screen.findByRole('switch', { name: '停用事实核对' })
     expect(toggle.getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByText('固定 Writer + 1 个独立任务子代理，其中 1 个已启用')).toBeTruthy()
+    expect(screen.getByText('1 个任务子代理 · 1 个已启用')).toBeTruthy()
     fireEvent.click(toggle)
     await waitFor(() => expect(c.calls).toContainEqual({
       endpoint: 'set-enabled',
@@ -224,22 +229,22 @@ describe('全局子代理管理界面', () => {
     }))
     expect(await screen.findByRole('switch', { name: '启用事实核对' })).toBeTruthy()
     expect(screen.getByText('已停用')).toBeTruthy()
-    expect(screen.getByText('固定 Writer + 1 个独立任务子代理，其中 0 个已启用')).toBeTruthy()
+    expect(screen.getByText('1 个任务子代理 · 0 个已启用')).toBeTruthy()
   })
 
   it('Writer 编辑页只允许选择模型并保留固定职责说明', async () => {
     const c = connection()
     render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c, modelCatalog: c.modelCatalog }))
     fireEvent.click(await screen.findByRole('button', { name: '编辑Writer' }))
-    expect(screen.getByText('Writer 的职责与上下文由 Roleplay 固定')).toBeTruthy()
-    expect(screen.getByText('用户子代理不能替换它。', { exact: false })).toBeTruthy()
-    expect(screen.getByLabelText('子代理模型').value).toBe('inherit')
+    expect(screen.getByText('未单独设置的对话将使用此配置。')).toBeTruthy()
+    expect(screen.queryByText('固定职责和上下文', { exact: false })).toBeNull()
+    expect(screen.getByLabelText('Writer 全局默认模型').value).toBe('inherit')
     expect(screen.queryByLabelText('名称')).toBeNull()
-    fireEvent.change(screen.getByLabelText('子代理模型'), { target: { value: JSON.stringify(['openai', 'gpt-5']) } })
-    expect(screen.getByLabelText('子代理推理强度').value).toBe('')
+    fireEvent.change(screen.getByLabelText('Writer 全局默认模型'), { target: { value: JSON.stringify(['openai', 'gpt-5']) } })
+    expect(screen.getByLabelText('Writer 全局默认推理强度').value).toBe('')
     expect(screen.getByRole('option', { name: '使用模型默认值（中）' })).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('子代理推理强度'), { target: { value: 'high' } })
-    fireEvent.click(screen.getByRole('button', { name: '保存 Writer 模型' }))
+    fireEvent.change(screen.getByLabelText('Writer 全局默认推理强度'), { target: { value: 'high' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
     await waitFor(() => expect(c.calls.some(call => call.endpoint === 'writer/update'
       && call.payload.route.model === 'gpt-5'
       && call.payload.route.reasoningEffort === 'high')).toBe(true))
@@ -290,8 +295,64 @@ describe('全局子代理管理界面', () => {
       : undefined })
     render(React.createElement(SubagentManagerModal, { open: true, onClose: () => {}, connection: c, modelCatalog: c.modelCatalog }))
     fireEvent.click(await screen.findByRole('button', { name: '编辑Writer' }))
-    fireEvent.click(screen.getByRole('button', { name: '保存 Writer 模型' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
     expect((await screen.findByRole('alert')).textContent).toContain('配置已在其他位置更新，请返回列表并重新打开后再保存。')
     expect(screen.queryByText(/internal conflict/)).toBeNull()
+  })
+
+  it('当前会话默认继承全局 Writer，并可单独覆盖模型与推理强度', async () => {
+    const c = connection()
+    const close = vi.fn()
+    render(React.createElement(SessionWriterSettingsModal, {
+      open: true,
+      onClose: close,
+      connection: c,
+      modelCatalog: c.modelCatalog,
+      sessionId: 'story-session',
+      profile: { revision: 4, runtime: { executionMode: 'chat' } },
+    }))
+
+    const modelSelect = await screen.findByLabelText('当前对话 Writer 模型')
+    expect(modelSelect.value).toBe('default')
+    expect(screen.getByRole('option', { name: '使用全局默认（跟随当前对话）' })).toBeTruthy()
+    expect(screen.getByText('仅影响当前对话，从下一次回复开始生效。')).toBeTruthy()
+    fireEvent.change(modelSelect, { target: { value: JSON.stringify(['openai', 'gpt-5']) } })
+    expect(screen.getByLabelText('当前对话 Writer 推理强度').value).toBe('')
+    fireEvent.change(screen.getByLabelText('当前对话 Writer 推理强度'), { target: { value: 'high' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => expect(c.calls).toContainEqual({
+      endpoint: 'writer/session-update',
+      payload: {
+        sessionId: 'story-session', expectedRevision: 4,
+        route: { kind: 'fixed', provider: 'openai', model: 'gpt-5', reasoningEffort: 'high' },
+      },
+    }))
+    expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('当前会话可清除 Writer 覆盖并恢复动态继承全局默认值', async () => {
+    const c = connection()
+    render(React.createElement(SessionWriterSettingsModal, {
+      open: true,
+      onClose: () => {},
+      connection: c,
+      modelCatalog: c.modelCatalog,
+      sessionId: 'story-session',
+      profile: {
+        revision: 8,
+        runtime: { executionMode: 'agent', writerRoute: { kind: 'fixed', provider: 'openai', model: 'gpt-5', reasoningEffort: 'high' } },
+      },
+    }))
+
+    const modelSelect = await screen.findByLabelText('当前对话 Writer 模型')
+    expect(modelSelect.value).toBe(JSON.stringify(['openai', 'gpt-5']))
+    fireEvent.change(modelSelect, { target: { value: 'default' } })
+    expect(modelSelect.value).toBe('default')
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(c.calls).toContainEqual({
+      endpoint: 'writer/session-update',
+      payload: { sessionId: 'story-session', expectedRevision: 8, route: null },
+    }))
   })
 })

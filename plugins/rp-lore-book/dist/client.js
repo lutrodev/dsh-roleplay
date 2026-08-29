@@ -10342,6 +10342,106 @@ get: (_target, key) => {
 			return domain.value;
 		}
 		//#endregion
+		//#region src/client-condition.js
+		const JSON_STRING = "\"(?:\\\\.|[^\"\\\\])*\"";
+		const JSON_NUMBER = "-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?";
+		const SIMPLE_CONDITION = new RegExp(`^\\s*state\\(\\s*(${JSON_STRING})\\s*,\\s*(${JSON_STRING})\\s*\\)\\s*(==|!=|>=|<=|>|<)\\s*(${JSON_STRING}|${JSON_NUMBER}|true|false|null)\\s*$`, "u");
+		const OPERATORS = /* @__PURE__ */ new Set([
+			"==",
+			"!=",
+			">",
+			">=",
+			"<",
+			"<="
+		]);
+		const NAMESPACE_PATTERN = /^[a-z0-9][a-z0-9._:-]{0,127}$/u;
+		const CONDITION_OPERATORS = Object.freeze([
+			{
+				value: ">=",
+				label: "大于或等于"
+			},
+			{
+				value: ">",
+				label: "大于"
+			},
+			{
+				value: "==",
+				label: "等于"
+			},
+			{
+				value: "!=",
+				label: "不等于"
+			},
+			{
+				value: "<",
+				label: "小于"
+			},
+			{
+				value: "<=",
+				label: "小于或等于"
+			}
+		]);
+		function parseCommonStateCondition(source) {
+			if (typeof source !== "string" || source.trim().length === 0) return null;
+			const match = SIMPLE_CONDITION.exec(source);
+			if (match === null) return null;
+			try {
+				const namespace = JSON.parse(match[1]);
+				const pointer = JSON.parse(match[2]);
+				const value = JSON.parse(match[4]);
+				if (typeof namespace !== "string" || !NAMESPACE_PATTERN.test(namespace) || typeof pointer !== "string" || !validCommonPath(pointer)) return null;
+				if (value === "") return null;
+				if (value !== null && typeof value === "object") return null;
+				return {
+					namespace,
+					path: pointer,
+					operator: match[3],
+					valueText: typeof value === "boolean" ? value ? "是" : "否" : value === null ? "null" : String(value),
+					valueType: value === null ? "null" : typeof value
+				};
+			} catch {
+				return null;
+			}
+		}
+		function serializeCommonStateCondition(condition) {
+			const namespace = String(condition?.namespace ?? "").trim();
+			const path = String(condition?.path ?? "").trim();
+			const valueText = String(condition?.valueText ?? "").trim();
+			if (namespace === "story" && path.length === 0 && valueText.length === 0 && (condition?.operator === void 0 || condition.operator === ">=")) return void 0;
+			if (commonStateConditionIssue(condition) !== null) return void 0;
+			const operator = OPERATORS.has(condition?.operator) ? condition.operator : ">=";
+			return `state(${JSON.stringify(namespace)}, ${JSON.stringify(path)}) ${operator} ${serializeValue(valueText, condition?.valueType)}`;
+		}
+		function commonStateConditionIssue(condition) {
+			const namespace = String(condition?.namespace ?? "").trim();
+			const path = String(condition?.path ?? "").trim();
+			const valueText = String(condition?.valueText ?? "").trim();
+			if (namespace === "story" && path.length === 0 && valueText.length === 0 && (condition?.operator === void 0 || condition.operator === ">=")) return null;
+			if (!NAMESPACE_PATTERN.test(namespace)) return "变量分组需使用小写字母或数字开头，可包含点、横线、下划线或冒号。";
+			if (path.length === 0) return "请填写完整路径，例如 /plot/progress。";
+			if (!path.startsWith("/")) return "完整路径必须以 / 开头，例如 /plot/progress。";
+			if (!validCommonPath(path)) return "完整路径中的 ~ 只能写成 ~0 或 ~1。";
+			if (valueText.length === 0) return "请填写用于比较的值。";
+			return null;
+		}
+		function serializeValue(input, type) {
+			const value = String(input ?? "").trim();
+			if (type === "string") return JSON.stringify(value);
+			if (type === "boolean" && (value === "是" || value === "否" || value === "true" || value === "false")) return value === "是" ? "true" : value === "否" ? "false" : value;
+			if (type === "null" && value === "null") return "null";
+			if (type === "number" && isJsonNumber(value)) return value;
+			if (value === "是" || value === "否") return value === "是" ? "true" : "false";
+			if (value === "true" || value === "false" || value === "null") return value;
+			if (isJsonNumber(value)) return value;
+			return JSON.stringify(value);
+		}
+		function isJsonNumber(value) {
+			return new RegExp(`^(?:${JSON_NUMBER})$`, "u").test(value) && Number.isFinite(Number(value));
+		}
+		function validCommonPath(value) {
+			return value.startsWith("/") && !/~(?:[^01]|$)/u.test(value);
+		}
+		//#endregion
 		//#region src/client-styles.generated.js
 		const css = {
 			"addEntryButton": "rp-lore-addEntryButton",
@@ -10349,6 +10449,14 @@ get: (_target, key) => {
 			"backButton": "rp-lore-backButton",
 			"book": "rp-lore-book",
 			"bookIdentity": "rp-lore-bookIdentity",
+			"conditionAddressFields": "rp-lore-conditionAddressFields",
+			"conditionAddressHint": "rp-lore-conditionAddressHint",
+			"conditionCompareFields": "rp-lore-conditionCompareFields",
+			"conditionEditor": "rp-lore-conditionEditor",
+			"conditionFooter": "rp-lore-conditionFooter",
+			"conditionHeading": "rp-lore-conditionHeading",
+			"conditionIssue": "rp-lore-conditionIssue",
+			"conditionReturn": "rp-lore-conditionReturn",
 			"content": "rp-lore-content",
 			"deleteConfirmAction": "rp-lore-deleteConfirmAction",
 			"deleteDialog": "rp-lore-deleteDialog",
@@ -10394,7 +10502,7 @@ get: (_target, key) => {
 		};
 		const STYLE_ID = "dsh-roleplay-rp-lore-book-styles";
 		const STYLE_OWNER = "dsh-roleplay-rp-lore-book";
-		const STYLE_TEXT = ".rp-lore-trigger {\n  display:flex;\n  align-items:center;\n  gap:8px;\n  width:calc(100% + 8px);\n  height:34px;\n  box-sizing:border-box;\n  overflow:hidden;\n  margin:4px -4px;\n  padding:6px 2px 6px 10px;\n  border:0;\n  border-radius:12px;\n  background:transparent;\n  color:var(--dsw-alias-label-primary);\n  cursor:pointer;\n  font:14px/22px var(--dsw-font-family);\n  text-align:left;\n}\n.rp-lore-trigger:hover { background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-trigger:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n.rp-lore-trigger.rp-lore-rail { justify-content:center; width:36px; height:36px; margin:8px 0 10px; padding:0; border-radius:50%; }\n\n.rp-lore-dialog {\n  width:min(1180px,calc(100vw - 48px));\n  height:min(780px,calc(100dvh - 48px));\n  box-sizing:border-box;\n}\n.rp-lore-content { flex:1; height:100%; min-height:0; overflow:hidden; padding:0!important; }\n.rp-lore-content>:first-child { min-height:48px; box-sizing:border-box; padding:10px 14px 8px 24px; border-bottom:1px solid var(--dsw-alias-separator-primary); }\n.rp-lore-content>:last-child { flex:1; min-width:0; min-height:0; overflow:hidden; margin-top:0; padding:0; }\n.rp-lore-shell { display:flex; height:100%; min-height:0; flex-direction:column; overflow:hidden; overscroll-behavior:contain; }\n.rp-lore-view { flex:1; min-height:0; overflow:hidden; }\n.rp-lore-viewTransition { height:100%; overflow:hidden; }\n\n.rp-lore-toolbar {\n  display:grid;\n  grid-template-columns:minmax(0,1fr) auto;\n  gap:10px;\n  padding:14px 16px;\n  border-bottom:1px solid var(--dsw-alias-separator-primary);\n}\n.rp-lore-search {\n  display:flex;\n  min-height:40px;\n  align-items:center;\n  gap:9px;\n  box-sizing:border-box;\n  padding:0 12px;\n  border:1px solid var(--dsw-alias-border-l2);\n  border-radius:10px;\n  background:var(--dsw-alias-bg-layer-2);\n  color:var(--dsw-alias-label-tertiary);\n}\n.rp-lore-search:focus-within { border-color:var(--dsw-alias-brand-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent); }\n.rp-lore-search input { width:100%; min-width:0; border:0; outline:0; background:transparent; color:var(--dsw-alias-label-primary); font:13px/20px var(--dsw-font-family); }\n.rp-lore-search input::placeholder { color:var(--dsw-alias-label-tertiary); }\n.rp-lore-importButton {\n  position:relative;\n  display:flex;\n  min-height:40px;\n  align-items:center;\n  overflow:hidden;\n  padding:0 14px;\n  border-radius:10px;\n  background:var(--dsw-alias-button-primary-fill);\n  color:var(--dsw-alias-label-primary-foreground);\n  cursor:pointer;\n  font:600 12px/20px var(--dsw-font-family);\n}\n.rp-lore-importButton:focus-within { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n.rp-lore-importButton[aria-disabled=\"true\"] { cursor:wait; }\n.rp-lore-importContent { display:inline-flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap; }\n.rp-lore-fileInput { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }\n.rp-lore-fileInput:disabled { cursor:wait; }\n\n.rp-lore-error { margin:10px 18px 0; padding:9px 11px; border-radius:9px; background:var(--dsw-alias-state-error-tertiary); color:var(--dsw-alias-state-error-primary); font-size:12px; line-height:18px; }\n.rp-lore-state { display:flex; min-height:180px; align-items:center; justify-content:center; padding:24px; color:var(--dsw-alias-label-tertiary); text-align:center; font-size:12px; }\n.rp-lore-srOnly { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }\n\n.rp-lore-list {\n  display:grid;\n  height:100%;\n  box-sizing:border-box;\n  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));\n  align-content:start;\n  gap:8px;\n  overflow-y:auto;\n  overscroll-behavior:contain;\n  padding:14px 16px;\n}\n.rp-lore-row {\n  display:grid;\n  grid-template-columns:42px minmax(0,1fr);\n  align-items:center;\n  gap:10px;\n  width:100%;\n  padding:10px;\n  border:1px solid transparent;\n  border-radius:11px;\n  background:transparent;\n  color:var(--dsw-alias-label-primary);\n  cursor:pointer;\n  text-align:left;\n}\n.rp-lore-row:hover { border-color:var(--dsw-alias-border-l2); background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-row:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n.rp-lore-row:disabled { opacity:.55; cursor:not-allowed; }\n.rp-lore-book { display:flex; width:42px; height:42px; align-items:center; justify-content:center; border-radius:10px; background:var(--dsw-specific-tip); color:var(--dsw-alias-brand-primary); font-weight:600; }\n.rp-lore-rowText { display:flex; min-width:0; flex-direction:column; gap:2px; }\n.rp-lore-rowText strong,.rp-lore-rowText small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }\n.rp-lore-rowText strong { font-size:13px; font-weight:550; }\n.rp-lore-rowText small { color:var(--dsw-alias-label-tertiary); font-size:11px; }\n\n.rp-lore-detailNavigation { display:flex; min-height:54px; align-items:center; padding:0 16px; border-bottom:1px solid var(--dsw-alias-separator-primary); }\n.rp-lore-backButton { display:flex; min-height:36px; align-items:center; gap:4px; padding:0 10px 0 6px; border:0; border-radius:9px; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; font:12px/20px var(--dsw-font-family); }\n.rp-lore-backButton:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }\n.rp-lore-backButton:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n\n.rp-lore-detail {\n  position:relative;\n  width:min(980px,100%);\n  height:100%;\n  min-height:0;\n  box-sizing:border-box;\n  overflow-y:auto;\n  overscroll-behavior:contain;\n  margin:0 auto;\n  padding:0 28px 90px;\n}\n.rp-lore-detail>header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:22px 0 14px; }\n.rp-lore-bookIdentity { min-width:0; }\n.rp-lore-bookIdentity input { width:min(620px,70vw); border:0; border-bottom:1px solid transparent; outline:0; background:transparent; color:var(--dsw-alias-label-primary); font:600 22px/30px var(--dsw-font-family); }\n.rp-lore-bookIdentity input:hover { border-color:var(--dsw-alias-border-l2); }\n.rp-lore-bookIdentity input:focus { border-color:var(--dsw-alias-brand-primary); }\n.rp-lore-detail header p { margin:3px 0 0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }\n.rp-lore-headerActions { display:flex; align-items:center; gap:6px; }\n.rp-lore-headerActions>button,.rp-lore-headerActions>span>button,.rp-lore-headerMore { display:inline-flex; min-width:36px; min-height:36px; align-items:center; justify-content:center; padding:0 9px; border:0; border-radius:9px; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; font:12px/18px var(--dsw-font-family); }\n.rp-lore-headerActions button:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }\n.rp-lore-headerActions button:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:1px; }\n\n.rp-lore-undoNotice { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:8px 0 0; padding:9px 11px; border-radius:9px; background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-secondary); font-size:12px; }\n.rp-lore-undoNotice button { min-height:30px; padding:0 9px; border:1px solid var(--dsw-alias-border-l2); border-radius:8px; background:transparent; color:var(--dsw-alias-label-primary); cursor:pointer; font:12px/18px var(--dsw-font-family); }\n\n.rp-lore-entryToolbar { display:grid; grid-template-columns:minmax(0,1fr) 132px auto; gap:8px; margin-top:14px; }\n.rp-lore-entryToolbar select { min-height:40px; padding:0 34px 0 11px; border:1px solid var(--dsw-alias-border-l2); border-radius:10px; outline:0; background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); font:12px/20px var(--dsw-font-family); }\n.rp-lore-entryToolbar select:focus-visible { border-color:var(--dsw-alias-brand-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent); }\n.rp-lore-addEntryButton { display:inline-flex; min-height:40px; align-items:center; justify-content:center; gap:6px; padding:0 14px; border:1px solid var(--dsw-alias-button-primary-fill); border-radius:10px; background:var(--dsw-alias-button-primary-fill); color:var(--dsw-alias-label-primary-foreground); cursor:pointer; white-space:nowrap; font:600 12px/20px var(--dsw-font-family); }\n.rp-lore-addEntryButton:hover { filter:brightness(.98); }\n.rp-lore-addEntryButton:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n\n.rp-lore-levelTabs { position:sticky; z-index:10; top:0; display:flex; min-width:0; gap:24px; overflow-x:auto; isolation:isolate; margin:14px -2px 0; padding:0 2px; border-bottom:1px solid var(--dsw-alias-separator-primary); background:var(--dsw-alias-bg-base); scrollbar-width:none; }\n.rp-lore-levelTabs::-webkit-scrollbar { display:none; }\n.rp-lore-levelTabs button { position:relative; display:inline-flex; min-height:44px; flex:0 0 auto; align-items:center; gap:7px; padding:0 2px; border:0; background:transparent; color:var(--dsw-alias-label-tertiary); cursor:pointer; font:550 13px/20px var(--dsw-font-family); }\n.rp-lore-levelTabs button:hover { color:var(--dsw-alias-label-primary); }\n.rp-lore-levelTabs button[aria-selected=\"true\"] { color:var(--dsw-alias-label-primary); font-weight:650; }\n.rp-lore-levelTabs button[aria-selected=\"true\"]::after { position:absolute; right:0; bottom:-1px; left:0; height:2px; border-radius:2px 2px 0 0; background:var(--dsw-alias-brand-primary); content:\"\"; }\n.rp-lore-levelTabs button:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-3px; border-radius:7px; }\n.rp-lore-levelTabs small { display:inline-flex; min-width:20px; height:20px; align-items:center; justify-content:center; box-sizing:border-box; padding:0 6px; border-radius:999px; background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-tertiary); font-size:10px; font-variant-numeric:tabular-nums; }\n.rp-lore-levelTabs button[aria-selected=\"true\"] small { background:var(--dsw-specific-tip); color:var(--dsw-alias-label-primary); }\n\n.rp-lore-levelPanel { min-height:220px; padding:6px 0 12px; outline:0; }\n.rp-lore-entryList { display:flex; flex-direction:column; margin:0; padding:0; list-style:none; }\n.rp-lore-entryRow { display:grid; grid-template-columns:30px minmax(0,1fr) auto 36px; align-items:center; gap:6px; min-height:70px; border-bottom:1px solid var(--dsw-alias-separator-primary); }\n.rp-lore-entryRow:last-child { border-bottom-color:transparent; }\n.rp-lore-entryRow:hover { background:color-mix(in srgb,var(--dsw-alias-interactive-bg-hover) 72%,transparent); }\n.rp-lore-dragHandle { display:flex; width:30px; height:40px; align-items:center; justify-content:center; padding:0; border:0; border-radius:8px; background:transparent; color:var(--dsw-alias-label-dimmed); cursor:grab; touch-action:none; }\n.rp-lore-dragHandle:active { cursor:grabbing; }\n.rp-lore-dragHandle:hover { background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-dragHandle:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-2px; }\n.rp-lore-dragHandle span { width:12px; height:18px; opacity:.7; background:radial-gradient(circle,var(--dsw-alias-label-tertiary) 1.3px,transparent 1.5px) 0 0/6px 6px; }\n.rp-lore-entryMain { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:14px; min-width:0; min-height:54px; padding:7px 8px; border:0; border-radius:9px; background:transparent; color:var(--dsw-alias-label-primary); text-align:left; cursor:pointer; }\n.rp-lore-entryMain:hover { background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-entryMain:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-2px; }\n.rp-lore-entryCopy { display:flex; min-width:0; flex-direction:column; gap:4px; }\n.rp-lore-entryCopy strong,.rp-lore-entryCopy small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }\n.rp-lore-entryCopy strong { font-size:14px; line-height:20px; font-weight:600; }\n.rp-lore-entryCopy small { color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }\n.rp-lore-entryStatus { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-secondary); font-size:11px; line-height:16px; white-space:nowrap; }\n.rp-lore-entryStatus i { width:7px; height:7px; border-radius:50%; background:var(--dsw-alias-label-dimmed); }\n.rp-lore-entryStatus[data-enabled=\"true\"] i { background:var(--dsw-alias-state-success-primary); }\n.rp-lore-editEntryButton,.rp-lore-moreAction { display:inline-flex; height:36px; align-items:center; justify-content:center; border:0; border-radius:9px; background:transparent; color:var(--dsw-alias-label-tertiary); cursor:pointer; }\n.rp-lore-editEntryButton { gap:5px; padding:0 9px; font:12px/18px var(--dsw-font-family); }\n.rp-lore-moreAction { width:36px; padding:0; }\n.rp-lore-editEntryButton:hover,.rp-lore-moreAction:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }\n.rp-lore-editEntryButton:focus-visible,.rp-lore-moreAction:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-2px; }\n.rp-lore-slotEmpty { display:flex; min-height:190px; flex-direction:column; align-items:center; justify-content:center; gap:5px; margin:10px 0 0; color:var(--dsw-alias-label-tertiary); text-align:center; }\n.rp-lore-slotEmpty strong { color:var(--dsw-alias-label-secondary); font-size:13px; line-height:20px; font-weight:600; }\n.rp-lore-slotEmpty span { font-size:12px; line-height:18px; }\n\n.rp-lore-inspectorForm { display:flex; flex-direction:column; gap:16px; }\n.rp-lore-field { display:flex; flex-direction:column; gap:6px; color:var(--dsw-alias-label-secondary); font-size:12px; font-weight:550; }\n.rp-lore-field input,.rp-lore-field textarea,.rp-lore-field select { width:100%; box-sizing:border-box; padding:9px 10px; resize:vertical; border:1px solid var(--dsw-alias-border-l2); border-radius:9px; outline:0; background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); font:13px/20px var(--dsw-font-family); }\n.rp-lore-field input:focus,.rp-lore-field textarea:focus,.rp-lore-field select:focus { border-color:var(--dsw-alias-brand-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent); }\n.rp-lore-toggleGrid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }\n.rp-lore-toggleGrid label { display:flex; min-height:32px; align-items:center; gap:8px; font-size:12px; }\n.rp-lore-toggleGrid input { width:16px; height:16px; accent-color:var(--dsw-alias-brand-primary); }\n.rp-lore-advanced { padding-top:10px; border-top:1px solid var(--dsw-alias-separator-primary); }\n.rp-lore-advanced summary { margin-bottom:12px; cursor:pointer; font-size:12px; font-weight:550; }\n\n.rp-lore-deleteDialog { width:min(460px,calc(100vw - 32px)); }\n.rp-lore-deleteSummary { display:flex; flex-direction:column; gap:5px; padding:13px 14px; border:1px solid color-mix(in srgb,var(--dsw-alias-state-error-primary) 18%,var(--dsw-alias-border-l2)); border-radius:12px; background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 4%,var(--dsw-alias-bg-layer-1)); color:var(--dsw-alias-label-secondary); }\n.rp-lore-deleteSummary strong { color:var(--dsw-alias-label-primary); font-size:13px; line-height:20px; font-weight:600; }\n.rp-lore-deleteSummary span { font-size:12px; line-height:19px; }\n.rp-lore-secondaryButton,.rp-lore-deleteConfirmAction { display:inline-flex; min-height:36px; align-items:center; justify-content:center; padding:0 14px; border:1px solid var(--dsw-alias-border-l2); border-radius:10px; background:transparent; cursor:pointer; font:600 12px/20px var(--dsw-font-family); }\n.rp-lore-secondaryButton { color:var(--dsw-alias-label-secondary); }\n.rp-lore-deleteConfirmAction { border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary) 46%,var(--dsw-alias-border-l2)); color:var(--dsw-alias-state-error-primary); }\n.rp-lore-secondaryButton:hover,.rp-lore-deleteConfirmAction:hover { background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-secondaryButton:focus-visible,.rp-lore-deleteConfirmAction:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n.rp-lore-secondaryButton:disabled,.rp-lore-deleteConfirmAction:disabled { opacity:.5; cursor:not-allowed; }\n\n@media(max-width:720px) {\n  .rp-lore-dialog { width:calc(100vw - 16px); height:calc(100dvh - 16px); }\n  .rp-lore-list { grid-template-columns:1fr; padding:12px; }\n  .rp-lore-toolbar { grid-template-columns:1fr; }\n  .rp-lore-importButton { justify-content:center; }\n  .rp-lore-detail { padding:18px 14px 88px; }\n  .rp-lore-detail>header { align-items:center; }\n  .rp-lore-bookIdentity input { width:100%; font-size:20px; }\n  .rp-lore-entryToolbar { grid-template-columns:minmax(0,1fr) auto; }\n  .rp-lore-entryToolbar .rp-lore-search { grid-column:1/-1; }\n  .rp-lore-entryToolbar select { min-width:0; }\n  .rp-lore-levelTabs { gap:20px; }\n  .rp-lore-entryRow { grid-template-columns:28px minmax(0,1fr) 36px; gap:4px; }\n  .rp-lore-editEntryButton { display:none; }\n  .rp-lore-entryMain { grid-template-columns:minmax(0,1fr); gap:5px; }\n  .rp-lore-entryStatus { width:max-content; padding:2px 0; background:transparent; }\n  .rp-lore-toggleGrid { grid-template-columns:1fr; }\n}\n";
+		const STYLE_TEXT = ".rp-lore-trigger {\n  display:flex;\n  align-items:center;\n  gap:8px;\n  width:calc(100% + 8px);\n  height:34px;\n  box-sizing:border-box;\n  overflow:hidden;\n  margin:4px -4px;\n  padding:6px 2px 6px 10px;\n  border:0;\n  border-radius:12px;\n  background:transparent;\n  color:var(--dsw-alias-label-primary);\n  cursor:pointer;\n  font:14px/22px var(--dsw-font-family);\n  text-align:left;\n}\n.rp-lore-trigger:hover { background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-trigger:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n.rp-lore-trigger.rp-lore-rail { justify-content:center; width:36px; height:36px; margin:8px 0 10px; padding:0; border-radius:50%; }\n\n.rp-lore-dialog {\n  width:min(1180px,calc(100vw - 48px));\n  height:min(780px,calc(100dvh - 48px));\n  box-sizing:border-box;\n}\n.rp-lore-content { flex:1; height:100%; min-height:0; overflow:hidden; padding:0!important; }\n.rp-lore-content>:first-child { min-height:48px; box-sizing:border-box; padding:10px 14px 8px 24px; border-bottom:1px solid var(--dsw-alias-separator-primary); }\n.rp-lore-content>:last-child { flex:1; min-width:0; min-height:0; overflow:hidden; margin-top:0; padding:0; }\n.rp-lore-shell { display:flex; height:100%; min-height:0; flex-direction:column; overflow:hidden; overscroll-behavior:contain; }\n.rp-lore-view { flex:1; min-height:0; overflow:hidden; }\n.rp-lore-viewTransition { height:100%; overflow:hidden; }\n\n.rp-lore-toolbar {\n  display:grid;\n  grid-template-columns:minmax(0,1fr) auto;\n  gap:10px;\n  padding:14px 16px;\n  border-bottom:1px solid var(--dsw-alias-separator-primary);\n}\n.rp-lore-search {\n  display:flex;\n  min-height:40px;\n  align-items:center;\n  gap:9px;\n  box-sizing:border-box;\n  padding:0 12px;\n  border:1px solid var(--dsw-alias-border-l2);\n  border-radius:10px;\n  background:var(--dsw-alias-bg-layer-2);\n  color:var(--dsw-alias-label-tertiary);\n}\n.rp-lore-search:focus-within { border-color:var(--dsw-alias-brand-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent); }\n.rp-lore-search input { width:100%; min-width:0; border:0; outline:0; background:transparent; color:var(--dsw-alias-label-primary); font:13px/20px var(--dsw-font-family); }\n.rp-lore-search input::placeholder { color:var(--dsw-alias-label-tertiary); }\n.rp-lore-importButton {\n  position:relative;\n  display:flex;\n  min-height:40px;\n  align-items:center;\n  overflow:hidden;\n  padding:0 14px;\n  border-radius:10px;\n  background:var(--dsw-alias-button-primary-fill);\n  color:var(--dsw-alias-label-primary-foreground);\n  cursor:pointer;\n  font:600 12px/20px var(--dsw-font-family);\n}\n.rp-lore-importButton:focus-within { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n.rp-lore-importButton[aria-disabled=\"true\"] { cursor:wait; }\n.rp-lore-importContent { display:inline-flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap; }\n.rp-lore-fileInput { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }\n.rp-lore-fileInput:disabled { cursor:wait; }\n\n.rp-lore-error { margin:10px 18px 0; padding:9px 11px; border-radius:9px; background:var(--dsw-alias-state-error-tertiary); color:var(--dsw-alias-state-error-primary); font-size:12px; line-height:18px; }\n.rp-lore-state { display:flex; min-height:180px; align-items:center; justify-content:center; padding:24px; color:var(--dsw-alias-label-tertiary); text-align:center; font-size:12px; }\n.rp-lore-srOnly { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }\n\n.rp-lore-list {\n  display:grid;\n  height:100%;\n  box-sizing:border-box;\n  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));\n  align-content:start;\n  gap:8px;\n  overflow-y:auto;\n  overscroll-behavior:contain;\n  padding:14px 16px;\n}\n.rp-lore-row {\n  display:grid;\n  grid-template-columns:42px minmax(0,1fr);\n  align-items:center;\n  gap:10px;\n  width:100%;\n  padding:10px;\n  border:1px solid transparent;\n  border-radius:11px;\n  background:transparent;\n  color:var(--dsw-alias-label-primary);\n  cursor:pointer;\n  text-align:left;\n}\n.rp-lore-row:hover { border-color:var(--dsw-alias-border-l2); background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-row:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n.rp-lore-row:disabled { opacity:.55; cursor:not-allowed; }\n.rp-lore-book { display:flex; width:42px; height:42px; align-items:center; justify-content:center; border-radius:10px; background:var(--dsw-specific-tip); color:var(--dsw-alias-brand-primary); font-weight:600; }\n.rp-lore-rowText { display:flex; min-width:0; flex-direction:column; gap:2px; }\n.rp-lore-rowText strong,.rp-lore-rowText small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }\n.rp-lore-rowText strong { font-size:13px; font-weight:550; }\n.rp-lore-rowText small { color:var(--dsw-alias-label-tertiary); font-size:11px; }\n\n.rp-lore-detailNavigation { display:flex; min-height:54px; align-items:center; padding:0 16px; border-bottom:1px solid var(--dsw-alias-separator-primary); }\n.rp-lore-backButton { display:flex; min-height:36px; align-items:center; gap:4px; padding:0 10px 0 6px; border:0; border-radius:9px; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; font:12px/20px var(--dsw-font-family); }\n.rp-lore-backButton:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }\n.rp-lore-backButton:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n\n.rp-lore-detail {\n  position:relative;\n  width:min(980px,100%);\n  height:100%;\n  min-height:0;\n  box-sizing:border-box;\n  overflow-y:auto;\n  overscroll-behavior:contain;\n  margin:0 auto;\n  padding:0 28px 90px;\n}\n.rp-lore-detail>header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:22px 0 14px; }\n.rp-lore-bookIdentity { min-width:0; }\n.rp-lore-bookIdentity input { width:min(620px,70vw); border:0; border-bottom:1px solid transparent; outline:0; background:transparent; color:var(--dsw-alias-label-primary); font:600 22px/30px var(--dsw-font-family); }\n.rp-lore-bookIdentity input:hover { border-color:var(--dsw-alias-border-l2); }\n.rp-lore-bookIdentity input:focus { border-color:var(--dsw-alias-brand-primary); }\n.rp-lore-detail header p { margin:3px 0 0; color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }\n.rp-lore-headerActions { display:flex; align-items:center; gap:6px; }\n.rp-lore-headerActions>button,.rp-lore-headerActions>span>button,.rp-lore-headerMore { display:inline-flex; min-width:36px; min-height:36px; align-items:center; justify-content:center; padding:0 9px; border:0; border-radius:9px; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; font:12px/18px var(--dsw-font-family); }\n.rp-lore-headerActions button:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }\n.rp-lore-headerActions button:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:1px; }\n\n.rp-lore-undoNotice { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:8px 0 0; padding:9px 11px; border-radius:9px; background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-secondary); font-size:12px; }\n.rp-lore-undoNotice button { min-height:30px; padding:0 9px; border:1px solid var(--dsw-alias-border-l2); border-radius:8px; background:transparent; color:var(--dsw-alias-label-primary); cursor:pointer; font:12px/18px var(--dsw-font-family); }\n\n.rp-lore-entryToolbar { display:grid; grid-template-columns:minmax(0,1fr) 132px auto; gap:8px; margin-top:14px; }\n.rp-lore-entryToolbar select { min-height:40px; padding:0 34px 0 11px; border:1px solid var(--dsw-alias-border-l2); border-radius:10px; outline:0; background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); font:12px/20px var(--dsw-font-family); }\n.rp-lore-entryToolbar select:focus-visible { border-color:var(--dsw-alias-brand-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent); }\n.rp-lore-addEntryButton { display:inline-flex; min-height:40px; align-items:center; justify-content:center; gap:6px; padding:0 14px; border:1px solid var(--dsw-alias-button-primary-fill); border-radius:10px; background:var(--dsw-alias-button-primary-fill); color:var(--dsw-alias-label-primary-foreground); cursor:pointer; white-space:nowrap; font:600 12px/20px var(--dsw-font-family); }\n.rp-lore-addEntryButton:hover { filter:brightness(.98); }\n.rp-lore-addEntryButton:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n\n.rp-lore-levelTabs { position:sticky; z-index:10; top:0; display:flex; min-width:0; gap:24px; overflow-x:auto; isolation:isolate; margin:14px -2px 0; padding:0 2px; border-bottom:1px solid var(--dsw-alias-separator-primary); background:var(--dsw-alias-bg-base); scrollbar-width:none; }\n.rp-lore-levelTabs::-webkit-scrollbar { display:none; }\n.rp-lore-levelTabs button { position:relative; display:inline-flex; min-height:44px; flex:0 0 auto; align-items:center; gap:7px; padding:0 2px; border:0; background:transparent; color:var(--dsw-alias-label-tertiary); cursor:pointer; font:550 13px/20px var(--dsw-font-family); }\n.rp-lore-levelTabs button:hover { color:var(--dsw-alias-label-primary); }\n.rp-lore-levelTabs button[aria-selected=\"true\"] { color:var(--dsw-alias-label-primary); font-weight:650; }\n.rp-lore-levelTabs button[aria-selected=\"true\"]::after { position:absolute; right:0; bottom:-1px; left:0; height:2px; border-radius:2px 2px 0 0; background:var(--dsw-alias-brand-primary); content:\"\"; }\n.rp-lore-levelTabs button:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-3px; border-radius:7px; }\n.rp-lore-levelTabs small { display:inline-flex; min-width:20px; height:20px; align-items:center; justify-content:center; box-sizing:border-box; padding:0 6px; border-radius:999px; background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-tertiary); font-size:10px; font-variant-numeric:tabular-nums; }\n.rp-lore-levelTabs button[aria-selected=\"true\"] small { background:var(--dsw-specific-tip); color:var(--dsw-alias-label-primary); }\n\n.rp-lore-levelPanel { min-height:220px; padding:6px 0 12px; outline:0; }\n.rp-lore-entryList { display:flex; flex-direction:column; margin:0; padding:0; list-style:none; }\n.rp-lore-entryRow { display:grid; grid-template-columns:30px minmax(0,1fr) auto 36px; align-items:center; gap:6px; min-height:70px; border-bottom:1px solid var(--dsw-alias-separator-primary); }\n.rp-lore-entryRow:last-child { border-bottom-color:transparent; }\n.rp-lore-entryRow:hover { background:color-mix(in srgb,var(--dsw-alias-interactive-bg-hover) 72%,transparent); }\n.rp-lore-dragHandle { display:flex; width:30px; height:40px; align-items:center; justify-content:center; padding:0; border:0; border-radius:8px; background:transparent; color:var(--dsw-alias-label-dimmed); cursor:grab; touch-action:none; }\n.rp-lore-dragHandle:active { cursor:grabbing; }\n.rp-lore-dragHandle:hover { background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-dragHandle:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-2px; }\n.rp-lore-dragHandle span { width:12px; height:18px; opacity:.7; background:radial-gradient(circle,var(--dsw-alias-label-tertiary) 1.3px,transparent 1.5px) 0 0/6px 6px; }\n.rp-lore-entryMain { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:14px; min-width:0; min-height:54px; padding:7px 8px; border:0; border-radius:9px; background:transparent; color:var(--dsw-alias-label-primary); text-align:left; cursor:pointer; }\n.rp-lore-entryMain:hover { background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-entryMain:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-2px; }\n.rp-lore-entryCopy { display:flex; min-width:0; flex-direction:column; gap:4px; }\n.rp-lore-entryCopy strong,.rp-lore-entryCopy small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }\n.rp-lore-entryCopy strong { font-size:14px; line-height:20px; font-weight:600; }\n.rp-lore-entryCopy small { color:var(--dsw-alias-label-tertiary); font-size:12px; line-height:18px; }\n.rp-lore-entryStatus { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:var(--dsw-alias-bg-layer-1); color:var(--dsw-alias-label-secondary); font-size:11px; line-height:16px; white-space:nowrap; }\n.rp-lore-entryStatus i { width:7px; height:7px; border-radius:50%; background:var(--dsw-alias-label-dimmed); }\n.rp-lore-entryStatus[data-enabled=\"true\"] i { background:var(--dsw-alias-state-success-primary); }\n.rp-lore-editEntryButton,.rp-lore-moreAction { display:inline-flex; height:36px; align-items:center; justify-content:center; border:0; border-radius:9px; background:transparent; color:var(--dsw-alias-label-tertiary); cursor:pointer; }\n.rp-lore-editEntryButton { gap:5px; padding:0 9px; font:12px/18px var(--dsw-font-family); }\n.rp-lore-moreAction { width:36px; padding:0; }\n.rp-lore-editEntryButton:hover,.rp-lore-moreAction:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }\n.rp-lore-editEntryButton:focus-visible,.rp-lore-moreAction:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-2px; }\n.rp-lore-slotEmpty { display:flex; min-height:190px; flex-direction:column; align-items:center; justify-content:center; gap:5px; margin:10px 0 0; color:var(--dsw-alias-label-tertiary); text-align:center; }\n.rp-lore-slotEmpty strong { color:var(--dsw-alias-label-secondary); font-size:13px; line-height:20px; font-weight:600; }\n.rp-lore-slotEmpty span { font-size:12px; line-height:18px; }\n\n.rp-lore-inspectorForm { display:flex; flex-direction:column; gap:16px; }\n.rp-lore-field { display:flex; flex-direction:column; gap:6px; color:var(--dsw-alias-label-secondary); font-size:12px; font-weight:550; }\n.rp-lore-field input,.rp-lore-field textarea,.rp-lore-field select { width:100%; box-sizing:border-box; padding:9px 10px; resize:vertical; border:1px solid var(--dsw-alias-border-l2); border-radius:9px; outline:0; background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); font:13px/20px var(--dsw-font-family); }\n.rp-lore-field input:focus,.rp-lore-field textarea:focus,.rp-lore-field select:focus { border-color:var(--dsw-alias-brand-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 14%,transparent); }\n.rp-lore-field small { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:17px; font-weight:400; }\n.rp-lore-conditionEditor { display:flex; flex-direction:column; gap:11px; min-width:0; margin:0; padding:12px; border:0; border-radius:11px; background:var(--dsw-alias-bg-layer-1); }\n.rp-lore-conditionHeading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }\n.rp-lore-conditionHeading>div { display:flex; min-width:0; flex-direction:column; gap:2px; }\n.rp-lore-conditionHeading strong { color:var(--dsw-alias-label-secondary); font-size:12px; line-height:18px; font-weight:600; }\n.rp-lore-conditionHeading span { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:17px; }\n.rp-lore-conditionEditor .rp-lore-conditionHeading button,.rp-lore-conditionEditor .rp-lore-conditionFooter button,.rp-lore-conditionEditor .rp-lore-conditionReturn { flex:0 0 auto; min-height:30px; padding:0 8px; border:0; border-radius:7px; background:transparent; color:var(--dsw-alias-brand-primary); cursor:pointer; font:550 11px/17px var(--dsw-font-family); }\n.rp-lore-conditionEditor .rp-lore-conditionHeading button:hover,.rp-lore-conditionEditor .rp-lore-conditionFooter button:hover,.rp-lore-conditionEditor .rp-lore-conditionReturn:hover { background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-conditionEditor .rp-lore-conditionHeading button:focus-visible,.rp-lore-conditionEditor .rp-lore-conditionFooter button:focus-visible,.rp-lore-conditionEditor .rp-lore-conditionReturn:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:1px; }\n.rp-lore-conditionAddressFields,.rp-lore-conditionCompareFields { display:grid; gap:8px; }\n.rp-lore-conditionAddressFields { grid-template-columns:minmax(100px,.72fr) minmax(0,1.45fr); }\n.rp-lore-conditionCompareFields { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }\n.rp-lore-conditionAddressFields .rp-lore-field,.rp-lore-conditionCompareFields .rp-lore-field { gap:5px; font-size:11px; }\n.rp-lore-conditionAddressFields .rp-lore-field input,.rp-lore-conditionCompareFields .rp-lore-field input,.rp-lore-conditionCompareFields .rp-lore-field select { min-height:38px; padding:7px 9px; background:var(--dsw-alias-bg-layer-2); font-size:12px; }\n.rp-lore-conditionAddressHint { margin:0; color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:17px; }\n.rp-lore-conditionIssue { color:var(--dsw-alias-state-error-primary); }\n.rp-lore-conditionFooter { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }\n.rp-lore-conditionFooter small { color:var(--dsw-alias-label-tertiary); font-size:11px; line-height:17px; }\n.rp-lore-conditionReturn { align-self:flex-start; }\n.rp-lore-toggleGrid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }\n.rp-lore-toggleGrid label { display:flex; min-height:32px; align-items:center; gap:8px; font-size:12px; }\n.rp-lore-toggleGrid input { width:16px; height:16px; accent-color:var(--dsw-alias-brand-primary); }\n.rp-lore-advanced { padding-top:10px; border-top:1px solid var(--dsw-alias-separator-primary); }\n.rp-lore-advanced summary { margin-bottom:12px; cursor:pointer; font-size:12px; font-weight:550; }\n\n.rp-lore-deleteDialog { width:min(460px,calc(100vw - 32px)); }\n.rp-lore-deleteSummary { display:flex; flex-direction:column; gap:5px; padding:13px 14px; border:1px solid color-mix(in srgb,var(--dsw-alias-state-error-primary) 18%,var(--dsw-alias-border-l2)); border-radius:12px; background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 4%,var(--dsw-alias-bg-layer-1)); color:var(--dsw-alias-label-secondary); }\n.rp-lore-deleteSummary strong { color:var(--dsw-alias-label-primary); font-size:13px; line-height:20px; font-weight:600; }\n.rp-lore-deleteSummary span { font-size:12px; line-height:19px; }\n.rp-lore-secondaryButton,.rp-lore-deleteConfirmAction { display:inline-flex; min-height:36px; align-items:center; justify-content:center; padding:0 14px; border:1px solid var(--dsw-alias-border-l2); border-radius:10px; background:transparent; cursor:pointer; font:600 12px/20px var(--dsw-font-family); }\n.rp-lore-secondaryButton { color:var(--dsw-alias-label-secondary); }\n.rp-lore-deleteConfirmAction { border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary) 46%,var(--dsw-alias-border-l2)); color:var(--dsw-alias-state-error-primary); }\n.rp-lore-secondaryButton:hover,.rp-lore-deleteConfirmAction:hover { background:var(--dsw-alias-interactive-bg-hover); }\n.rp-lore-secondaryButton:focus-visible,.rp-lore-deleteConfirmAction:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }\n.rp-lore-secondaryButton:disabled,.rp-lore-deleteConfirmAction:disabled { opacity:.5; cursor:not-allowed; }\n\n@media(max-width:720px) {\n  .rp-lore-dialog { width:calc(100vw - 16px); height:calc(100dvh - 16px); }\n  .rp-lore-list { grid-template-columns:1fr; padding:12px; }\n  .rp-lore-toolbar { grid-template-columns:1fr; }\n  .rp-lore-importButton { justify-content:center; }\n  .rp-lore-detail { padding:18px 14px 88px; }\n  .rp-lore-detail>header { align-items:center; }\n  .rp-lore-bookIdentity input { width:100%; font-size:20px; }\n  .rp-lore-entryToolbar { grid-template-columns:minmax(0,1fr) auto; }\n  .rp-lore-entryToolbar .rp-lore-search { grid-column:1/-1; }\n  .rp-lore-entryToolbar select { min-width:0; }\n  .rp-lore-levelTabs { gap:20px; }\n  .rp-lore-entryRow { grid-template-columns:28px minmax(0,1fr) 36px; gap:4px; }\n  .rp-lore-editEntryButton { display:none; }\n  .rp-lore-entryMain { grid-template-columns:minmax(0,1fr); gap:5px; }\n  .rp-lore-entryStatus { width:max-content; padding:2px 0; background:transparent; }\n  .rp-lore-conditionAddressFields,.rp-lore-conditionCompareFields { grid-template-columns:1fr; }\n  .rp-lore-conditionFooter { flex-direction:column; gap:4px; }\n  .rp-lore-toggleGrid { grid-template-columns:1fr; }\n}\n";
 		function ensureStyles() {
 			document.getElementById(STYLE_ID)?.remove();
 			const style = document.createElement("style");
@@ -11257,15 +11365,11 @@ get: (_target, key) => {
 				rows: 2,
 				value: textList(entry.secondaryKeys ?? []),
 				onChange: (event) => onChange({ secondaryKeys: parseList(event.target.value) })
-			})), h(Field, {
-				label: "变量启用条件",
-				hint: "可留空。示例：state(\"story\", \"/characters/李钰/好感度\") > 50"
-			}, h("textarea", {
-				rows: 2,
-				value: entry.stateCondition ?? "",
-				placeholder: "仅在当前故事状态满足条件时使用这条设定",
-				onChange: (event) => onChange({ stateCondition: event.target.value.trim().length === 0 ? void 0 : event.target.value })
-			})), h("div", { className: css.toggleGrid }, ...[
+			})), h(StateConditionEditor, {
+				entryId: entry.id,
+				value: entry.stateCondition,
+				onChange: (stateCondition) => onChange({ stateCondition })
+			}), h("div", { className: css.toggleGrid }, ...[
 				["enabled", "启用"],
 				["constant", "始终使用"],
 				["caseSensitive", "区分大小写"],
@@ -11296,6 +11400,114 @@ get: (_target, key) => {
 				value: entry.order,
 				onChange: (event) => onChange({ order: Number(event.target.value) })
 			}))));
+		}
+		function StateConditionEditor({ entryId, value, onChange }) {
+			const initial = parseCommonStateCondition(value);
+			const [mode, setMode] = (0, react.useState)(value && initial === null ? "advanced" : "common");
+			const [draft, setDraft] = (0, react.useState)(initial ?? emptyConditionDraft());
+			const lastEntryId = (0, react.useRef)(entryId);
+			const lastEmitted = (0, react.useRef)(value);
+			(0, react.useEffect)(() => {
+				if (lastEntryId.current === entryId) return;
+				const next = parseCommonStateCondition(value);
+				lastEntryId.current = entryId;
+				lastEmitted.current = value;
+				setDraft(next ?? emptyConditionDraft());
+				setMode(value && next === null ? "advanced" : "common");
+			}, [entryId, value]);
+			(0, react.useEffect)(() => {
+				if (value === lastEmitted.current) return;
+				const next = parseCommonStateCondition(value);
+				lastEmitted.current = value;
+				setDraft(next ?? emptyConditionDraft());
+				setMode(value && next === null ? "advanced" : "common");
+			}, [value]);
+			const emit = (next) => {
+				lastEmitted.current = next;
+				onChange(next);
+			};
+			const updateDraft = (patch) => {
+				const next = {
+					...draft,
+					...patch
+				};
+				setDraft(next);
+				emit(serializeCommonStateCondition(next));
+			};
+			const clear = () => {
+				setDraft(emptyConditionDraft());
+				setMode("common");
+				emit(void 0);
+			};
+			const parsed = parseCommonStateCondition(value);
+			const issue = commonStateConditionIssue(draft);
+			const hasDraft = value !== void 0 || draft.namespace !== "story" || draft.path.length > 0 || draft.valueText.length > 0 || draft.operator !== ">=";
+			return h("fieldset", { className: css.conditionEditor }, h("legend", { className: css.srOnly }, "会话变量条件"), h("div", { className: css.conditionHeading }, h("div", null, h("strong", null, "会话变量条件"), h("span", null, "引用会话中已经存在的变量；这里只设置使用条件，不会创建变量。")), hasDraft ? h("button", {
+				type: "button",
+				onClick: clear
+			}, "清除条件") : null), mode === "common" ? h(react.default.Fragment, null, h("div", { className: css.conditionAddressFields }, h(Field, { label: "变量分组" }, h("input", {
+				value: draft.namespace,
+				placeholder: "story",
+				autoCapitalize: "none",
+				spellCheck: false,
+				"aria-label": "变量分组",
+				"aria-invalid": hasDraft && !/^[a-z0-9][a-z0-9._:-]{0,127}$/u.test(draft.namespace.trim()),
+				onChange: (event) => updateDraft({ namespace: event.target.value })
+			})), h(Field, { label: "完整路径" }, h("input", {
+				value: draft.path,
+				placeholder: "例如：/plot/progress",
+				autoCapitalize: "none",
+				spellCheck: false,
+				"aria-label": "完整变量路径",
+				"aria-invalid": hasDraft && (draft.path.length === 0 || !draft.path.startsWith("/") || /~(?:[^01]|$)/u.test(draft.path)),
+				onChange: (event) => updateDraft({ path: event.target.value })
+			}))), h("div", { className: css.conditionCompareFields }, h(Field, { label: "比较方式" }, h("select", {
+				value: draft.operator,
+				"aria-label": "变量比较方式",
+				onChange: (event) => updateDraft({ operator: event.target.value })
+			}, ...CONDITION_OPERATORS.map((operator) => h("option", {
+				key: operator.value,
+				value: operator.value
+			}, operator.label)))), h(Field, { label: "值" }, h("input", {
+				value: draft.valueText,
+				placeholder: "例如：50",
+				"aria-label": "变量比较值",
+				"aria-invalid": hasDraft && draft.valueText.trim().length === 0,
+				onChange: (event) => updateDraft({
+					valueText: event.target.value,
+					valueType: "auto"
+				})
+			}))), hasDraft ? h("p", {
+				className: issue === null ? css.conditionAddressHint : `${css.conditionAddressHint} ${css.conditionIssue}`,
+				role: issue === null ? "status" : "alert"
+			}, issue ?? `当前变量地址：${draft.namespace.trim()} · ${draft.path.trim()}`) : null, h("div", { className: css.conditionFooter }, h("small", null, "格式示例：story · /plot/progress。路径必须以 / 开头并包含完整层级；同名字段可写成 /main/progress、/side/progress。"), h("button", {
+				type: "button",
+				onClick: () => setMode("advanced")
+			}, "高级条件"))) : h(react.default.Fragment, null, h(Field, {
+				label: "高级条件",
+				hint: "用于组合多个条件。格式示例：state(\"story\", \"/plot/progress\") >= 50"
+			}, h("textarea", {
+				rows: 3,
+				value: value ?? "",
+				placeholder: "输入条件表达式",
+				onChange: (event) => emit(event.target.value.trim().length === 0 ? void 0 : event.target.value)
+			})), parsed !== null || value === void 0 ? h("button", {
+				type: "button",
+				className: css.conditionReturn,
+				onClick: () => {
+					if (parsed !== null) setDraft(parsed);
+					setMode("common");
+				}
+			}, "返回常用设置") : null));
+		}
+		function emptyConditionDraft() {
+			return {
+				namespace: "story",
+				path: "",
+				operator: ">=",
+				valueText: "",
+				valueType: "auto"
+			};
 		}
 		function Field({ label, hint, children }) {
 			return h("label", { className: css.field }, h("span", null, label), children, hint ? h("small", null, hint) : null);

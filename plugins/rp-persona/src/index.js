@@ -30,6 +30,7 @@ export const DEFAULT_PERSONA = Object.freeze({
 })
 const AVATAR_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
 const AVATAR_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
+const PERSONA_EDITABLE_FIELDS = new Set(['name', 'description', 'personality', 'scenario', 'firstMessage', 'tags'])
 
 export class RpPersonas extends Service {
   constructor(ctx, config) {
@@ -59,6 +60,7 @@ export class RpPersonas extends Service {
   }
 
   async create(input, options = {}) {
+    validateEditablePersona(input)
     const persona = normalizePersona(input, this.config.maxTextCharacters)
     const avatar = options.avatar === undefined ? null : await sanitizeAvatar(options.avatar, this.config)
     return withLibraryMutation(this.config.libraryDir, async () => {
@@ -78,6 +80,7 @@ export class RpPersonas extends Service {
   async update(id, input, expectedRevision, options = {}) {
     assertId(id)
     if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) throw coded('INVALID_REQUEST', 'expectedRevision must be a positive safe integer.')
+    validateEditablePersona(input)
     const persona = normalizePersona(input, this.config.maxTextCharacters)
     const avatar = options.avatar === undefined ? null : await sanitizeAvatar(options.avatar, this.config)
     return withLibraryMutation(this.config.libraryDir, async () => {
@@ -308,6 +311,11 @@ function normalizePersona(value, maxTextCharacters) {
   const total = [persona.name, persona.description, persona.personality, persona.scenario, persona.firstMessage, ...persona.tags].reduce((sum, text) => sum + [...text].length, 0)
   if (total > maxTextCharacters) throw coded('LIMIT_EXCEEDED', `Persona text exceeds the ${maxTextCharacters} character limit.`)
   return persona
+}
+function validateEditablePersona(value) {
+  if (!objectLike(value)) throw coded('INVALID_REQUEST', 'Persona must be an object.')
+  const unknownField = Object.keys(value).find(key => !PERSONA_EDITABLE_FIELDS.has(key))
+  if (unknownField !== undefined) throw coded('INVALID_REQUEST', `Persona contains unknown field "${unknownField}".`)
 }
 function normalizeStored(value, id, maxTextCharacters) {
   if (!objectLike(value) || value.id !== id || !Number.isSafeInteger(value.revision) || value.revision < 1) throw coded('ASSET_CORRUPT', 'Persona storage metadata is invalid.')

@@ -52,7 +52,7 @@
 .sectionTagSwitch>span{display:block;width:14px;height:14px;border-radius:50%;background:var(--dsw-alias-bg-layer-1);box-shadow:0 1px 3px color-mix(in srgb,black 20%,transparent)}
 @media(max-width:720px){.positionGroup .fieldGrid{grid-template-columns:1fr}.sectionTagCompact>span{display:none}.sectionTagCompact{margin-right:1px}}
 
-/* Creation starts from an explicit blank/example choice; defaults remain user-controlled assets. */
+/* Defaults remain user-controlled assets; new presets open as blank drafts. */
 .rowWrap{display:grid;grid-template-columns:minmax(0,1fr) 36px;align-items:center;box-sizing:border-box;border:1px solid transparent;border-radius:11px}
 .rowWrap>span{justify-self:center}
 .rowWrap[data-default="true"]{border-color:color-mix(in srgb,var(--dsw-alias-brand-primary) 28%,transparent)}
@@ -65,21 +65,11 @@
 .editorActions{display:flex;align-items:center;gap:5px}
 .editorNav .deleteEditorAction{color:var(--dsw-alias-state-error-primary)}
 .editorNav .deleteEditorAction:hover{background:var(--dsw-alias-interactive-bg-hover-danger);color:var(--dsw-alias-state-error-primary)}
-.createChooser{display:flex;flex:1;min-height:0;flex-direction:column}
-.createChooserBody{display:flex;width:min(680px,100%);box-sizing:border-box;overflow-y:auto;flex-direction:column;gap:10px;margin:0 auto;padding:28px 24px 40px}
-.createChooserBody header{margin-bottom:6px}
-.createChooserBody h3{margin:0;color:var(--dsw-alias-label-primary);font-size:20px}
-.createChooserBody header p{margin:5px 0 0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:19px}
-.templateCard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;min-height:68px;padding:14px 16px;border:1px solid var(--dsw-alias-border-l2);border-radius:13px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);cursor:pointer;text-align:left}
-.templateCard:hover{border-color:color-mix(in srgb,var(--dsw-alias-brand-primary) 40%,var(--dsw-alias-border-l2));background:var(--dsw-alias-interactive-bg-hover)}
-.templateCard:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-.templateCard strong{font-size:14px}
-.templateCard>span{grid-column:2;color:var(--dsw-alias-brand-primary);font-size:11px;white-space:nowrap}
 .deleteDialog{width:min(460px,calc(100vw - 32px))}
 .deleteSummary{display:flex;flex-direction:column;gap:5px;padding:13px 14px;border:1px solid color-mix(in srgb,var(--dsw-alias-state-error-primary) 18%,var(--dsw-alias-border-l2));border-radius:12px;background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 4%,var(--dsw-alias-bg-layer-1));color:var(--dsw-alias-label-secondary)}
 .deleteSummary strong{color:var(--dsw-alias-label-primary);font-size:13px;line-height:20px;font-weight:550}
 .deleteSummary span{font-size:12px;line-height:19px}
 .deleteConfirmAction:not(:disabled){color:var(--dsw-alias-state-error-primary)}
 .deleteError{margin-top:10px;padding:9px 11px;border-radius:9px;background:var(--dsw-alias-state-error-tertiary);color:var(--dsw-alias-state-error-primary);font-size:12px;line-height:18px}
-@media(max-width:720px){.createChooserBody{padding:20px 14px 32px}.templateCard{grid-template-columns:1fr;gap:5px}.templateCard>span{grid-column:1}.editorActions{gap:2px}.editorNav .deleteEditorAction{padding-inline:7px}}
+@media(max-width:720px){.editorActions{gap:2px}.editorNav .deleteEditorAction{padding-inline:7px}}
 @media(prefers-reduced-motion:reduce){.fieldCardHeader .sectionTagSwitch{transition:none}}

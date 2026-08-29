@@ -92,6 +92,33 @@ test('updates personas with revision CAS and exposes the latest content', async 
   }
 })
 
+test('rejects non-canonical persona fields instead of silently discarding them', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-persona-native-schema-'))
+  const ctx = new Context()
+  const personas = new RpPersonas(ctx, configFor(root))
+  try {
+    await assert.rejects(
+      personas.create({ name: '林澈', background: '旧书修复师' }),
+      error => error.code === 'INVALID_REQUEST' && /unknown field "background"/.test(error.message),
+    )
+    const created = await personas.create({ name: '林澈', description: '旧书修复师' })
+    await assert.rejects(
+      personas.update(created.id, { name: '林澈', description: '旧书修复师', instructions: '保持冷静' }, created.revision),
+      error => error.code === 'INVALID_REQUEST' && /unknown field "instructions"/.test(error.message),
+    )
+    assert.equal((await personas.get(created.id)).revision, created.revision)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('agent persona guidance maps background facts to the canonical description field', async () => {
+  const guidance = await readFile(new URL('../skills/rp-guide-persona/SKILL.md', import.meta.url), 'utf8')
+  assert.match(guidance, /Put identity, history, appearance, capabilities, and other background facts in `description`/)
+  assert.match(guidance, /aliases such as `background`, `bio`, or `instructions`.*rejected/)
+})
+
 test('registers the selected live persona as user-controlled prompt context', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-persona-source-'))
   const ctx = new Context()

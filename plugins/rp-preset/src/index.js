@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
@@ -13,15 +13,17 @@ export const Config = Schema.object({
   exposeBrowser: Schema.boolean().default(true),
 })
 
-// Neutral five-field starter template for interactive storytelling.
-export const PRESET_TEMPLATES = Object.freeze([Object.freeze({
-  id: 'roleplay-example-v2',
+const RETIRED_DEFAULT_PRESET_FINGERPRINTS = new Set([
+  '85211d95514caf67fcf8a75689c0c0220f249a0703606f5cbf40b4919f1616f7',
+  '24d31c6ca677ff21561bd8944feaa3a892af300b3f071e6d5e7b628870487312',
+  '8b2b2ec4b431eafa986ff747612ab16f322dae2f8682ff7fe0818e6ad762a02e',
+])
+
+// Managed five-field default for interactive storytelling.
+export const DEFAULT_PRESET = Object.freeze({
   name: '示例预设',
   description: '',
-  preset: Object.freeze({
-    name: '示例预设',
-    description: '',
-    fields: Object.freeze([
+  fields: Object.freeze([
       Object.freeze({
         name: '声明',
         description: '说明虚构故事可以承载的内容。',
@@ -39,7 +41,7 @@ export const PRESET_TEMPLATES = Object.freeze([Object.freeze({
 
 ## 主角
 
-主角是故事当前聚焦的核心角色。用户代入主角时，由用户决定主角的对白、行动、内心、同意、意图、承诺、关系选择和其他重要决定；你只能完成用户最新输入已经明确开始的直接动作。用户从故事外导演时，可以按照其明确指示描写主角，但不要把指示之外的重大选择擅自写成既定事实。
+主角是故事当前聚焦的核心角色。根据当前语境判断用户是在扮演还是导演主角。
 
 ## 其他角色
 
@@ -59,11 +61,9 @@ export const PRESET_TEMPLATES = Object.freeze([Object.freeze({
 
 连续性：把对话历史视为已经发生的事件。选择、伤势、承诺、误会和损失都会留下后果；惊喜与变化必须从这些经历中自然生长。
 
-用户主权：遵循用户最新输入及其当前参与方式，守住任务描述中的主角控制边界；用户没有表达或授权的关键选择保持开放。
-
 角色自主：其他角色拥有自己的动机、知识、局限、偏见，以及主角视野之外的生活。他们可以误解、拒绝、隐瞒、犹豫、抢先行动，或追求与主角冲突的利益。
 
-故事推进：每次回复都应通过反应、后果、发现、压力、关系变化或其他角色的行动，使场景发生有意义的变化。安静而细微的变化同样有效；如果当前场景已有足够张力，不要为推进而强行制造反转或打断。
+故事推进：根据场景需要，通过反应、后果、发现、压力、关系变化或其他角色的行动推动故事。安静的观察、停顿和过渡也可以成立，不必每轮制造事件或反转。
 
 ## 人物塑造
 
@@ -75,9 +75,9 @@ export const PRESET_TEMPLATES = Object.freeze([Object.freeze({
 
 ## 收束方式
 
-在场景仍有行动惯性、用户能够自然介入的位置结束。用未完成的反应、局势变化、具体压力或进行中的动作形成开放接续点，不写尽余波，不预设用户行动，不擅自跳转时间或场景。
+根据场景自然收束：可以留下接续点，也可以完成当前动作、对话或余波。不要机械制造悬念，也不要无故跳转时间或场景。
 
-避免作者式总结、意义升华及近期结尾的机械重复。情绪和主题留在人物行为与后果中；结尾既要保持因果连续，也要为用户保留多种合理回应空间。
+避免作者式总结、意义升华及近期结尾的机械重复。让情绪和主题留在人物行为与后果中。
 
 ## 避免
 
@@ -89,7 +89,7 @@ export const PRESET_TEMPLATES = Object.freeze([Object.freeze({
       Object.freeze({
         name: '思维链指导',
         description: '写作前简要检查关键约束。',
-        content: '使用正文语言在内部简要检查用户最新意图、连续性、主要角色动机、任务描述中的主角控制边界、场景变化和自然停笔位置。对照当前可见对话历史中的近期结尾，检查当前计划是否重复无法产生新作用的形式或内容。不要复述上下文或探索无关分支，形成清晰的下一段场景后立即开始写作。不要在正文中展示规划、分析或创作说明。',
+        content: '写作前简要检查用户意图、连续性、角色动机、场景变化和收束位置，并避免重复近期结尾。确定下一段后立即写作，不要在正文中展示规划、分析或创作说明。',
         position: 'bottom',
       }),
       Object.freeze({
@@ -98,12 +98,14 @@ export const PRESET_TEMPLATES = Object.freeze([Object.freeze({
         content: '输出故事正文，并使用当前对话所用的语言。不要输出状态、规划、分析或创作说明。',
         position: 'bottom',
       }),
-    ]),
-  }),
-})])
+  ]),
+})
 
 const PREFERENCES_FILE = '.preferences.json'
 const PRESET_POSITIONS = new Set(['top', 'bottom'])
+const PRESET_EDITABLE_FIELDS = new Set(['name', 'description', 'fields'])
+const PRESET_FIELD_EDITABLE_FIELDS = new Set(['id', 'name', 'description', 'content', 'position', 'sectionTag'])
+const PRESET_FIELD_ID = /^[0-9a-f-]{36}$/
 const PROMPT_POSITION_ORDERS = Object.freeze({ top: -90, bottom: 40 })
 const LEGACY_PROMPT_POSITION_SLOTS = Object.freeze(['prompt-top', 'prompt-bottom'])
 
@@ -150,6 +152,7 @@ export class RpPresets extends Service {
   }
 
   async create(input, options = {}) {
+    validateEditablePreset(input)
     const value = normalizePreset(input, this.config)
     return withLibraryMutation(this.config.libraryDir, async () => {
       await mkdir(this.config.libraryDir, { recursive: true })
@@ -221,6 +224,7 @@ export class RpPresets extends Service {
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== current.revision) {
         throw coded('REVISION_CONFLICT', `Preset revision conflict: expected ${String(expectedRevision)}, current ${current.revision}.`)
       }
+      validateEditablePreset(input, { update: true })
       const value = normalizePreset(input, this.config)
       const record = { ...current, ...value, revision: current.revision + 1, updatedAt: new Date().toISOString() }
       await writeRecord(this.config.libraryDir, record)
@@ -270,12 +274,13 @@ export class RpPresets extends Service {
       const preferences = await this.readPreferences()
       const selected = ready.find(item => item.id === preferences.defaultPresetId) ?? ready[0]
       if (selected !== undefined) {
+        const current = await this.get(selected.id)
+        if (isRetiredDefaultSeed(current)) await replaceDefaultSeed(this.config.libraryDir, current, this.config)
         if (preferences.defaultPresetId !== selected.id) await this.writePreferences(selected.id)
         return this.detail(selected.id)
       }
 
-      const template = PRESET_TEMPLATES[0].preset
-      const value = normalizePreset(template, this.config)
+      const value = normalizePreset(DEFAULT_PRESET, this.config)
       const now = new Date().toISOString()
       const record = { id: randomUUID(), revision: 1, ...value, createdAt: now, updatedAt: now }
       await writeRecord(this.config.libraryDir, record)
@@ -333,7 +338,7 @@ export async function apply(ctx, config) {
 }
 
 function registerBrowser(ctx, presets, ready) {
-  const endpoints = new Set(['list', 'get', 'validate-binding', 'create', 'update', 'delete', 'set-default', 'templates'])
+  const endpoints = new Set(['list', 'get', 'validate-binding', 'create', 'update', 'delete', 'set-default'])
   const dispose = ctx.rpRemote.register('/rp-presets', async (endpoint, payload) => {
     if (!endpoints.has(endpoint)) return transportSuccess(failure('INVALID_REQUEST', `Unknown preset endpoint: ${endpoint}`))
     try {
@@ -359,7 +364,6 @@ export async function dispatchBrowser(presets, endpoint, payload) {
     case 'update': return presets.update(requiredId(input.id), input.preset, input.expectedRevision)
     case 'delete': return presets.delete(requiredId(input.id), input.expectedRevision)
     case 'set-default': return presets.setDefault(requiredId(input.id))
-    case 'templates': return { items: cloneTemplates(PRESET_TEMPLATES) }
     default: throw coded('INVALID_REQUEST', `Unknown preset endpoint: ${endpoint}`)
   }
 }
@@ -377,13 +381,41 @@ function normalizePreset(value, config, requireFieldIds = false, allowLegacyPosi
   return { name, description, fields }
 }
 
+function validateEditablePreset(value, { update = false } = {}) {
+  if (!objectLike(value)) throw coded('INVALID_REQUEST', 'Preset must be an object.')
+  const unknownField = Object.keys(value).find(key => !PRESET_EDITABLE_FIELDS.has(key))
+  if (unknownField !== undefined) throw coded('INVALID_REQUEST', `Preset contains unknown field "${unknownField}".`)
+  if (update) {
+    for (const field of ['name', 'description', 'fields']) {
+      if (!Object.hasOwn(value, field)) throw coded('INVALID_REQUEST', `Preset update requires the complete editable body, including ${field}.`)
+    }
+    if (typeof value.description !== 'string') throw coded('INVALID_REQUEST', 'Preset update description must be a string.')
+  }
+  if (!Object.hasOwn(value, 'fields')) return
+  if (!Array.isArray(value.fields)) throw coded('INVALID_REQUEST', 'Preset fields must be an array.')
+  for (const [index, field] of value.fields.entries()) {
+    if (!objectLike(field)) throw coded('INVALID_REQUEST', `Preset field ${index + 1} must be an object.`)
+    const unknownField = Object.keys(field).find(key => !PRESET_FIELD_EDITABLE_FIELDS.has(key))
+    if (unknownField !== undefined) throw coded('INVALID_REQUEST', `Preset field ${index + 1} contains unknown field "${unknownField}".`)
+    if ((field.id !== undefined || update) && (typeof field.id !== 'string' || !PRESET_FIELD_ID.test(field.id))) {
+      throw coded('INVALID_REQUEST', `Preset field ${index + 1} id must be a valid UUID.`)
+    }
+    if (!update) continue
+    for (const requiredField of PRESET_FIELD_EDITABLE_FIELDS) {
+      if (!Object.hasOwn(field, requiredField)) throw coded('INVALID_REQUEST', `Preset update field ${index + 1} requires ${requiredField}.`)
+    }
+    if (typeof field.description !== 'string' || typeof field.content !== 'string') throw coded('INVALID_REQUEST', `Preset update field ${index + 1} description and content must be strings.`)
+    if (typeof field.sectionTag !== 'boolean') throw coded('INVALID_REQUEST', `Preset field ${index + 1} sectionTag must be a boolean.`)
+  }
+}
+
 function normalizeField(value, index, requireFieldId, allowLegacyPosition) {
   if (!objectLike(value)) throw coded('INVALID_REQUEST', `Preset field ${index + 1} must be an object.`)
-  if (requireFieldId && (typeof value.id !== 'string' || !/^[0-9a-f-]{36}$/.test(value.id))) throw coded('ASSET_CORRUPT', `Preset field ${index + 1} has invalid storage metadata.`)
+  if (requireFieldId && (typeof value.id !== 'string' || !PRESET_FIELD_ID.test(value.id))) throw coded('ASSET_CORRUPT', `Preset field ${index + 1} has invalid storage metadata.`)
   const position = allowLegacyPosition && value.position === undefined ? legacyFieldPosition(value.name) : value.position
   if (!PRESET_POSITIONS.has(position)) throw coded(requireFieldId ? 'ASSET_CORRUPT' : 'INVALID_REQUEST', `Preset field ${index + 1} position must be top or bottom.`)
   return {
-    id: typeof value.id === 'string' && /^[0-9a-f-]{36}$/.test(value.id) ? value.id : randomUUID(),
+    id: typeof value.id === 'string' && PRESET_FIELD_ID.test(value.id) ? value.id : randomUUID(),
     name: requiredText(value.name, `field ${index + 1} name`, 120),
     description: optionalText(value.description, `field ${index + 1} description`, 1000),
     content: optionalText(value.content, `field ${index + 1} content`, 100000),
@@ -401,11 +433,19 @@ function legacyFieldPosition(name) { return ['思维链', '思维链指导', '�
 
 function summary(value) { return { id: value.id, name: value.name, description: value.description, revision: value.revision, fields: value.fields.length, updatedAt: value.updatedAt, status: 'ready' } }
 function clipCharacters(value, limit) { const characters = [...value]; return characters.length <= limit ? value : `${characters.slice(0, limit - 1).join('')}…` }
+function presetFingerprint(value) { return createHash('sha256').update(JSON.stringify([value.name, value.description, value.fields.map(field => [field.name, field.description, field.content, field.position])])).digest('hex') }
+function isRetiredDefaultSeed(value) { return RETIRED_DEFAULT_PRESET_FINGERPRINTS.has(presetFingerprint(value)) }
+async function replaceDefaultSeed(libraryDir, current, config) {
+  const value = normalizePreset(DEFAULT_PRESET, config)
+  const fields = value.fields.map((field, index) => ({ ...field, id: current.fields[index].id, sectionTag: current.fields[index].sectionTag }))
+  const record = { ...current, ...value, fields, revision: current.revision + 1, updatedAt: new Date().toISOString() }
+  await writeRecord(libraryDir, record)
+  return record
+}
 function requiredText(value, field, limit) { if (typeof value !== 'string' || value.trim().length === 0) throw coded('INVALID_REQUEST', `Preset ${field} must be a non-empty string.`); const text = value.trim(); if ([...text].length > limit) throw coded('LIMIT_EXCEEDED', `Preset ${field} exceeds ${limit} characters.`); return text }
 function optionalText(value, field, limit) { if (value === undefined || value === null || value === '') return ''; if (typeof value !== 'string') throw coded('INVALID_REQUEST', `Preset ${field} must be a string.`); const text = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim(); if ([...text].length > limit) throw coded('LIMIT_EXCEEDED', `Preset ${field} exceeds ${limit} characters.`); return text }
 function optionalBoolean(value, field) { if (value === undefined) return false; if (typeof value !== 'boolean') throw coded('INVALID_REQUEST', `${field} must be a boolean.`); return value }
 function defaultBoolean(value, field) { if (value === undefined) return true; if (typeof value !== 'boolean') throw coded('INVALID_REQUEST', `${field} must be a boolean.`); return value }
-function cloneTemplates(templates) { return templates.map(template => ({ ...template, preset: { ...template.preset, fields: template.preset.fields.map(field => ({ ...field })) } })) }
 function pageOptions(query, cursor, limit) { if (typeof query !== 'string') throw coded('INVALID_REQUEST', 'query must be a string'); if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw coded('INVALID_REQUEST', 'limit must be between 1 and 100'); const offset = cursor == null ? 0 : Number(cursor); if (!Number.isSafeInteger(offset) || offset < 0 || (cursor != null && String(offset) !== String(cursor))) throw coded('INVALID_REQUEST', 'cursor is invalid'); return { query: query.trim().toLocaleLowerCase(), limit, offset } }
 function compareAssets(left, right) { return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id) }
 function object(value) { if (!objectLike(value)) throw coded('INVALID_REQUEST', 'request payload must be an object'); return value }

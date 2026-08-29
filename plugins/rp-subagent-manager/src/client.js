@@ -53,6 +53,12 @@ export function IconSubagentRobotOutline16({ size = 16, className }) {
 
 export function apply(ctx) {
   ctx.effect(ensureStyles)
+  ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
+    name: 'conversation.session.header.utilities',
+    id: 'rp-session-writer-settings',
+    order: 100,
+    inject: () => ({ connection: ctx.rpRemote, modelCatalog: ctx.remote.session }),
+  }, SessionWriterSettingsEntry))
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
     id: 'rp-subagents-navigation',
@@ -212,6 +218,106 @@ export function SubagentManagerEntry({ wide, connection, modelCatalog }) {
     h(SubagentManagerModal, { open, onClose: () => setOpen(false), connection, modelCatalog }))))
 }
 
+export function SessionWriterSettingsEntry({ sessionId, useProjection, useSession, connection, modelCatalog }) {
+  const profile = useProjection('rp/session')
+  const session = useSession(state => ({ running: state.running }))
+  const [open, setOpen] = useState(false)
+  if (profile === null || profile === undefined) return null
+  return h(MotionConfig, { reducedMotion: 'user', transition }, h(LazyMotion, { features: domMax, strict: true }, h(React.Fragment, null,
+    h(m.button, {
+      type: 'button',
+      className: css.sessionTrigger,
+      whileHover: { y: -1 },
+      whileTap: { scale: 0.98 },
+      onClick: () => setOpen(true),
+      'aria-label': '设置当前对话的 Writer 模型',
+      title: '设置当前对话的 Writer 模型与推理强度',
+    }, h(IconSubagentRobotOutline16, { size: 15 }), h('strong', null, 'Writer')),
+    h(SessionWriterSettingsModal, {
+      open,
+      onClose: () => setOpen(false),
+      connection,
+      modelCatalog,
+      sessionId,
+      profile,
+      running: session.running,
+    }))))
+}
+
+export function SessionWriterSettingsModal({ open, onClose, connection, modelCatalog, sessionId, profile, running = false }) {
+  const [catalog, setCatalog] = useState(null)
+  const [models, setModels] = useState({ groups: [], failures: [] })
+  const [route, setRoute] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [modelLoadFailed, setModelLoadFailed] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!open) return
+    let active = true
+    setCatalog(null)
+    setRoute(profile?.runtime?.writerRoute ?? null)
+    setLoading(true)
+    setSaving(false)
+    setError(null)
+    setModelLoadFailed(false)
+    void rpc(connection, 'list', {})
+      .then(value => { if (active) setCatalog(value) })
+      .catch(reason => { if (active) setError(sessionUserMessage(reason, 'load')) })
+      .finally(() => { if (active) setLoading(false) })
+    void modelCatalog.modelCatalog()
+      .then(value => { if (active) setModels(modelCatalogValue(value)) })
+      .catch(() => { if (active) { setModelLoadFailed(true); setModels({ groups: [], failures: [] }) } })
+    return () => { active = false }
+  }, [connection, modelCatalog, open])
+
+  const save = async () => {
+    if (saving || loading || profile == null || catalog === null || running) return
+    setSaving(true)
+    setError(null)
+    try {
+      await rpc(connection, 'writer/session-update', {
+        sessionId,
+        expectedRevision: profile.revision,
+        route,
+      })
+      onClose()
+    } catch (reason) {
+      setError(sessionUserMessage(reason))
+    } finally {
+      setSaving(false)
+    }
+  }
+  const close = () => { if (!saving) onClose() }
+  const disabled = saving || loading || catalog === null || running
+  return h(Modal, {
+    open,
+    onClose: close,
+    closeLabel: '关闭当前对话 Writer 设置',
+    title: 'Writer 设置',
+    description: '仅影响当前对话，从下一次回复开始生效。',
+    className: css.sessionDialog,
+    footer: h(React.Fragment, null,
+      h(Button, { variant: 'outline', disabled: saving, onClick: close }, '取消'),
+      h(Button, { disabled, onClick: () => void save() }, saving ? '保存中…' : '保存')),
+  },
+  error === null ? null : h('div', { className: css.sessionError, role: 'alert' }, error),
+  running ? h('div', { className: css.sessionNotice, role: 'status' }, h('strong', null, '当前回复正在生成'), h('span', null, '回复结束后即可修改 Writer 设置。')) : null,
+  loading && catalog === null
+    ? h('div', { className: css.sessionState, role: 'status' }, '正在加载…')
+    : catalog === null
+      ? h('div', { className: css.sessionState }, '暂时无法加载设置。')
+      : h('div', { className: css.sessionEditor },
+        h(SessionModelField, {
+          route,
+          defaultRoute: catalog.writer.route,
+          onChange: setRoute,
+          models,
+          modelLoadFailed,
+        })))
+}
+
 export function SubagentManagerModal({ open, onClose, connection, modelCatalog }) {
   const reduced = useReducedMotion()
   const [catalog, setCatalog] = useState(null)
@@ -314,7 +420,7 @@ export function SubagentManagerModal({ open, onClose, connection, modelCatalog }
       open,
       onClose: deleteTarget === null ? onClose : () => {},
       title: '子代理',
-      description: 'Writer 保持固定；这里管理可插拔的独立任务子代理。只有启用项会提供给 Agent，修改从下一次回复开始生效。',
+      description: '设置 Writer 默认模型，管理任务子代理。',
       closeLabel: '关闭子代理管理',
       className: css.dialog,
       contentClassName: css.content,
@@ -335,29 +441,30 @@ function SubagentList({ catalog, models, loading, reduced, togglingId, onWriter,
   const enabledCount = catalog.subagents.filter(subagent => subagent.enabled !== false).length
   return h('div', { className: css.list },
     h('div', { className: css.listToolbar },
-      h('div', null, h('strong', null, '全局子代理'), h('span', null, `固定 Writer + ${catalog.subagents.length} 个独立任务子代理，其中 ${enabledCount} 个已启用`)),
+      h('div', null, h('strong', null, 'Writer 与任务子代理'), h('span', null, `${catalog.subagents.length} 个任务子代理 · ${enabledCount} 个已启用`)),
       h(m.button, { type: 'button', className: css.primaryButton, whileTap: { scale: 0.98 }, disabled: catalog.subagents.length >= catalog.limits.subagents, onClick: onCreate }, h(IconPlusOutline16, { size: 16 }), '新增子代理')),
     h('section', { className: css.section, 'aria-labelledby': 'rp-subagent-writer-heading' },
-      h('h3', { id: 'rp-subagent-writer-heading' }, '写作'),
-      h(SubagentCard, { subagent: { ...catalog.writer, name: 'Writer', description: '使用完整 RP 上下文生成唯一的故事初稿，不可被用户子代理替换。', tools: [] }, fixed: true, models, onEdit: onWriter })),
+      h('h3', { id: 'rp-subagent-writer-heading' }, 'Writer 默认设置'),
+      h(SubagentCard, { subagent: { ...catalog.writer, name: 'Writer', description: '所有对话默认使用此设置，也可在对话中单独调整。', tools: [] }, fixed: true, models, onEdit: onWriter })),
     h('section', { className: css.section, 'aria-labelledby': 'rp-subagent-tasks-heading' },
-      h('div', { className: css.sectionHeading }, h('h3', { id: 'rp-subagent-tasks-heading' }, '独立任务子代理'), h('span', null, '仅启用项会进入 Agent 的本轮目录')),
+      h('div', { className: css.sectionHeading }, h('h3', { id: 'rp-subagent-tasks-heading' }, '任务子代理'), h('span', null, '启用后可在 Agent 模式中使用')),
       catalog.subagents.length === 0
-        ? h('div', { className: css.empty }, h(IconSubagentRobotOutline16, { size: 24 }), h('strong', null, '还没有独立任务子代理'), h('span', null, '适合需要干净上下文或独立模型的大纲、润色等任务。'))
+        ? h('div', { className: css.empty }, h(IconSubagentRobotOutline16, { size: 24 }), h('strong', null, '还没有任务子代理'), h('span', null, '可用于大纲、润色等独立任务。'))
         : catalog.subagents.map(subagent => h(SubagentCard, { key: subagent.id, subagent, models, reduced, pending: togglingId === subagent.id, toggleDisabled: togglingId !== null, onEdit: () => onEdit(subagent.id), onToggle: () => onToggle(subagent), onDelete: () => onDelete(subagent) }))))
 }
 
 function SubagentCard({ subagent, fixed = false, models, reduced = false, pending = false, toggleDisabled = false, onEdit, onToggle, onDelete }) {
   const available = routeAvailable(subagent.route, models.groups)
   const enabled = fixed || subagent.enabled !== false
+  const modelLabel = fixed && subagent.route?.kind !== 'fixed' ? '跟随当前对话' : routeLabel(subagent.route, models.groups)
   return h(m.article, { className: css.card, layout: true, transition, whileHover: { y: -1 }, 'data-enabled': enabled ? 'true' : 'false' },
     h('button', { type: 'button', className: css.cardMain, onClick: onEdit, 'aria-label': `编辑${subagent.name}` },
       h('span', { className: css.cardIcon }, h(IconSubagentRobotOutline16, { size: 18 })),
       h('span', { className: css.cardCopy },
-        h('span', { className: css.cardTitle }, h('strong', null, subagent.name), fixed ? h(Pill, null, '固定') : h('span', { className: css.statusTag, 'data-enabled': enabled ? 'true' : 'false' }, pending ? '正在更新' : enabled ? '已启用' : '已停用')),
+        h('span', { className: css.cardTitle }, h('strong', null, subagent.name), fixed ? h(Pill, null, '全局默认') : h('span', { className: css.statusTag, 'data-enabled': enabled ? 'true' : 'false' }, pending ? '正在更新' : enabled ? '已启用' : '已停用')),
         h('span', { className: css.cardDescription }, subagent.description),
         h('span', { className: css.tags },
-          h('span', { className: available ? css.modelTag : `${css.modelTag} ${css.unavailable}` }, available ? routeLabel(subagent.route, models.groups) : `${routeLabel(subagent.route, models.groups)} · 当前不可用`),
+          h('span', { className: available ? css.modelTag : `${css.modelTag} ${css.unavailable}` }, available ? modelLabel : `${modelLabel} · 当前不可用`),
           ...(subagent.tools ?? []).map(tool => h('span', { className: css.toolTag, key: tool }, tool === 'web_search' ? 'Web 搜索' : 'Skills'))))),
     fixed ? null : h('span', { className: css.cardActions },
       h(AvailabilitySwitch, { checked: enabled, disabled: toggleDisabled, pending, reduced, label: `${enabled ? '停用' : '启用'}${subagent.name}`, onClick: onToggle }),
@@ -382,9 +489,8 @@ function AvailabilitySwitch({ checked, disabled, pending, reduced, label, onClic
 }
 
 function WriterEditor({ draft, onDraft, models, modelLoadFailed, saving, onBack, onSave }) {
-  return h(EditorShell, { title: 'Writer', subtitle: '固定写作子代理', saving, onBack, onSave, saveLabel: '保存 Writer 模型' },
-    h('div', { className: css.fixedNotice }, h('strong', null, 'Writer 的职责与上下文由 Roleplay 固定'), h('span', null, 'Chat 与 Agent 都必须使用这个 Writer 生成故事初稿；用户子代理不能替换它。')),
-    h(ModelField, { route: draft.route, onChange: route => onDraft(current => ({ ...current, route })), models, modelLoadFailed }))
+  return h(EditorShell, { title: 'Writer', subtitle: '默认设置', description: '未单独设置的对话将使用此配置。', saving, onBack, onSave, saveLabel: '保存' },
+    h(ModelField, { route: draft.route, onChange: route => onDraft(current => ({ ...current, route })), models, modelLoadFailed, writer: true }))
 }
 
 function SubagentEditor({ draft, onDraft, limits, models, modelLoadFailed, saving, onBack, onSave, onDelete }) {
@@ -401,7 +507,7 @@ function SubagentEditor({ draft, onDraft, limits, models, modelLoadFailed, savin
       h('label', null, h('input', { type: 'checkbox', checked: draft.tools.includes('skill'), disabled: saving, onChange: () => toggleTool('skill') }), h(IconSkillOutline16, { size: 14 }), h('span', null, h('strong', null, 'Skills'), h('small', null, '读取并执行已安装的只读工作指南')))))
 }
 
-function EditorShell({ title, subtitle, saving, onBack, onSave, saveLabel, onDelete, children }) {
+function EditorShell({ title, subtitle, description = '更改从下一次回复开始生效。', saving, onBack, onSave, saveLabel, onDelete, children }) {
   return h('div', { className: css.editor },
     h('div', { className: css.editorNav },
       h('button', { type: 'button', disabled: saving, onClick: onBack }, h(IconChevronLeftOutline14, { size: 14 }), '返回'),
@@ -409,11 +515,11 @@ function EditorShell({ title, subtitle, saving, onBack, onSave, saveLabel, onDel
         onDelete === undefined ? null : h('button', { type: 'button', className: css.deleteEditorAction, disabled: saving, onClick: onDelete }, h(IconTrashOutline16, { size: 14 }), '删除'),
         h('button', { type: 'button', className: css.primaryButton, disabled: saving, onClick: onSave }, saving ? '保存中…' : saveLabel))),
     h('div', { className: css.editorBody },
-      h('header', null, h('span', { className: css.editorMark }, h(IconSubagentRobotOutline16, { size: 22 })), h('div', null, h('small', null, subtitle), h('h3', null, title), h('p', null, '保存后，从下一次 Roleplay 回复开始使用新配置；已经开始的任务不受影响。'))),
+      h('header', null, h('span', { className: css.editorMark }, h(IconSubagentRobotOutline16, { size: 22 })), h('div', null, h('small', null, subtitle), h('h3', null, title), h('p', null, description))),
       children))
 }
 
-function ModelField({ route, onChange, models, modelLoadFailed }) {
+function ModelField({ route, onChange, models, modelLoadFailed, writer = false }) {
   const key = routeKey(route)
   const available = routeAvailable(route, models.groups)
   const selectedModel = route.kind === 'fixed'
@@ -428,29 +534,93 @@ function ModelField({ route, onChange, models, modelLoadFailed }) {
   return h(React.Fragment, null,
     h('label', { className: css.field },
       h('span', null, '模型'),
-      h('small', null, '跟随父代理会使用当前对话的完整模型路由，包括已显式选择的推理强度与输出上限。'),
-      h('select', { value: key, onChange: event => onChange(routeFromKey(event.target.value)), 'aria-label': '子代理模型' },
-        h('option', { value: 'inherit' }, '跟随父代理'),
+      h('small', null, writer ? '选择“跟随当前对话”时，使用对话当前的模型设置。' : '跟随父代理时，使用当前对话的模型设置。'),
+      h('select', { value: key, onChange: event => onChange(routeFromKey(event.target.value)), 'aria-label': writer ? 'Writer 全局默认模型' : '子代理模型' },
+        h('option', { value: 'inherit' }, writer ? '跟随当前对话' : '跟随父代理'),
         !available && route.kind === 'fixed' && selectedModel === undefined ? h('option', { value: key, disabled: true }, `${route.provider} · ${route.model}（当前不可用）`) : null,
         ...models.groups.map(group => h('optgroup', { key: group.id, label: group.name }, ...group.models.map(model => h('option', { key: model.id, value: JSON.stringify([group.id, model.id]) }, model.name))))),
-      !available && route.kind === 'fixed' && selectedModel === undefined ? h('span', { className: css.fieldWarning, role: 'status' }, '已保存的模型当前不在可用目录中。请选择其他模型或改为跟随父代理后再保存。') : null,
+      !available && route.kind === 'fixed' && selectedModel === undefined ? h('span', { className: css.fieldWarning, role: 'status' }, `已保存的模型当前不可用。请选择其他模型或${writer ? '跟随当前对话' : '跟随父代理'}。`) : null,
       modelLoadFailed ? h('span', { className: css.fieldWarning, role: 'status' }, '模型目录暂时无法读取。稍后重新打开即可重试。') : null,
       ...failures.map(failure => h('span', { className: css.catalogFailure, key: failure.id }, `${failure.name} 的模型目录暂时不可用，其他提供方仍可选择。`))),
     route.kind !== 'fixed' || selectedModel === undefined || efforts.length === 0 ? null : h('label', { className: css.field },
       h('span', null, '推理强度'),
-      h('small', null, '不显式指定时使用该模型的默认推理强度；切换模型会自动恢复默认。'),
+      h('small', null, '默认使用模型推荐值。'),
       h('select', {
         value: explicitEffort,
         onChange: event => onChange({
           kind: 'fixed', provider: route.provider, model: route.model,
           ...(event.target.value === '' ? {} : { reasoningEffort: event.target.value }),
         }),
-        'aria-label': '子代理推理强度',
+        'aria-label': writer ? 'Writer 全局默认推理强度' : '子代理推理强度',
       },
       h('option', { value: '' }, defaultEffortName === undefined ? '使用模型默认值' : `使用模型默认值（${defaultEffortName}）`),
       !effortAvailable ? h('option', { value: explicitEffort, disabled: true }, `${explicitEffort}（当前不可用）`) : null,
       ...efforts.map(effort => h('option', { key: effort.id, value: effort.id }, effort.name))),
       !effortAvailable ? h('span', { className: css.fieldWarning, role: 'status' }, '已保存的推理强度不再受此模型支持。请选择其他强度或使用模型默认值。') : null))
+}
+
+function SessionModelField({ route, defaultRoute, onChange, models, modelLoadFailed }) {
+  const key = route === null ? 'default' : routeKey(route)
+  const available = route === null || routeAvailable(route, models.groups)
+  const defaultAvailable = routeAvailable(defaultRoute, models.groups)
+  const selectedModel = route?.kind === 'fixed'
+    ? models.groups.find(group => group.id === route.provider)?.models?.find(model => model.id === route.model)
+    : undefined
+  const efforts = selectedModel?.reasoning?.efforts ?? []
+  const defaultEffort = selectedModel?.reasoning?.defaultEffort
+  const explicitEffort = typeof route?.reasoningEffort === 'string' ? route.reasoningEffort : ''
+  const effortAvailable = explicitEffort === '' || efforts.some(effort => effort.id === explicitEffort)
+  const defaultEffortName = efforts.find(effort => effort.id === defaultEffort)?.name
+  const failures = models.failures ?? []
+  const globalLabel = defaultRoute?.kind === 'fixed' ? routeLabel(defaultRoute, models.groups) : '跟随当前对话'
+  const modelOptions = [
+    h('option', { key: 'default', value: 'default' }, `使用全局默认（${globalLabel}）`),
+    h('option', { key: 'inherit', value: 'inherit' }, '跟随当前对话'),
+    !available && route?.kind === 'fixed' && selectedModel === undefined
+      ? h('option', { key: 'unavailable', value: key, disabled: true }, `${route.provider} · ${route.model}（当前不可用）`)
+      : null,
+    ...models.groups.map(group => h('optgroup', { key: group.id, label: group.name },
+      ...group.models.map(model => h('option', { key: model.id, value: JSON.stringify([group.id, model.id]) }, model.name)))),
+  ]
+  const modelField = h('label', { className: css.field },
+    h('span', null, '模型'),
+    h('small', null, '使用全局默认会自动同步；其他选择只影响当前对话。'),
+    h('select', {
+      value: key,
+      onChange: event => onChange(event.target.value === 'default' ? null : routeFromKey(event.target.value)),
+      'aria-label': '当前对话 Writer 模型',
+    }, ...modelOptions),
+    route === null && !defaultAvailable ? h('span', { className: css.fieldWarning, role: 'status' }, '全局默认模型当前不可用。可以为当前对话选择其他模型，或稍后修改全局默认值。') : null,
+    !available && route?.kind === 'fixed' && selectedModel === undefined ? h('span', { className: css.fieldWarning, role: 'status' }, '当前对话保存的模型已不可用。请选择其他模型、跟随当前对话或恢复全局默认。') : null,
+    modelLoadFailed ? h('span', { className: css.fieldWarning, role: 'status' }, '模型目录暂时无法读取。稍后重新打开即可重试。') : null,
+    ...failures.map(failure => h('span', { className: css.catalogFailure, key: failure.id }, `${failure.name} 的模型目录暂时不可用，其他提供方仍可选择。`)))
+  const effortField = route?.kind !== 'fixed' || selectedModel === undefined || efforts.length === 0
+    ? null
+    : h('label', { className: css.field },
+      h('span', null, '推理强度'),
+      h('small', null, '默认使用模型推荐值。'),
+      h('select', {
+        value: explicitEffort,
+        onChange: event => onChange({
+          kind: 'fixed', provider: route.provider, model: route.model,
+          ...(event.target.value === '' ? {} : { reasoningEffort: event.target.value }),
+        }),
+        'aria-label': '当前对话 Writer 推理强度',
+      },
+      h('option', { value: '' }, defaultEffortName === undefined ? '使用模型默认值' : `使用模型默认值（${defaultEffortName}）`),
+      !effortAvailable ? h('option', { value: explicitEffort, disabled: true }, `${explicitEffort}（当前不可用）`) : null,
+      ...efforts.map(effort => h('option', { key: effort.id, value: effort.id }, effort.name))),
+      !effortAvailable ? h('span', { className: css.fieldWarning, role: 'status' }, '当前对话保存的推理强度已不受此模型支持。请选择其他强度或使用模型默认值。') : null)
+  return h(React.Fragment, null, modelField, effortField)
+}
+
+function sessionUserMessage(error, action = 'save') {
+  if (error?.code === 'REVISION_CONFLICT') return '当前对话的设置刚刚发生了变化，请关闭并重新打开后再保存。'
+  if (error?.code === 'SESSION_RUNNING') return '当前回复正在生成，结束后再修改 Writer 设置。'
+  if (error?.code === 'MODEL_UNAVAILABLE') return '所选模型当前不可用，请选择其他模型、跟随当前对话或恢复全局默认。'
+  if (error?.code === 'NOT_RP_SESSION' || error?.code === 'ASSET_NOT_FOUND') return '当前对话已经不可用，请刷新页面后重试。'
+  if (action === 'load') return '暂时无法读取 Writer 的全局默认值，请稍后重试。'
+  return '暂时无法保存当前对话的 Writer 设置，请检查选择后重试。'
 }
 
 function DeleteSubagentDialog({ target, pending, error, onCancel, onConfirm }) {

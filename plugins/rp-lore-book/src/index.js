@@ -19,6 +19,14 @@ export const Config = Schema.object({
   exposeBrowser: Schema.boolean().default(false),
 })
 
+const EDITABLE_ENTRY_FIELDS = new Set([
+  'id', 'name', 'semanticKey', 'level', 'keys', 'secondaryKeys', 'stateCondition', 'content',
+  'enabled', 'constant', 'caseSensitive', 'recursive', 'order', 'position',
+  'insertionPosition', 'depth', 'probability',
+])
+const EDITABLE_ENTRY_LEVELS = new Set(['worldDescription', 'roleplayGuide', 'importantRules'])
+const EDITABLE_INSERTION_POSITIONS = new Set(['before_char', 'after_char', 'before_examples', 'after_examples', 'in_chat', 'before_an', 'after_an'])
+
 export class RpLoreBooks extends Service {
   constructor(ctx, config) {
     super(ctx, 'rpLoreBooks')
@@ -393,6 +401,7 @@ export class RpLoreBooks extends Service {
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw coded('INVALID_REQUEST', 'lorebook patch must be an object')
     const keys = Object.keys(patch)
     if (keys.length === 0 || keys.some(key => !['name', 'entries'].includes(key))) throw coded('INVALID_REQUEST', 'lorebook patch contains no editable fields or an unknown field')
+    if (patch.name !== undefined && (typeof patch.name !== 'string' || patch.name.trim().length === 0)) throw coded('INVALID_REQUEST', 'lorebook name must be a non-empty string')
     const current = await this.get(id)
     if (expectedRevision !== undefined && expectedRevision !== current.revision) throw coded('REVISION_CONFLICT', `Lorebook ${id} changed from revision ${expectedRevision} to ${current.revision}.`)
     if (patch.entries !== undefined) validateEditableEntries(patch.entries)
@@ -505,19 +514,45 @@ function validateEditableEntries(entries) {
   const ids = new Set()
   for (const [index, entry] of entries.entries()) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw coded('INVALID_REQUEST', `lorebook entry ${index} must be an object`)
-    if (typeof entry.id !== 'string' || entry.id.length === 0) throw coded('INVALID_REQUEST', `lorebook entry ${index} requires an id`)
+    const unknownField = Object.keys(entry).find(key => !EDITABLE_ENTRY_FIELDS.has(key))
+    if (unknownField !== undefined) throw coded('INVALID_REQUEST', `lorebook entry ${index} contains unknown field "${unknownField}"`)
+    if (typeof entry.id !== 'string' || entry.id.trim().length === 0) throw coded('INVALID_REQUEST', `lorebook entry ${index} requires an id`)
     if (ids.has(entry.id)) throw coded('INVALID_REQUEST', `lorebook contains duplicate entry id "${entry.id}"`)
     ids.add(entry.id)
-    if (typeof entry.content !== 'string') throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" requires string content`)
-    if (entry.keys !== undefined && (!Array.isArray(entry.keys) || entry.keys.some(key => typeof key !== 'string'))) {
-      throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" keys must be a string array`)
+    if (typeof entry.name !== 'string' || entry.name.trim().length === 0) throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" requires a non-empty name`)
+    if (typeof entry.content !== 'string' || entry.content.trim().length === 0) throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" requires non-empty string content`)
+    if (!EDITABLE_ENTRY_LEVELS.has(entry.level)) throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" level must be worldDescription, roleplayGuide, or importantRules`)
+    validateEntryStringArray(entry, 'keys')
+    validateEntryStringArray(entry, 'secondaryKeys')
+    const primaryKeys = entry.keys ?? []
+    const secondaryKeys = entry.secondaryKeys ?? []
+    for (const field of ['enabled', 'constant', 'caseSensitive', 'recursive']) {
+      if (entry[field] !== undefined && typeof entry[field] !== 'boolean') throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" ${field} must be a boolean`)
     }
-    if (entry.secondaryKeys !== undefined && (!Array.isArray(entry.secondaryKeys) || entry.secondaryKeys.some(key => typeof key !== 'string'))) {
-      throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" secondaryKeys must be a string array`)
+    if (secondaryKeys.length > 0 && primaryKeys.length === 0) throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" secondaryKeys require at least one primary key`)
+    if (entry.enabled !== false && entry.constant !== true && primaryKeys.length === 0) throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" must be constant or have at least one primary key while enabled`)
+    if (entry.semanticKey !== undefined && (typeof entry.semanticKey !== 'string' || entry.semanticKey.trim().length === 0)) {
+      throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" semanticKey must be a non-empty string`)
     }
     if (entry.stateCondition !== undefined && (typeof entry.stateCondition !== 'string' || entry.stateCondition.trim().length === 0)) {
       throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" stateCondition must be a non-empty string`)
     }
+    if (entry.order !== undefined && !Number.isSafeInteger(entry.order)) throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" order must be a safe integer`)
+    if (entry.position !== undefined && (!Number.isSafeInteger(entry.position) || entry.position < 0)) throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" position must be a non-negative safe integer`)
+    if (entry.insertionPosition !== undefined && !EDITABLE_INSERTION_POSITIONS.has(entry.insertionPosition)) {
+      throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" insertionPosition is invalid`)
+    }
+    if (entry.depth !== undefined && (!Number.isSafeInteger(entry.depth) || entry.depth < 0)) throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" depth must be a non-negative safe integer`)
+    if (entry.probability !== undefined && (typeof entry.probability !== 'number' || !Number.isFinite(entry.probability) || entry.probability < 0 || entry.probability > 1)) {
+      throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" probability must be a number between 0 and 1`)
+    }
+  }
+}
+
+function validateEntryStringArray(entry, field) {
+  if (entry[field] === undefined) return
+  if (!Array.isArray(entry[field]) || entry[field].some(value => typeof value !== 'string' || value.trim().length === 0)) {
+    throw coded('INVALID_REQUEST', `lorebook entry "${entry.id}" ${field} must be an array of non-empty strings`)
   }
 }
 
