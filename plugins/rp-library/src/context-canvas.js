@@ -97,22 +97,39 @@ export function PromptWorkbench({ open, profile, session, sessionId, connection 
   const [preview, setPreview] = useState(null)
   const [previewState, setPreviewState] = useState('idle')
   const [previewError, setPreviewError] = useState(null)
-  const refresh = async () => {
+  const requestGeneration = useRef(0)
+  useEffect(() => {
+    const generation = requestGeneration.current + 1
+    requestGeneration.current = generation
+    if (!promptPreviewRefreshReady(open, session?.running)) return
     setPreviewState('loading')
     setPreviewError(null)
-    try {
-      const value = await rpRpc(connection, 'session/context-build-preview', { sessionId })
-      setPreview(value)
-      setPreviewState('ready')
-    } catch (error) {
-      setPreviewState('error')
-      setPreviewError(userErrorMessage(error, 'context-preview'))
+    setPreview(null)
+    const refresh = async () => {
+      try {
+        const value = await rpRpc(connection, 'session/context-build-preview', { sessionId })
+        if (requestGeneration.current !== generation) return
+        setPreview(value)
+        setPreviewState('ready')
+      } catch (error) {
+        if (requestGeneration.current !== generation) return
+        setPreviewState('error')
+        setPreviewError(userErrorMessage(error, 'context-preview'))
+      }
     }
-  }
-  useEffect(() => { if (open) void refresh() }, [open, profile?.revision, profile?.runtime?.executionMode])
+    void refresh()
+    return () => {
+      if (requestGeneration.current === generation) requestGeneration.current += 1
+    }
+  }, [open, sessionId, session?.running, profile?.revision, profile?.runtime?.executionMode, connection])
   return h('div', { className: css.promptWorkbenchShell },
     h('main', { className: css.promptWorkbenchBody },
       h(ContextBuildView, { preview, previewState, previewError, profile, session, sessionId, connection })))
+}
+
+/** Wait for an open, idle Session before reading its effective Prompt. */
+export function promptPreviewRefreshReady(open, running) {
+  return open === true && running !== true
 }
 
 function ContextBuildView({ preview, previewState, previewError, profile, session, sessionId, connection }) {

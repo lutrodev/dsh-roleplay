@@ -4,6 +4,7 @@ import {
   movePromptSlotToArea,
   movePromptSource,
   promptDragScrollDelta,
+  promptPreviewRefreshReady,
   promptSourceTone,
   promptToneIconName,
   promptSlotCanIdle,
@@ -11,6 +12,13 @@ import {
   renderPromptSlotPreview,
   setPromptSlotIdle,
 } from '../src/context-canvas.js'
+
+test('Prompt 预览只在弹窗打开且会话生成结束后刷新', () => {
+  assert.equal(promptPreviewRefreshReady(false, false), false)
+  assert.equal(promptPreviewRefreshReady(true, true), false)
+  assert.equal(promptPreviewRefreshReady(true, false), true)
+  assert.equal(promptPreviewRefreshReady(true, undefined), true)
+})
 
 test('独立文风来源沿用文风颜色分类', () => {
   assert.equal(promptSourceTone({ id: 'rp.writing-style:8aa0f7fd-38cc-4a37-aee5-c7ec33b8b12d' }), 'writing-style')

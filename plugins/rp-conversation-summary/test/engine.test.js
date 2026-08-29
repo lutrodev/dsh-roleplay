@@ -186,8 +186,9 @@ test('overflow recovery and manual compact stay synchronous native Roleplay tran
   const signal = new AbortController().signal
 
   const overflowSession = ctx.sessions.create(SessionId('rp-overflow-summary'))
-  appendCompletedTurn(overflowSession, 1, '溢出历史', true)
-  overflowSession.append('turn/start', { turn: 2 })
+  appendCompletedTurn(overflowSession, 1, '溢出旧历史', true)
+  appendCompletedTurn(overflowSession, 2, '溢出近期原文')
+  overflowSession.append('turn/start', { turn: 3 })
   const overflow = await ctx.compaction.compactIfNeeded({
     session: overflowSession,
     options: { provider: 'mock', model: 'mock' },
@@ -215,6 +216,65 @@ test('overflow recovery and manual compact stay synchronous native Roleplay tran
   )
   assert.equal(adapter.requests.length, 2)
   assert.ok(adapter.requests.every(request => request.purpose === 'compaction'))
+})
+
+test('overflow recovery keeps the latest completed Roleplay exchange verbatim', async (t) => {
+  const adapter = new DeferredSummaryAdapter({ response: VALID_SUMMARY })
+  const ctx = await createContext(adapter)
+  t.after(() => ctx.fiber.dispose())
+  const session = ctx.sessions.create(SessionId('rp-overflow-retains-latest-reply'))
+  appendCompletedTurn(session, 1, '应当总结的旧历史', true)
+  const latestExchangeStart = session.surface.nodes.length
+  appendCompletedTurn(session, 2, '必须保留的近期原文')
+  const latestExchange = session.surface.nodes.slice(latestExchangeStart)
+  const latestAssistant = latestExchange.findLast(seq => session.events[seq]?.type === 'assistant/message')
+  session.append('turn/start', { turn: 3 })
+  session.append('step/start', { turn: 3, step: 1 })
+  const currentInput = session.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: '触发溢出的当前输入' }],
+    source: { kind: 'user' },
+  }), { surfaceOp: 'append' })
+
+  const result = await ctx.compaction.compactIfNeeded({
+    session,
+    options: { provider: 'mock', model: 'mock' },
+  }, 'context-overflow', new AbortController().signal)
+
+  assert.ok(result)
+  assert.ok(latestAssistant !== undefined)
+  assert.equal(result.shadowedSeqs.includes(latestAssistant), false)
+  assert.ok(latestExchange.every(seq => session.surface.nodes.includes(seq)))
+  assert.equal(session.surface.nodes.includes(currentInput.seq), true)
+  assert.equal(conversationSummaryContext(session).text, VALID_SUMMARY)
+  assert.match(
+    roleplayTranscriptMessages(session).map(messageText).join('\n'),
+    /必须保留的近期原文（回复）/u,
+  )
+})
+
+test('overflow recovery does not consume the only completed model reply', async (t) => {
+  const adapter = new DeferredSummaryAdapter({ response: VALID_SUMMARY })
+  const ctx = await createContext(adapter)
+  t.after(() => ctx.fiber.dispose())
+  const session = ctx.sessions.create(SessionId('rp-overflow-keeps-only-reply'))
+  appendCompletedTurn(session, 1, '唯一的近期原文', true)
+  session.append('turn/start', { turn: 2 })
+  session.append('step/start', { turn: 2, step: 1 })
+  session.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: '触发溢出的当前输入' }],
+    source: { kind: 'user' },
+  }), { surfaceOp: 'append' })
+  const before = [...session.surface.nodes]
+
+  const result = await ctx.compaction.compactIfNeeded({
+    session,
+    options: { provider: 'mock', model: 'mock' },
+  }, 'context-overflow', new AbortController().signal)
+
+  assert.equal(result, null)
+  assert.deepEqual(session.surface.nodes, before)
+  assert.equal(session.events.some(event => event.type === 'compaction/start'), false)
+  assert.equal(adapter.requests.length, 0)
 })
 
 test('manual compact meters an existing idle reroll carrier without changing the Session log', async (t) => {
@@ -275,10 +335,12 @@ test('overflow recovery uses the same scoped meter for an existing reroll carrie
   const ctx = await createContext(adapter)
   t.after(() => ctx.fiber.dispose())
   const session = ctx.sessions.create(SessionId('rp-overflow-summary-after-reroll'))
-  appendCompletedTurn(session, 1, '溢出前保留的第一轮', true)
-  const secondStart = session.surface.nodes.length
-  appendCompletedTurn(session, 2, '溢出前重新生成的第二轮')
-  const shadowed = session.surface.nodes.slice(secondStart)
+  appendCompletedTurn(session, 1, '溢出前应总结的第一轮', true)
+  appendCompletedTurn(session, 2, '溢出前保留的第二轮')
+  const retainedAssistant = session.surface.nodes.findLast(seq => session.events[seq]?.type === 'assistant/message')
+  const rerollStart = session.surface.nodes.length
+  appendCompletedTurn(session, 3, '溢出前重新生成的第三轮')
+  const shadowed = session.surface.nodes.slice(rerollStart)
   const assistant = session.events[shadowed.findLast(seq => (
     session.events[seq]?.type === 'assistant/message'
   ))]
@@ -291,7 +353,7 @@ test('overflow recovery uses the same scoped meter for an existing reroll carrie
       turn: assistant.data.turn, step: assistant.data.step,
     }], {
       replay: [createUserMessage({
-        content: [{ type: 'text', text: '重新生成溢出前第二轮' }],
+        content: [{ type: 'text', text: '重新生成溢出前第三轮' }],
         source: { kind: 'user' },
       })],
     }),
@@ -300,7 +362,7 @@ test('overflow recovery uses the same scoped meter for an existing reroll carrie
     surfaceOp: { op: 'replace', start: shadowed[0], end: shadowed.at(-1) },
     sourceEventSeqs: shadowed,
   })
-  session.append('turn/start', { turn: 3 })
+  session.append('turn/start', { turn: 4 })
 
   const result = await ctx.compaction.compactIfNeeded({
     session,
@@ -308,6 +370,9 @@ test('overflow recovery uses the same scoped meter for an existing reroll carrie
   }, 'context-overflow', new AbortController().signal)
 
   assert.ok(result)
+  assert.ok(retainedAssistant !== undefined)
+  assert.equal(result.shadowedSeqs.includes(retainedAssistant), false)
+  assert.equal(session.surface.nodes.includes(retainedAssistant), true)
   assert.equal(result.shadowedSeqs.includes(carrier.seq), false)
   assert.equal(session.surface.nodes.includes(carrier.seq), true)
   assert.equal(conversationSummaryContext(session).text, VALID_SUMMARY)

@@ -11287,24 +11287,37 @@ get: (_target, key) => {
 			const [preview, setPreview] = (0, react.useState)(null);
 			const [previewState, setPreviewState] = (0, react.useState)("idle");
 			const [previewError, setPreviewError] = (0, react.useState)(null);
-			const refresh = async () => {
+			const requestGeneration = (0, react.useRef)(0);
+			(0, react.useEffect)(() => {
+				const generation = requestGeneration.current + 1;
+				requestGeneration.current = generation;
+				if (!promptPreviewRefreshReady(open, session?.running)) return;
 				setPreviewState("loading");
 				setPreviewError(null);
-				try {
-					const value = await rpRpc(connection, "session/context-build-preview", { sessionId });
-					setPreview(value);
-					setPreviewState("ready");
-				} catch (error) {
-					setPreviewState("error");
-					setPreviewError(userErrorMessage(error, "context-preview"));
-				}
-			};
-			(0, react.useEffect)(() => {
-				if (open) refresh();
+				setPreview(null);
+				const refresh = async () => {
+					try {
+						const value = await rpRpc(connection, "session/context-build-preview", { sessionId });
+						if (requestGeneration.current !== generation) return;
+						setPreview(value);
+						setPreviewState("ready");
+					} catch (error) {
+						if (requestGeneration.current !== generation) return;
+						setPreviewState("error");
+						setPreviewError(userErrorMessage(error, "context-preview"));
+					}
+				};
+				refresh();
+				return () => {
+					if (requestGeneration.current === generation) requestGeneration.current += 1;
+				};
 			}, [
 				open,
+				sessionId,
+				session?.running,
 				profile?.revision,
-				profile?.runtime?.executionMode
+				profile?.runtime?.executionMode,
+				connection
 			]);
 			return h$2("div", { className: css.promptWorkbenchShell }, h$2("main", { className: css.promptWorkbenchBody }, h$2(ContextBuildView, {
 				preview,
@@ -11315,6 +11328,10 @@ get: (_target, key) => {
 				sessionId,
 				connection
 			})));
+		}
+		/** Wait for an open, idle Session before reading its effective Prompt. */
+		function promptPreviewRefreshReady(open, running) {
+			return open === true && running !== true;
 		}
 		function ContextBuildView({ preview, previewState, previewError, profile, session, sessionId, connection }) {
 			if (previewState === "loading" && preview === null) return h$2(CanvasEmpty, {

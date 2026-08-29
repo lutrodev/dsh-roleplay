@@ -5,6 +5,7 @@ import {
   toolPairingBalancedBefore,
 } from '@deepseek-ai/dsh-compaction'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { roleplayTranscriptMessages } from 'dsh-roleplay-rp-core/conversation'
 import {
   nativeSummaryInput,
   pressureSummaryInput,
@@ -54,9 +55,19 @@ export class RpConversationSummaryEngine extends BasicCompactionEngine {
   async compactIfNeeded(agent, trigger, signal) {
     if (trigger === 'context-overflow') {
       this.discardCandidate(agent, true)
-      return BasicCompactionEngine.prototype.compactIfNeeded.call(
-        this.baseCompactionReceiver(), agent, trigger, signal,
-      )
+      if (sessionTarget(agent.session) === undefined) return null
+      if (latestReplyExchangeStart(agent.session) === undefined) {
+        return BasicCompactionEngine.prototype.compactIfNeeded.call(
+          this.baseCompactionReceiver(), agent, trigger, signal,
+        )
+      }
+      signal.throwIfAborted()
+      this.ctx.get('toolResultPruner')?.pruneSession(agent.session)
+      signal.throwIfAborted()
+      const range = overflowRangeBeforeLatestReply(agent.session)
+      return range === null
+        ? null
+        : this.compactRegion(range.start, range.end, agent, signal)
     }
     const boundary = firstStepBoundary(agent.session)
     if (boundary === undefined) return null
@@ -207,15 +218,57 @@ export class RpConversationSummaryEngine extends BasicCompactionEngine {
 }
 
 function parentTarget(agent) {
-  const routed = agent.session.requestHeader?.()?.config
-  if (typeof routed?.provider === 'string' && routed.provider.length > 0
-    && typeof routed?.model === 'string' && routed.model.length > 0) {
-    return { provider: routed.provider, model: routed.model }
-  }
+  const routed = sessionTarget(agent.session)
+  if (routed !== undefined) return routed
   const options = agent.options ?? {}
   if (typeof options.provider !== 'string' || options.provider.length === 0
     || typeof options.model !== 'string' || options.model.length === 0) return undefined
   return { provider: options.provider, model: options.model }
+}
+
+function sessionTarget(session) {
+  const routed = session.requestHeader?.()?.config
+  if (typeof routed?.provider === 'string' && routed.provider.length > 0
+    && typeof routed?.model === 'string' && routed.model.length > 0) {
+    return { provider: routed.provider, model: routed.model }
+  }
+  return undefined
+}
+
+/**
+ * Select the oldest compactable prefix while retaining the newest completed
+ * Roleplay exchange. Provider overflow happens after the current input has
+ * entered the Surface, so token-tail retention alone would otherwise keep that
+ * input and shadow the latest model prose.
+ */
+function overflowRangeBeforeLatestReply(session) {
+  const nodes = Array.isArray(session?.surface?.nodes) ? session.surface.nodes : []
+  if (nodes.length === 0) return null
+  const keepFrom = latestReplyExchangeStart(session)
+  const keepFromIndex = keepFrom === undefined ? -1 : nodes.indexOf(keepFrom)
+  if (keepFromIndex <= 0) return null
+
+  let endIndex = keepFromIndex - 1
+  while (endIndex >= 0 && !toolPairingBalancedAfter(session, nodes[endIndex])) endIndex -= 1
+  if (endIndex < 0 || !toolPairingBalancedBefore(session, nodes[0])) return null
+  return { start: nodes[0], end: nodes[endIndex] }
+}
+
+/** Return the first active message in the exchange owning the latest model reply. */
+function latestReplyExchangeStart(session) {
+  const transcript = roleplayTranscriptMessages(session)
+  let replyIndex = transcript.findLastIndex(message => message?.role === 'assistant')
+  if (replyIndex < 0) return undefined
+  while (replyIndex > 0 && transcript[replyIndex - 1]?.role === 'user') replyIndex -= 1
+  const anchorId = transcript[replyIndex]?.id
+  if (typeof anchorId !== 'string' || anchorId.length === 0) return undefined
+  return session.surface.nodes.find(seq => surfaceMessage(session.events[seq])?.id === anchorId)
+}
+
+function surfaceMessage(event) {
+  if (event?.type === 'user/message') return event.data
+  if (event?.type === 'assistant/message') return event.data?.message
+  return undefined
 }
 
 function firstStepBoundary(session) {
