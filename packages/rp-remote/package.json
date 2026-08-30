@@ -42,7 +42,7 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm run build:host && node --test test/*.test.js",
     "build:host": "tsc -b tsconfig.json && tsdown --config tsdown.host.config.js --config-loader native",
-    "build:client": "pnpm run build:host && tsdown --config tsdown.client.config.js --config-loader native",
+    "build:client": "pnpm run build:host && tsdown --config tsdown.client.config.js --config-loader native && node scripts/normalize-client-bundle.mjs",
     "verify": "pnpm run check && pnpm test && pnpm run build:client"
   },
   "dsh": {

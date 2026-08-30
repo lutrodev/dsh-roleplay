@@ -51,7 +51,7 @@ corepack enable
 pnpm install --frozen-lockfile
 ```
 
-当前锁文件使用已发布的 DSH `0.1.2-alpha.2`，可直接完成独立安装。需要与上游最新源码联调时，把 `deepseek-harness` checkout 放在同一集成工作区，再从工作区根目录运行 `./dev.sh --dump-config` 做无端口配置校验，或运行 `./dev.sh` 联调；启动脚本会把所需 DSH packages 链接到固定的本地 checkout，且不会把本地路径写进公开 lockfile。
+当前锁文件使用已发布的 DSH `0.1.2-alpha.2`，可直接完成独立安装。需要与上游最新源码联调时，把 `deepseek-harness` checkout 放在同一集成工作区，再从工作区根目录运行 `./dev.sh --dump-config` 做无端口配置校验，或运行 `./dev.sh` 联调；启动脚本以公开 lockfile 固定所有外部依赖，只把所需 DSH packages 与 Sharp 替换为固定 checkout 中的本地物理链接，并在启动前校验最终依赖图，不会把本地路径写进公开 lockfile。
 
 ### 检查与构建
 

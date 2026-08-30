@@ -7,22 +7,24 @@
   "type": "module",
   "scripts": {
     "check:compat": "node tools/check-harness-compat.mjs",
+    "test:compat": "node --test tools/check-harness-compat.test.mjs",
     "check:dev": "node --check scripts/dev.mjs",
     "test:dev": "node --test scripts/dev.test.mjs",
     "check": "pnpm run check:compat && pnpm run check:dev && pnpm -r --if-present run check",
-    "test": "pnpm run test:dev && pnpm -r --if-present run test",
+    "test": "pnpm run test:compat && pnpm run test:dev && pnpm -r --if-present run test",
     "build:host": "tsc -b tsconfig.host.json && pnpm --filter dsh-roleplay-rp-remote run build:host",
     "build": "pnpm run build:host && pnpm -r --if-present --filter '!dsh-roleplay-rp-remote' run build:client && pnpm --filter dsh-roleplay-rp-remote run build:client",
     "build:package": "pnpm run build && node scripts/build-npm-package.mjs",
     "pack:package": "pnpm run build:package && npm pack ./.npm-package",
     "publish:package": "pnpm run build:package && npm publish ./.npm-package --access public",
-    "verify": "pnpm run check:compat && pnpm run check:dev && pnpm run test:dev && pnpm -r --if-present run verify",
+    "verify": "pnpm run check:compat && pnpm run test:compat && pnpm run check:dev && pnpm run test:dev && pnpm -r --if-present run verify",
     "dev": "node scripts/dev.mjs",
     "dev:config": "node scripts/dev.mjs --dump-config"
   },
   "devDependencies": {
     "@deepseek-ai/dsh": "0.1.2-alpha.2",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "yaml": "2.9.0"
   },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
