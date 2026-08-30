@@ -58,6 +58,15 @@ test('the previous full feature set adopts compact access mode without changing 
   assert.deepEqual(migrateLegacyFeatureSelection(['dialogue-highlight']), ['dialogue-highlight'])
 })
 
+test('the retired writer history id is removed without accepting arbitrary unknown features', () => {
+  assert.deepEqual(
+    migrateLegacyFeatureSelection(['lore-book', 'writer-history', 'message-actions']),
+    ['lore-book', 'message-actions'],
+  )
+  assert.throws(() => migrateLegacyFeatureSelection(['future-feature']), /unknown feature/)
+  assert.throws(() => migrateLegacyFeatureSelection(['writer-history', 'writer-history']), /duplicates/)
+})
+
 test('Roleplay Skills are independently selected in catalog order', () => {
   assert.deepEqual(normalizeSkillSelection(['rp-guide-state', 'rp-guide-character-card']), [
     'rp-guide-character-card',

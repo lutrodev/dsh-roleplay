@@ -8,6 +8,7 @@ import {
   MAX_QUICK_REPLIES,
   normalizeQuickReplies,
   insertQuickReply,
+  planQuickReplyEdits,
 } from '../src/protocol.js'
 
 class MemorySettings extends SettingsProvider {
@@ -42,28 +43,52 @@ test('validates the complete reply collection at exact and over-limit boundaries
     { id: 'same-a', label: '继续', content: 'A' },
     { id: 'same-b', label: '继续', content: 'B' },
   ]), error => error.code === 'DUPLICATE_LABEL')
+  assert.throws(() => normalizeQuickReplies([
+    { id: 'invalid-cursor', label: '无效', content: '内容', cursorPosition: 'start' },
+  ]), error => error.code === 'INVALID_REQUEST')
+  assert.deepEqual(normalizeQuickReplies([
+    { id: 'legacy-pair', label: '旧括号', content: '（）' },
+    { id: 'legacy-text', label: '旧文本', content: '继续' },
+  ]), [
+    { id: 'legacy-pair', label: '旧括号', content: '（）', cursorPosition: 'middle' },
+    { id: 'legacy-text', label: '旧文本', content: '继续', cursorPosition: 'end' },
+  ])
 })
 
-test('inserts ordinary replies and wraps selections with paired delimiters', () => {
+test('places the caret in the configured middle or end and preserves paired selection text', () => {
   assert.deepEqual(DEFAULT_QUICK_REPLIES.slice(0, 2), [
-    { id: 'double-quote', label: '“”', content: '“”' },
-    { id: 'parentheses', label: '（）', content: '（）' },
+    { id: 'double-quote', label: '“”', content: '“”', cursorPosition: 'middle' },
+    { id: 'parentheses', label: '（）', content: '（）', cursorPosition: 'middle' },
   ])
-  assert.deepEqual(insertQuickReply('港口', '继续', { start: 2, end: 2 }), {
+  assert.deepEqual(insertQuickReply('港口', '继续', { start: 2, end: 2 }, 'end'), {
     text: '港口继续', selection: { start: 4, end: 4 },
   })
-  assert.deepEqual(insertQuickReply('港口', '（）', { start: 2, end: 2 }), {
+  assert.deepEqual(insertQuickReply('港口', '（）', { start: 2, end: 2 }, 'middle'), {
     text: '港口（）', selection: { start: 3, end: 3 },
   })
-  assert.deepEqual(insertQuickReply('hello', '“”', { start: 1, end: 4 }), {
-    text: 'h“ell”o', selection: { start: 2, end: 5 },
+  assert.deepEqual(insertQuickReply('港口', '（）', { start: 2, end: 2 }, 'end'), {
+    text: '港口（）', selection: { start: 4, end: 4 },
   })
-  assert.deepEqual(insertQuickReply('hello', '()', { start: 5, end: 5 }), {
+  assert.deepEqual(insertQuickReply('hello', '“”', { start: 1, end: 4 }, 'middle'), {
+    text: 'h“ell”o', selection: { start: 2, end: 2 },
+  })
+  assert.deepEqual(insertQuickReply('hello', '“”', { start: 1, end: 4 }, 'end'), {
+    text: 'h“”o', selection: { start: 3, end: 3 },
+  })
+  assert.deepEqual(insertQuickReply('hello', '()', { start: 5, end: 5 }, 'middle'), {
     text: 'hello()', selection: { start: 6, end: 6 },
   })
-  assert.deepEqual(insertQuickReply('hello', '""', { start: 1, end: 4 }), {
-    text: 'h"ell"o', selection: { start: 2, end: 5 },
+  assert.deepEqual(insertQuickReply('', '🙂🙂', { start: 0, end: 0 }, 'middle'), {
+    text: '🙂🙂', selection: { start: 2, end: 2 },
   })
+  assert.deepEqual(planQuickReplyEdits('“”', { start: 1, end: 4 }, 'middle'), [
+    { start: 4, end: 4, text: '”' },
+    { start: 1, end: 1, text: '“' },
+  ])
+  assert.deepEqual(planQuickReplyEdits('🙂继续', { start: 3, end: 3 }, 'middle'), [
+    { start: 3, end: 3, text: '🙂继续' },
+    { start: 5, end: 5, text: '' },
+  ])
 })
 
 test('publishes defaults and persists edits through the typed Remote boundary', async () => {
@@ -87,7 +112,7 @@ test('publishes defaults and persists edits through the typed Remote boundary', 
     assert.equal(initial.value.value.writable, true)
     assert.equal(initial.value.value.revision, 0)
 
-    const replies = [{ id: 'nod', label: '点头', content: '*轻轻点头*' }]
+    const replies = [{ id: 'nod', label: '点头', content: '*轻轻点头*', cursorPosition: 'end' }]
     const updated = await handler('replace', { replies, expectedRevision: 0 })
     assert.equal(updated.value.ok, true)
     assert.deepEqual(updated.value.value.replies, replies)

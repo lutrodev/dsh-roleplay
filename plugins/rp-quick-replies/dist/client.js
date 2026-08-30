@@ -6385,21 +6385,25 @@ get: (_target, key) => {
 		const QUICK_REPLIES_RPC_PATH = "/rp-quick-replies";
 		const MAX_QUICK_REPLY_CONTENT_CHARACTERS = 2e3;
 		const MAX_QUICK_REPLY_TOTAL_CHARACTERS = 8e3;
+		const QUICK_REPLY_CURSOR_POSITION_MIDDLE = "middle";
 		Object.freeze([
 			Object.freeze({
 				id: "double-quote",
 				label: "“”",
-				content: "“”"
+				content: "“”",
+				cursorPosition: QUICK_REPLY_CURSOR_POSITION_MIDDLE
 			}),
 			Object.freeze({
 				id: "parentheses",
 				label: "（）",
-				content: "（）"
+				content: "（）",
+				cursorPosition: QUICK_REPLY_CURSOR_POSITION_MIDDLE
 			}),
 			Object.freeze({
 				id: "continue",
 				label: "继续",
-				content: "继续"
+				content: "继续",
+				cursorPosition: "end"
 			})
 		]);
 		const PAIRS = /* @__PURE__ */ new Map([
@@ -6436,49 +6440,88 @@ get: (_target, key) => {
 				if (content === void 0 || content.trim().length === 0) throw coded("INVALID_REQUEST", `Quick reply ${index + 1} needs content.`);
 				const contentCharacters = characters(content);
 				if (contentCharacters > 2e3) throw coded("LIMIT_EXCEEDED", `Quick reply content cannot exceed ${MAX_QUICK_REPLY_CONTENT_CHARACTERS} characters.`);
+				const cursorPosition = item.cursorPosition === void 0 ? legacyCursorPosition(content) : text(item.cursorPosition);
+				if (cursorPosition !== "middle" && cursorPosition !== "end") throw coded("INVALID_REQUEST", `Quick reply ${index + 1} has an invalid cursor position.`);
 				totalCharacters += contentCharacters;
 				return {
 					id,
 					label,
-					content
+					content,
+					cursorPosition
 				};
 			});
 			if (totalCharacters > 8e3) throw coded("LIMIT_EXCEEDED", `Quick replies cannot exceed ${MAX_QUICK_REPLY_TOTAL_CHARACTERS} total characters.`);
 			return replies;
 		}
-		/** Insert one reply at the current textarea selection, wrapping selected text for paired delimiters. */
-		function insertQuickReply(draft, content, selection) {
-			const source = typeof draft === "string" ? draft : "";
+		/** Build the ordered editor edits that insert one reply and leave a collapsed caret at the requested position. */
+		function planQuickReplyEdits(content, selection, cursorPosition) {
 			const insertion = typeof content === "string" ? content : "";
-			const start = coordinate(selection?.start, source.length);
-			const end = Math.max(start, coordinate(selection?.end, source.length));
+			const start = nonNegativeCoordinate(selection?.start);
+			const end = Math.max(start, nonNegativeCoordinate(selection?.end));
+			if ((cursorPosition === void 0 ? legacyCursorPosition(insertion) : cursorPosition) === "end") return [{
+				start,
+				end,
+				text: insertion
+			}];
 			const pair = PAIRS.get(insertion);
-			if (pair !== void 0) {
+			if (pair !== void 0 && start < end) {
 				const [open, close] = pair;
-				const selected = source.slice(start, end);
-				return {
-					text: `${source.slice(0, start)}${open}${selected}${close}${source.slice(end)}`,
-					selection: selected.length === 0 ? {
-						start: start + open.length,
-						end: start + open.length
-					} : {
-						start: start + open.length,
-						end: start + open.length + selected.length
-					}
-				};
+				return [{
+					start: end,
+					end,
+					text: close
+				}, {
+					start,
+					end: start,
+					text: open
+				}];
 			}
-			const caret = start + insertion.length;
+			const middle = pair?.[0].length ?? middleOffset(insertion);
+			return [{
+				start,
+				end,
+				text: insertion
+			}, {
+				start: start + middle,
+				end: start + middle,
+				text: ""
+			}];
+		}
+		/** Insert one reply at the current plain-text selection and return its requested caret placement. */
+		function insertQuickReply(draft, content, selection, cursorPosition) {
+			const source = typeof draft === "string" ? draft : "";
+			const start = coordinate(selection?.start, source.length);
+			const edits = planQuickReplyEdits(content, {
+				start,
+				end: Math.max(start, coordinate(selection?.end, source.length))
+			}, cursorPosition);
+			let text = source;
+			let caret = start;
+			for (const edit of edits) {
+				text = `${text.slice(0, edit.start)}${edit.text}${text.slice(edit.end)}`;
+				caret = edit.start + edit.text.length;
+			}
 			return {
-				text: `${source.slice(0, start)}${insertion}${source.slice(end)}`,
+				text,
 				selection: {
 					start: caret,
 					end: caret
 				}
 			};
 		}
+		function legacyCursorPosition(content) {
+			return PAIRS.has(content) ? QUICK_REPLY_CURSOR_POSITION_MIDDLE : "end";
+		}
+		function middleOffset(value) {
+			const characters = [...value];
+			return characters.slice(0, Math.floor(characters.length / 2)).join("").length;
+		}
 		function coordinate(value, maximum) {
 			if (!Number.isSafeInteger(value)) return maximum;
 			return Math.min(Math.max(value, 0), maximum);
+		}
+		function nonNegativeCoordinate(value) {
+			return Number.isSafeInteger(value) ? Math.max(value, 0) : 0;
 		}
 		function characters(value) {
 			return [...value].length;
@@ -6622,20 +6665,29 @@ get: (_target, key) => {
 		}
 		//#endregion
 		//#region src/client.js
-		const inject = ["slots", "rpRemote"];
+		const inject = [
+			"slots",
+			"rpRemote",
+			"sessions",
+			"conversation"
+		];
 		const h = react.default.createElement;
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
 			const store = createQuickReplyStore(ctx.rpRemote);
+			const applyTextEdits = createScopedTextEditor(ctx.sessions, ctx.conversation);
 			ctx.slots.inject("conversation.input.right", () => ctx.slots.register({
 				name: "conversation.input.right",
 				id: "rp-quick-replies",
 				order: 70,
-				inject: () => ({ store })
+				inject: () => ({
+					store,
+					applyTextEdits
+				})
 			}, QuickReplyControl));
 		}
 		function QuickReplyControl(props) {
-			const { input, inputActions, sessionId, useSession, useSessions, store } = props;
+			const { input, inputActions, sessionId, useSession, useSessions, store, applyTextEdits } = props;
 			const roleplay = useSessions((state) => {
 				const summary = state.byId?.[sessionId];
 				return isRoleplaySessionSummary(summary) && summary.origin !== "subagent";
@@ -6643,6 +6695,7 @@ get: (_target, key) => {
 			const removed = useSession((state) => state.removed === true);
 			const state = (0, react.useSyncExternalStore)(store.subscribe, store.getSnapshot);
 			const controlRef = (0, react.useRef)(null);
+			const selectionRef = (0, react.useRef)(null);
 			const [menuOpen, setMenuOpen] = (0, react.useState)(false);
 			const busy = removed || input.phase === "adjudicating" || input.phase === "submitting";
 			(0, react.useEffect)(() => {
@@ -6658,7 +6711,13 @@ get: (_target, key) => {
 			const inlineReplies = ready ? state.replies.slice(0, 3) : [];
 			const selectReply = (reply, target) => {
 				if (busy) return;
-				applyReplyToComposer(inputActions, input.draft, reply.content, target);
+				applyReplyToComposer(inputActions, input.draft, reply.content, target, reply.cursorPosition, {
+					applyTextEdits,
+					inputState: input,
+					selection: selectionRef.current,
+					sessionId
+				});
+				selectionRef.current = null;
 				setMenuOpen(false);
 			};
 			const menuItems = ready ? state.replies.map((reply) => ({
@@ -6706,7 +6765,7 @@ get: (_target, key) => {
 				"aria-expanded": menuOpen,
 				disabled: removed,
 				whileTap: { scale: .94 },
-				onMouseDown: (event) => keepComposerFocus(event, input.draft),
+				onMouseDown: (event) => keepComposerFocus(event, input, selectionRef),
 				onClick: () => setMenuOpen((open) => !open)
 			}, h(_deepseek_ai_dsh_client_ui_primitives.IconEllipsisOutline16, { size: 16 })));
 			return h(MotionConfig, { reducedMotion: "user" }, h(LazyMotion, {
@@ -6729,7 +6788,7 @@ get: (_target, key) => {
 				"aria-label": `插入快捷回复：${reply.label}`,
 				whileHover: { y: -1 },
 				whileTap: { scale: .96 },
-				onMouseDown: (event) => keepComposerFocus(event, input.draft),
+				onMouseDown: (event) => keepComposerFocus(event, input, selectionRef),
 				onClick: (event) => selectReply(reply, event.currentTarget)
 			}, h("span", null, reply.label)))), hasMenu ? h(_deepseek_ai_dsh_client_ui_primitives.Menu, {
 				key: "quick-reply-menu",
@@ -6755,38 +6814,189 @@ get: (_target, key) => {
 				"data-has-preview": hasPreview ? "true" : "false"
 			}, h("strong", null, reply.label), hasPreview ? h("small", null, content) : null);
 		}
-		function applyReplyToComposer(inputActions, draft, content, target) {
-			const textarea = findComposerTextarea(target);
-			const next = insertQuickReply(draft, content, textarea === null ? {
-				start: draft.length,
-				end: draft.length
+		function applyReplyToComposer(inputActions, draft, content, target, cursorPosition, options = {}) {
+			const inputState = options.inputState ?? {
+				draft,
+				draftRev: 0,
+				occurrences: []
+			};
+			let selection = options.selection ?? captureComposerSelection(target, inputState);
+			if (selection.kind === "detect" && selection.draftRev !== inputState.draftRev) {
+				const end = detectLength(inputState);
+				selection = {
+					kind: "detect",
+					start: end,
+					end,
+					draftRev: inputState.draftRev
+				};
+			}
+			const next = insertQuickReply(draft, content, selection.kind === "detect" ? {
+				start: detectToClipboardOffset(selection.start, inputState.occurrences),
+				end: detectToClipboardOffset(selection.end, inputState.occurrences)
 			} : {
-				start: textarea.selectionStart ?? draft.length,
-				end: textarea.selectionEnd ?? draft.length
-			});
+				start: selection.start,
+				end: selection.end
+			}, cursorPosition);
+			if (selection.kind === "detect" && typeof options.applyTextEdits === "function") {
+				const edits = planQuickReplyEdits(content, selection, cursorPosition);
+				if (options.applyTextEdits(options.sessionId, edits, selection.draftRev, next) === true) return next;
+			}
 			inputActions.setDraft(next.text);
+			const textarea = findComposerTextarea(target);
 			if (textarea !== null) requestAnimationFrame(() => {
 				textarea.focus({ preventScroll: true });
 				textarea.setSelectionRange(next.selection.start, next.selection.end);
 			});
 			return next;
 		}
+		/** Apply an ordered edit plan through the scoped public input event, preserving Lexical nodes around the span. */
+		function createScopedTextEditor(sessions, conversation) {
+			return (sessionId, edits, expectedRevision, fallback) => {
+				const actx = sessions.scope(sessionId);
+				if (actx === void 0) return false;
+				const input = conversation.input.for(actx);
+				let applied = 0;
+				for (const edit of edits) {
+					const state = input.state.getSnapshot();
+					if (applied === 0 && state.draftRev !== expectedRevision) return false;
+					if (!(actx.bail(actx, "slash/input-insert-text", {
+						text: edit.text,
+						span: {
+							start: edit.start,
+							end: edit.end,
+							draftRev: state.draftRev
+						}
+					}) === true)) {
+						if (applied === 0) return false;
+						input.setDraft(fallback.text);
+						const recovered = input.state.getSnapshot();
+						actx.bail(actx, "slash/input-insert-text", {
+							text: "",
+							span: {
+								start: fallback.selection.start,
+								end: fallback.selection.start,
+								draftRev: recovered.draftRev
+							}
+						});
+						return true;
+					}
+					applied += 1;
+				}
+				return true;
+			};
+		}
+		/** Capture the native composer selection in the Lexical detect-coordinate plane. */
+		function captureComposerSelection(target, inputState) {
+			const end = detectLength(inputState);
+			const textarea = findComposerTextarea(target);
+			if (textarea !== null) return {
+				kind: "clipboard",
+				start: textarea.selectionStart ?? inputState.draft.length,
+				end: textarea.selectionEnd ?? inputState.draft.length
+			};
+			const editor = findComposerEditor(target);
+			const nativeSelection = document.getSelection();
+			if (editor === null || nativeSelection === null || nativeSelection.anchorNode === null || nativeSelection.focusNode === null || !editor.contains(nativeSelection.anchorNode) || !editor.contains(nativeSelection.focusNode)) return {
+				kind: "detect",
+				start: end,
+				end,
+				draftRev: inputState.draftRev
+			};
+			const anchor = detectOffsetOfDomPoint(editor, nativeSelection.anchorNode, nativeSelection.anchorOffset, end);
+			const focus = detectOffsetOfDomPoint(editor, nativeSelection.focusNode, nativeSelection.focusOffset, end);
+			return {
+				kind: "detect",
+				start: Math.min(anchor, focus),
+				end: Math.max(anchor, focus),
+				draftRev: inputState.draftRev
+			};
+		}
 		function findComposerTextarea(target) {
 			if (!(target instanceof Element)) return null;
 			const textarea = target.closest("[data-composer-card]")?.querySelector("textarea");
 			return textarea instanceof HTMLTextAreaElement ? textarea : null;
 		}
-		function keepComposerFocus(event, draft) {
+		function findComposerEditor(target) {
+			if (!(target instanceof Element)) return null;
+			const editor = target.closest("[data-composer-card]")?.querySelector("[data-composer-input][contenteditable=\"true\"]");
+			return editor instanceof HTMLElement ? editor : null;
+		}
+		function keepComposerFocus(event, inputState, selectionRef) {
 			event.preventDefault();
 			const textarea = findComposerTextarea(event.currentTarget);
-			if (textarea === null || document.activeElement === textarea) return;
-			if (textarea.selectionStart === 0 && textarea.selectionEnd === 0 && draft.length > 0) textarea.setSelectionRange(draft.length, draft.length);
+			if (textarea !== null && document.activeElement !== textarea && textarea.selectionStart === 0 && textarea.selectionEnd === 0 && inputState.draft.length > 0) textarea.setSelectionRange(inputState.draft.length, inputState.draft.length);
+			selectionRef.current = captureComposerSelection(event.currentTarget, inputState);
+		}
+		function detectLength(inputState) {
+			const draft = typeof inputState?.draft === "string" ? inputState.draft : "";
+			const occurrences = Array.isArray(inputState?.occurrences) ? inputState.occurrences : [];
+			return Math.max(0, draft.length - occurrences.reduce((total, occurrence) => total + Math.max(0, safeLength(occurrence?.length) - 1), 0));
+		}
+		function detectToClipboardOffset(offset, occurrences) {
+			let expansion = 0;
+			for (const occurrence of Array.isArray(occurrences) ? occurrences : []) {
+				const length = safeLength(occurrence?.length);
+				if (offset <= safeLength(occurrence?.offset) - expansion) break;
+				expansion += Math.max(0, length - 1);
+			}
+			return offset + expansion;
+		}
+		function detectOffsetOfDomPoint(editor, node, offset, expectedLength) {
+			try {
+				const range = document.createRange();
+				range.setStart(editor, 0);
+				range.setEnd(node, offset);
+				const complete = domMetrics(editor);
+				const actualBreaks = Math.min(complete.breaks, Math.max(0, expectedLength - complete.base));
+				const partial = domMetrics(range.cloneContents());
+				let result = partial.base + Math.min(partial.breaks, actualBreaks);
+				if (node === editor && offset > 0 && offset < editor.childNodes.length) {
+					const before = [...editor.childNodes].slice(0, offset).some((child) => child instanceof Element);
+					const after = [...editor.childNodes].slice(offset).some((child) => child instanceof Element);
+					if (before && after) result += 1;
+				}
+				return Math.min(Math.max(result, 0), expectedLength);
+			} catch {
+				return expectedLength;
+			}
+		}
+		function domMetrics(root) {
+			let base = 0;
+			let breaks = 0;
+			const topLevelElements = [...root.childNodes].filter((child) => child instanceof Element).length;
+			base += Math.max(0, topLevelElements - 1);
+			const visit = (node) => {
+				if (node.nodeType === Node.TEXT_NODE) {
+					base += node.textContent?.length ?? 0;
+					return;
+				}
+				if (!(node instanceof Element)) return;
+				if (node.matches("[data-composer-chip]")) {
+					base += 1;
+					return;
+				}
+				if (node.tagName === "BR") {
+					breaks += 1;
+					return;
+				}
+				for (const child of node.childNodes) visit(child);
+			};
+			for (const child of root.childNodes) visit(child);
+			return {
+				base,
+				breaks
+			};
+		}
+		function safeLength(value) {
+			return Number.isSafeInteger(value) && value > 0 ? value : 0;
 		}
 		//#endregion
 		exports.QuickReplyControl = QuickReplyControl;
 		exports.apply = apply;
 		exports.applyReplyToComposer = applyReplyToComposer;
+		exports.captureComposerSelection = captureComposerSelection;
 		exports.createQuickReplyStore = createQuickReplyStore;
+		exports.createScopedTextEditor = createScopedTextEditor;
 		exports.inject = inject;
 		return module.exports;
 	}

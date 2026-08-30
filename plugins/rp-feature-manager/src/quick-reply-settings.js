@@ -10,7 +10,12 @@ import {
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createQuickReplyStore, friendlyQuickReplyRequestError } from 'dsh-roleplay-rp-quick-replies/client-store'
-import { DEFAULT_QUICK_REPLIES, normalizeQuickReplies } from 'dsh-roleplay-rp-quick-replies/protocol'
+import {
+  DEFAULT_QUICK_REPLIES,
+  QUICK_REPLY_CURSOR_POSITION_END,
+  QUICK_REPLY_CURSOR_POSITION_MIDDLE,
+  normalizeQuickReplies,
+} from 'dsh-roleplay-rp-quick-replies/protocol'
 import { css } from './client-styles.generated.js'
 
 const h = React.createElement
@@ -60,7 +65,9 @@ function QuickReplyEditor({ state, store, onClose }) {
     const used = new Set(draft.map(reply => reply.label))
     let ordinal = draft.length + 1
     while (used.has(`新回复 ${ordinal}`)) ordinal += 1
-    setDraft(current => [...current, { id: createReplyId(), label: `新回复 ${ordinal}`, content: '' }])
+    setDraft(current => [...current, {
+      id: createReplyId(), label: `新回复 ${ordinal}`, content: '', cursorPosition: QUICK_REPLY_CURSOR_POSITION_END,
+    }])
   }
   const save = async event => {
     event.preventDefault()
@@ -89,7 +96,7 @@ function QuickReplyEditor({ state, store, onClose }) {
     onClose: saving ? () => {} : onClose,
     title: '设置快捷回复',
     closeLabel: '关闭快捷回复设置',
-    description: '前三项会显示在输入栏；更多项目会收进“更多快捷回复”菜单。点击后只会插入草稿，不会立即发送。',
+    description: '前三项会显示在输入栏；更多项目会收进“更多快捷回复”菜单。每项可设置插入后光标停在内容中间或末尾，点击后不会立即发送。',
     className: css.quickDialog,
     contentClassName: css.quickDialogContent,
     footer,
@@ -149,7 +156,16 @@ function ReplyEditorRow({ reply, index, total, limits, saving, reduced, onUpdate
         placeholder: '填写点击后插入输入框的完整内容',
         'aria-label': `第 ${index + 1} 项插入内容`,
         onChange: event => onUpdate('content', event.target.value),
-      }))),
+      })),
+    h('label', { className: css.quickCursorField },
+      h('span', null, '光标位置'),
+      h('select', {
+        value: reply.cursorPosition, disabled: saving,
+        'aria-label': `第 ${index + 1} 项光标位置`,
+        onChange: event => onUpdate('cursorPosition', event.target.value),
+      },
+      h('option', { value: QUICK_REPLY_CURSOR_POSITION_MIDDLE }, '中间'),
+      h('option', { value: QUICK_REPLY_CURSOR_POSITION_END }, '末尾')))),
   h('div', { className: css.quickRowActions },
     h(ActionButton, { label: '上移', disabled: saving || index === 0, onClick: () => onMove(-1) }, h(IconChevronUpOutline14, { size: 14 })),
     h(ActionButton, { label: '下移', disabled: saving || index === total - 1, onClick: () => onMove(1) }, h(IconChevronDownOutline14, { size: 14 })),

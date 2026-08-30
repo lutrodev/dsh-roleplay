@@ -230,7 +230,7 @@ flowchart LR
 | `rp-compat-mvu` | 无实体的 MVU 社区适配；内聚角色卡源、开场、世界书初始化与只读模板语义 | character import transformer、Host/preset session materializer、lore activation adapter、开场/角色卡控制块文本转换 |
 
 | `rp-library` | 资产入口编排、会话绑定、Roleplay 引导、唯一资料编辑器能力注册表、故事上下文工作台、只读 State Wiki，以及活动运行边界；不持有五类资料字段 schema | typed Remote `roleplay.assets`、`rpAssetEditors`、Sidebar、Composer dock、`rp-run-marker` Conversation Node |
-| `rp-quick-replies` | 全局可复用快捷回复设置；只把用户选择的内容写入当前浏览器草稿，不自动提交、不建立消息或 Session 旁路事实源；编辑器由功能管理器的“快捷回复”功能卡打开 | Settings `rp-quick-replies`、typed Remote `roleplay.quickReplies`、公开 `./client-store`、`conversation.input.right`、`InputActions.setDraft()` |
+| `rp-quick-replies` | 全局可复用快捷回复及插入后光标位置设置；只把用户选择的内容写入当前浏览器草稿，不自动提交、不建立消息或 Session 旁路事实源；编辑器由功能管理器的“快捷回复”功能卡打开 | Settings `rp-quick-replies`、typed Remote `roleplay.quickReplies`、公开 `./client-store`、`conversation.input.right`、Session scope 的 `slash/input-insert-text` |
 | `rp-message-avatar` | 用户消息、开场与普通助手回复的统一头像展示 | 三类自定义 Conversation Nodes、公开 `conversation.chat.node` renderer、局部 Portal、角色卡与人设 typed Remote |
 | `rp-message-actions` | Roleplay 消息复制、行内编辑、后缀删除、同会话重新生成、保存并重新生成、分支、回复指标及失败恢复 | typed Remote `roleplay.messageActions`、`rpMessageAction`、原生 surface replacement、自定义 Conversation Nodes、`conversation.chat.node` / `commandview` / `turnTail`、局部 Portal |
 | `rp-dialogue-highlight` | Roleplay 助手正文的成对引号橙色高亮，不改写消息事实或占用可见操作 | 公开 `conversation.chat.assistant-actions` 隐藏锚点；优先使用 CSS Custom Highlight API，缺失或不可用时使用脱离 React 消息树的无障碍隐藏镜像层 |

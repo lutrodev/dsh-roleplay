@@ -269,6 +269,30 @@ test('manager publishes its enabled selection through the shared settings namesp
   }
 })
 
+test('manager keeps settings writable through a caller context without the settings service', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  ctx.provide('loader', { entries: () => [], async await() {} })
+  try {
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(ManagerPlugin, { enabledFeatures: ['lore-book'] })
+
+    const callerCtx = ctx.isolate('settings')
+    assert.equal(callerCtx.get('settings'), undefined)
+    const manager = callerCtx.get('rpFeatures')
+    assert.deepEqual(manager.status().settings, { writable: true, revision: 0 })
+
+    const updated = await manager.setSetting({
+      field: 'enabledFeatures', value: ['state'], expectedRevision: 0,
+    })
+    assert.deepEqual(updated.enabledFeatures, ['state'])
+    assert.deepEqual(updated.settings, { writable: true, revision: 1 })
+    assert.deepEqual(ctx.settings.get('roleplay-features').enabledFeatures, ['state'])
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
 test('browser API follows the typed Remote boundary and persists Roleplay settings remotely', async () => {
   const ctx = new Context()
   let handler
@@ -375,6 +399,38 @@ test('manager persists compact access mode without changing the saved display ch
     await manager.settled()
     assert.deepEqual(ctx.settings.get('roleplay-features').enabledFeatures, migratedDefaults)
     assert.deepEqual(manager.snapshot().enabledFeatures, migratedDefaults)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('manager registers writable settings and removes the retired writer history id', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  ctx.provide('loader', { entries: () => [], async await() {} })
+  try {
+    await ctx.plugin(MemorySettings, {
+      document: {
+        'roleplay-features': {
+          enabledFeatures: ['lore-book', 'writer-history', 'message-actions'],
+          enabledSkills: [],
+          harnessIdentity: '',
+        },
+      },
+    })
+    await ctx.plugin(ManagerPlugin, { enabledFeatures: [] })
+    const manager = ctx.get('rpFeatures')
+    await manager.settled()
+
+    assert.deepEqual(ctx.settings.get('roleplay-features').enabledFeatures, ['lore-book', 'message-actions'])
+    assert.deepEqual(manager.status().settings, { writable: true, revision: 1 })
+
+    const callerCtx = ctx.isolate('settings')
+    const updated = await callerCtx.get('rpFeatures').setSetting({
+      field: 'enabledFeatures', value: ['state'], expectedRevision: 1,
+    })
+    assert.deepEqual(updated.enabledFeatures, ['state'])
+    assert.deepEqual(updated.settings, { writable: true, revision: 2 })
   } finally {
     await ctx.fiber.dispose()
   }

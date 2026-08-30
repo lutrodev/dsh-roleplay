@@ -21,8 +21,8 @@ import {
   assertFeatureSelection,
   assertSkillSelection,
   migrateLegacyFeatureSelection,
-  normalizeFeatureSelection,
   normalizeSkillSelection,
+  RETIRED_FEATURE_IDS,
 } from './selection.js'
 import { satisfiesVersion } from './version.js'
 
@@ -41,7 +41,9 @@ export const MAX_HARNESS_IDENTITY_CHARACTERS = 4000
 export const name = 'rp-feature-manager'
 export const inject = ['loader', 'systemPrompt', 'rpRemote']
 export const Config = Schema.object({
-  enabledFeatures: Schema.array(Schema.union(FEATURE_IDS)).default(DEFAULT_ENABLED_FEATURES),
+  // The schema must be able to decode persisted ids from released versions so
+  // installSection can register the namespace before migration removes them.
+  enabledFeatures: Schema.array(Schema.union([...FEATURE_IDS, ...RETIRED_FEATURE_IDS])).default(DEFAULT_ENABLED_FEATURES),
   enabledSkills: Schema.array(Schema.union(SKILL_IDS)).default(DEFAULT_ENABLED_SKILLS),
   harnessIdentity: Schema.string().default(''),
 })
@@ -50,8 +52,13 @@ export const Config = Schema.object({
 export class RpFeatureManager extends Service {
   constructor(ctx, config, harnessSections) {
     super(ctx, 'rpFeatures')
+    // Cordis traceable service proxies rebind `this.ctx` to the caller. Keep
+    // the provider context and injected Settings service stable so browser
+    // Remote calls cannot lose access to Host-owned capabilities.
+    this.selfCtx = ctx
+    this.settingsService = undefined
     this.source = () => config
-    this.enabled = normalizeFeatureSelection(config.enabledFeatures)
+    this.enabled = migrateLegacyFeatureSelection(config.enabledFeatures)
     this.enabledSkills = normalizeSkillSelection(config.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
     this.harnessSections = harnessSections
     this.defaultHarnessIdentity = requiredHarnessIdentity(harnessSections)
@@ -64,7 +71,9 @@ export class RpFeatureManager extends Service {
     this.environment = inspectEnvironment()
 
     ctx.inject(['settings'], settingsCtx => {
-      settingsCtx.settings.installSection(ctx, ROLEPLAY_SETTINGS_NAMESPACE, Config, config, {
+      const settings = settingsCtx.settings
+      this.settingsService = settings
+      settings.installSection(ctx, ROLEPLAY_SETTINGS_NAMESPACE, Config, config, {
         setSource: source => { this.source = source },
         validate: value => {
           migrateLegacyFeatureSelection(value.enabledFeatures)
@@ -73,7 +82,10 @@ export class RpFeatureManager extends Service {
         },
         onChange: () => { this.refresh() },
       })
-      this.migrationTail = this.migrationTail.then(() => migratePersistedSelection(settingsCtx.settings))
+      this.migrationTail = this.migrationTail.then(() => migratePersistedSelection(settings))
+      settingsCtx.effect(() => () => {
+        if (this.settingsService === settings) this.settingsService = undefined
+      }, 'rpFeatures.settings()')
     })
 
     ctx.on('loader/entry-init', entry => {
@@ -149,7 +161,7 @@ export class RpFeatureManager extends Service {
   }
 
   status() {
-    const loaderEntries = loaderEntriesFor(this.ctx)
+    const loaderEntries = loaderEntriesFor(this.selfCtx)
     return {
       roleplay: { version: ROLEPLAY_SUITE_VERSION },
       dsh: this.environment.dsh,
@@ -191,11 +203,11 @@ export class RpFeatureManager extends Service {
 
   /** Project the current runtime-owned prompt composition for read-only settings inspection. */
   async promptPreview() {
-    const subagentManager = this.ctx.get('rpSubagentManager')
+    const subagentManager = this.selfCtx.get('rpSubagentManager')
     const subagentProfile = this.isEnabled('subagent-manager') && subagentManager?.prepareRuntimeProfile !== undefined
       ? await subagentManager.prepareRuntimeProfile()
       : undefined
-    this.updateHarnessSections(await resolveHarnessPromptSections(this.ctx))
+    this.updateHarnessSections(await resolveHarnessPromptSections(this.selfCtx))
     return buildRoleplayPromptPreview({
       stateEnabled: this.isEnabled('state'),
       subagentsEnabled: this.isEnabled('subagent-manager'),
@@ -228,7 +240,7 @@ export class RpFeatureManager extends Service {
   }
 
   settingsStatus() {
-    const settings = this.ctx.get('settings')
+    const settings = this.settingsService
     const descriptor = settings?.describe().find(item => item.ns === SETTINGS_NAMESPACE)
     return {
       writable: settings?.writable === true && descriptor !== undefined,
@@ -237,7 +249,7 @@ export class RpFeatureManager extends Service {
   }
 
   requireWritableSettings() {
-    const settings = this.ctx.get('settings')
+    const settings = this.settingsService
     const registered = settings?.describe().some(item => item.ns === SETTINGS_NAMESPACE) === true
     if (settings?.writable !== true || !registered) {
       throw new Error('rp-feature-manager: Roleplay settings are not writable')
@@ -247,7 +259,7 @@ export class RpFeatureManager extends Service {
 
   refresh() {
     const source = this.source()
-    const next = normalizeFeatureSelection(source.enabledFeatures)
+    const next = migrateLegacyFeatureSelection(source.enabledFeatures)
     const nextSkills = normalizeSkillSelection(source.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
     const nextOverride = normalizeHarnessIdentityOverride(source.harnessIdentity)
     const nextIdentity = nextOverride ?? this.defaultHarnessIdentity
@@ -263,7 +275,7 @@ export class RpFeatureManager extends Service {
     const listeners = [...this.listeners]
     this.listenerTail = this.listenerTail.then(async () => {
       for (const listener of listeners) {
-        try { await listener(snapshot) } catch (error) { this.ctx.logger.warn(error) }
+        try { await listener(snapshot) } catch (error) { this.selfCtx.logger.warn(error) }
       }
     })
   }
@@ -271,9 +283,9 @@ export class RpFeatureManager extends Service {
   scheduleReconcile() {
     this.reconcileTail = this.reconcileTail
       .then(async () => {
-        for (const entry of loaderEntriesFor(this.ctx)) await this.reconcileEntry(entry)
+        for (const entry of loaderEntriesFor(this.selfCtx)) await this.reconcileEntry(entry)
       })
-      .catch(error => { this.ctx.logger.warn(error) })
+      .catch(error => { this.selfCtx.logger.warn(error) })
   }
 
   async reconcileEntry(entry) {

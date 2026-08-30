@@ -5,6 +5,8 @@ import {
   MAX_QUICK_REPLY_CONTENT_CHARACTERS,
   MAX_QUICK_REPLY_LABEL_CHARACTERS,
   MAX_QUICK_REPLY_TOTAL_CHARACTERS,
+  QUICK_REPLY_CURSOR_POSITION_END,
+  QUICK_REPLY_CURSOR_POSITION_MIDDLE,
   QUICK_REPLIES_RPC_PATH,
   QUICK_REPLIES_SETTINGS_NAMESPACE,
   normalizeQuickReplies,
@@ -15,6 +17,7 @@ const QUICK_REPLY_CONFIG = Schema.object({
   id: Schema.string().required(),
   label: Schema.string().required(),
   content: Schema.string().required(),
+  cursorPosition: Schema.union([QUICK_REPLY_CURSOR_POSITION_MIDDLE, QUICK_REPLY_CURSOR_POSITION_END]),
 })
 
 export const name = 'rp-quick-replies'

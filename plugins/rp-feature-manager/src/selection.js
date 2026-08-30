@@ -8,6 +8,8 @@ import {
 
 const KNOWN_IDS = new Set(FEATURE_IDS)
 const KNOWN_SKILL_IDS = new Set(SKILL_IDS)
+export const RETIRED_FEATURE_IDS = Object.freeze(['writer-history'])
+const RETIRED_IDS = new Set(RETIRED_FEATURE_IDS)
 const LEGACY_DEFAULTS_BEFORE_COMPACT_ACCESS_MODE = Object.freeze(
   FEATURE_IDS.filter(id => id !== 'state-display' && id !== 'compact-access-mode'),
 )
@@ -58,12 +60,12 @@ export function assertFeatureSelection(value) {
  * explicit. Every other incomplete selection still fails loud.
  */
 export function migrateLegacyFeatureSelection(value) {
-  const normalized = normalizeFeatureSelection(value)
-  if (new Set(value).size !== value.length) throw new TypeError('enabledFeatures must not contain duplicates')
+  const current = removeRetiredFeatureIds(value)
+  const normalized = normalizeFeatureSelection(current)
   if (sameSelection(normalized, LEGACY_DEFAULTS_BEFORE_COMPACT_ACCESS_MODE)) {
     return LEGACY_DEFAULTS_BEFORE_STATE_DISPLAY_DEFAULT_ON
   }
-  const actual = new Set(value)
+  const actual = new Set(current)
   const missing = normalized.filter(id => !actual.has(id))
   if (missing.length === 1
     && missing[0] === 'state'
@@ -72,7 +74,27 @@ export function migrateLegacyFeatureSelection(value) {
     && actual.has('lore-book')) {
     return normalized
   }
-  return assertFeatureSelection(value)
+  return assertFeatureSelection(current)
+}
+
+/**
+ * Remove only feature ids that were shipped by an older Roleplay release and
+ * are now unconditional or obsolete. Unknown ids remain hard errors so a
+ * corrupt or future configuration cannot be silently rewritten.
+ */
+function removeRetiredFeatureIds(value) {
+  if (!Array.isArray(value)) throw new TypeError('enabledFeatures must be an array')
+  const seen = new Set()
+  const current = []
+  for (const id of value) {
+    if (typeof id !== 'string' || (!KNOWN_IDS.has(id) && !RETIRED_IDS.has(id))) {
+      throw new TypeError(`enabledFeatures contains an unknown feature: ${String(id)}`)
+    }
+    if (seen.has(id)) throw new TypeError('enabledFeatures must not contain duplicates')
+    seen.add(id)
+    if (!RETIRED_IDS.has(id)) current.push(id)
+  }
+  return current
 }
 
 function sameSelection(left, right) {

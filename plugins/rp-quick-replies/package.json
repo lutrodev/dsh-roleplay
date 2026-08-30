@@ -35,6 +35,7 @@
       "inject": [
         "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-api-session-controller",
         "dsh-roleplay-rp-remote"
       ],
       "platform": "web"
@@ -47,6 +48,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
     "@deepseek-ai/dsh-settings": "^0.1.2-alpha.2",
+    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
     "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
     "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
     "dsh-roleplay-rp-remote": "^0.1.7"
@@ -55,6 +57,7 @@
     "@testing-library/react": "16.3.2",
     "@deepseek-ai/cordis": "4.0.2",
     "@deepseek-ai/dsh-settings": "0.1.2-alpha.2",
+    "@deepseek-ai/dsh-api-session-controller": "0.1.2-alpha.2",
     "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.2",
     "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
     "jsdom": "29.1.1",

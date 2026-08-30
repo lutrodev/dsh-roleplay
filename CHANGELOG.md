@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- 快捷回复新增逐项“中间／末尾”光标位置设置，并改用原生会话输入事件在真实富文本草稿的当前光标或选区插入内容。
+- 修复 Cordis 4.0.2 通过浏览器 Remote 调用服务时重绑定上下文，导致 Roleplay 功能开关和“编辑统一身份”被误判为不可写并全部禁用。
+- 修复升级后遗留的 `writer-history` 功能 ID 阻断 Roleplay Settings 注册，导致所有功能开关和统一身份编辑一起禁用；启动时会移除并持久化这个已下线 ID。
 - 保持 Roleplay 套件版本 0.1.7 并对齐 DSH `0.1.2-alpha.2`：Prompt 顺序与 Settings 注册改用服务 API，开发依赖同步到 Cordis 4.0.2、Loader 1.0.3、Include 1.0.7、Group 1.0.2 与 Schemastery 3.18.2，并重新生成 Typert Remote 产物。
 - 加强 Harness 兼容门禁：除 package manifest 外，同时校验公开 lockfile 中的直接与传递 DSH 解析版本，并通过 pnpm 的 lockfile-only peer 检查阻止不一致依赖图。
 - 主角控制边界集中到 Core：允许合理对白和行动，只把重大或不可逆选择留给用户，包括亲密或危险情境中的同意、形成承诺或改变关系与目标；默认预设同时允许安静过渡和自然收束。

@@ -301,11 +301,14 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
 
     fireEvent.change(await screen.findByLabelText('第 1 项按钮名称'), { target: { value: '旁白' } })
     fireEvent.change(screen.getByLabelText('第 1 项插入内容'), { target: { value: '请从旁白视角继续。' } })
+    fireEvent.change(screen.getByLabelText('第 1 项光标位置'), { target: { value: 'end' } })
     fireEvent.click(screen.getByRole('button', { name: '保存快捷回复' }))
 
     await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-quick-replies', 'replace', expect.objectContaining({ expectedRevision: 0 })))
     const replaceCall = connection.call.mock.calls.find(([, endpoint]) => endpoint === 'replace')
-    expect(replaceCall[2].replies[0]).toEqual({ id: 'double-quote', label: '旁白', content: '请从旁白视角继续。' })
+    expect(replaceCall[2].replies[0]).toEqual({
+      id: 'double-quote', label: '旁白', content: '请从旁白视角继续。', cursorPosition: 'end',
+    })
   })
 
   it('功能未启用时保留可发现但不可点击的设置入口', async () => {

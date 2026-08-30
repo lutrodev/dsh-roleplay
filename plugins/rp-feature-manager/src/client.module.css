@@ -680,11 +680,12 @@
 .quickFields {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(120px, .38fr) minmax(0, 1fr);
+  grid-template-columns: minmax(105px, .32fr) minmax(0, 1fr) minmax(90px, .22fr);
   gap: 10px;
 }
 
 .quickLabelField,
+.quickCursorField,
 .quickContentField {
   display: flex;
   min-width: 0;
@@ -696,6 +697,7 @@
 }
 
 .quickLabelField > span,
+.quickCursorField > span,
 .quickContentField > span {
   display: flex;
   justify-content: space-between;
@@ -711,6 +713,7 @@
 }
 
 .quickLabelField input,
+.quickCursorField select,
 .quickContentField textarea {
   width: 100%;
   box-sizing: border-box;
@@ -727,6 +730,12 @@
   padding: 8px 9px;
 }
 
+.quickCursorField select {
+  min-height: 38px;
+  padding: 8px 9px;
+  cursor: pointer;
+}
+
 .quickContentField textarea {
   min-height: 58px;
   resize: vertical;
@@ -734,6 +743,7 @@
 }
 
 .quickLabelField input:focus,
+.quickCursorField select:focus,
 .quickContentField textarea:focus {
   border-color: var(--dsw-alias-state-business-primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);

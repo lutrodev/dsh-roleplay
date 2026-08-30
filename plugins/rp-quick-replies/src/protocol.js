@@ -6,10 +6,19 @@ export const MAX_QUICK_REPLY_LABEL_CHARACTERS = 12
 export const MAX_QUICK_REPLY_CONTENT_CHARACTERS = 2000
 export const MAX_QUICK_REPLY_TOTAL_CHARACTERS = 8000
 
+export const QUICK_REPLY_CURSOR_POSITION_MIDDLE = 'middle'
+export const QUICK_REPLY_CURSOR_POSITION_END = 'end'
+
 export const DEFAULT_QUICK_REPLIES = Object.freeze([
-  Object.freeze({ id: 'double-quote', label: '“”', content: '“”' }),
-  Object.freeze({ id: 'parentheses', label: '（）', content: '（）' }),
-  Object.freeze({ id: 'continue', label: '继续', content: '继续' }),
+  Object.freeze({
+    id: 'double-quote', label: '“”', content: '“”', cursorPosition: QUICK_REPLY_CURSOR_POSITION_MIDDLE,
+  }),
+  Object.freeze({
+    id: 'parentheses', label: '（）', content: '（）', cursorPosition: QUICK_REPLY_CURSOR_POSITION_MIDDLE,
+  }),
+  Object.freeze({
+    id: 'continue', label: '继续', content: '继续', cursorPosition: QUICK_REPLY_CURSOR_POSITION_END,
+  }),
 ])
 
 const PAIRS = new Map([
@@ -59,8 +68,14 @@ export function normalizeQuickReplies(value) {
     if (contentCharacters > MAX_QUICK_REPLY_CONTENT_CHARACTERS) {
       throw coded('LIMIT_EXCEEDED', `Quick reply content cannot exceed ${MAX_QUICK_REPLY_CONTENT_CHARACTERS} characters.`)
     }
+    const cursorPosition = item.cursorPosition === undefined
+      ? legacyCursorPosition(content)
+      : text(item.cursorPosition)
+    if (cursorPosition !== QUICK_REPLY_CURSOR_POSITION_MIDDLE && cursorPosition !== QUICK_REPLY_CURSOR_POSITION_END) {
+      throw coded('INVALID_REQUEST', `Quick reply ${index + 1} has an invalid cursor position.`)
+    }
     totalCharacters += contentCharacters
-    return { id, label, content }
+    return { id, label, content, cursorPosition }
   })
   if (totalCharacters > MAX_QUICK_REPLY_TOTAL_CHARACTERS) {
     throw coded('LIMIT_EXCEEDED', `Quick replies cannot exceed ${MAX_QUICK_REPLY_TOTAL_CHARACTERS} total characters.`)
@@ -68,33 +83,64 @@ export function normalizeQuickReplies(value) {
   return replies
 }
 
-/** Insert one reply at the current textarea selection, wrapping selected text for paired delimiters. */
-export function insertQuickReply(draft, content, selection) {
-  const source = typeof draft === 'string' ? draft : ''
+/** Build the ordered editor edits that insert one reply and leave a collapsed caret at the requested position. */
+export function planQuickReplyEdits(content, selection, cursorPosition) {
   const insertion = typeof content === 'string' ? content : ''
+  const start = nonNegativeCoordinate(selection?.start)
+  const end = Math.max(start, nonNegativeCoordinate(selection?.end))
+  const resolvedCursorPosition = cursorPosition === undefined ? legacyCursorPosition(insertion) : cursorPosition
+  if (resolvedCursorPosition === QUICK_REPLY_CURSOR_POSITION_END) {
+    return [{ start, end, text: insertion }]
+  }
+  const pair = PAIRS.get(insertion)
+  if (pair !== undefined && start < end) {
+    const [open, close] = pair
+    return [
+      { start: end, end, text: close },
+      { start, end: start, text: open },
+    ]
+  }
+  const middle = pair?.[0].length ?? middleOffset(insertion)
+  return [
+    { start, end, text: insertion },
+    { start: start + middle, end: start + middle, text: '' },
+  ]
+}
+
+/** Insert one reply at the current plain-text selection and return its requested caret placement. */
+export function insertQuickReply(draft, content, selection, cursorPosition) {
+  const source = typeof draft === 'string' ? draft : ''
   const start = coordinate(selection?.start, source.length)
   const end = Math.max(start, coordinate(selection?.end, source.length))
-  const pair = PAIRS.get(insertion)
-  if (pair !== undefined) {
-    const [open, close] = pair
-    const selected = source.slice(start, end)
-    return {
-      text: `${source.slice(0, start)}${open}${selected}${close}${source.slice(end)}`,
-      selection: selected.length === 0
-        ? { start: start + open.length, end: start + open.length }
-        : { start: start + open.length, end: start + open.length + selected.length },
-    }
+  const edits = planQuickReplyEdits(content, { start, end }, cursorPosition)
+  let text = source
+  let caret = start
+  for (const edit of edits) {
+    text = `${text.slice(0, edit.start)}${edit.text}${text.slice(edit.end)}`
+    caret = edit.start + edit.text.length
   }
-  const caret = start + insertion.length
   return {
-    text: `${source.slice(0, start)}${insertion}${source.slice(end)}`,
+    text,
     selection: { start: caret, end: caret },
   }
+}
+
+function legacyCursorPosition(content) {
+  return PAIRS.has(content) ? QUICK_REPLY_CURSOR_POSITION_MIDDLE : QUICK_REPLY_CURSOR_POSITION_END
+}
+
+function middleOffset(value) {
+  const characters = [...value]
+  return characters.slice(0, Math.floor(characters.length / 2)).join('').length
 }
 
 function coordinate(value, maximum) {
   if (!Number.isSafeInteger(value)) return maximum
   return Math.min(Math.max(value, 0), maximum)
+}
+
+function nonNegativeCoordinate(value) {
+  return Number.isSafeInteger(value) ? Math.max(value, 0) : 0
 }
 
 function characters(value) { return [...value].length }
