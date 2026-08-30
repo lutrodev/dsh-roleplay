@@ -40,7 +40,7 @@ test('registers import_character_card and reads bytes through the Harness filesy
   try {
     apply(ctx, {
       libraryDir,
-      maxInputBytes: 8 * 1024 * 1024,
+      maxInputBytes: 20 * 1024 * 1024,
       maxTextCharacters: 150000,
     })
     await new Promise(resolve => setImmediate(resolve))
@@ -51,7 +51,7 @@ test('registers import_character_card and reads bytes through the Harness filesy
       { path: '/workspace/tool-card.PNG' },
       { signal: new AbortController().signal },
     )
-    assert.equal(requestedMaxBytes, 8 * 1024 * 1024)
+    assert.equal(requestedMaxBytes, 20 * 1024 * 1024)
     assert.equal(result.name, 'Tool Imported')
     assert.equal(result.format, 'character_card_v2')
     assert.equal(JSON.parse(await readFile(result.characterPath, 'utf8')).name, 'Tool Imported')
@@ -305,12 +305,12 @@ test('accepts a large complete import under the raised card text limit', async (
   try {
     apply(ctx, {
       libraryDir,
-      maxInputBytes: 8 * 1024 * 1024,
-      maxTextCharacters: 1000000,
+      maxInputBytes: 20 * 1024 * 1024,
+      maxTextCharacters: 2_000_000,
       registerTool: false,
       exposeBrowser: false,
     })
-    const bytes = Buffer.from(JSON.stringify({ name: 'Limit Card', description: 'x'.repeat(400000) }))
+    const bytes = Buffer.from(JSON.stringify({ name: 'Limit Card', description: 'x'.repeat(800000) }))
     const result = await ctx.rpCharacterCards.import(bytes, { path: 'limit-card.json' })
     assert.equal(result.name, 'Limit Card')
   } finally {

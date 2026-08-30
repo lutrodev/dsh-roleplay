@@ -45,8 +45,8 @@
         maxWriterBriefCharacters: 4096
         maxSubagentPromptCharacters: 20000
         maxSessionProfileBytes: 262144
-        maxCardInputBytes: 8388608
-        maxCardTextCharacters: 1000000
+        maxCardInputBytes: 20971520
+        maxCardTextCharacters: 2000000
         maxStateNamespacesInContext: 32
         maxLoreInputBytes: 2097152
         maxLoreTokens: 4096
@@ -99,8 +99,8 @@
       name: dsh-roleplay-rp-character-card
       config:
         libraryDir: !!js (process.env.DSH_ROLEPLAY_DATA_DIR ?? './.dsh-roleplay') + '/characters'
-        maxInputBytes: 8388608
-        maxTextCharacters: 1000000
+        maxInputBytes: 20971520
+        maxTextCharacters: 2000000
         registerTool: false
         exposeBrowser: true
     - id: rp-mvu-import

@@ -12,8 +12,8 @@ export const inject = []
 
 export const Config = Schema.object({
   libraryDir: Schema.string().required(),
-  maxInputBytes: Schema.number().default(8 * 1024 * 1024),
-  maxTextCharacters: Schema.number().default(1000000),
+  maxInputBytes: Schema.number().default(20 * 1024 * 1024),
+  maxTextCharacters: Schema.number().default(2_000_000),
   registerTool: Schema.boolean().default(true),
   exposeBrowser: Schema.boolean().default(false),
 })

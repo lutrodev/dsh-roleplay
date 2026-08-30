@@ -27,6 +27,8 @@ test('角色卡入口使用独立的资料卡图标', async () => {
 test('角色卡导入由覆盖按钮区域的原生文件输入直接打开', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
   const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
+  assert.match(client, /const MAX_IMPORT_BYTES = 20 \* 1024 \* 1024/)
+  assert.match(client, /不超过 20 MiB、文本总量不超过 2,000,000 字符/)
   assert.match(client, /className: css\.fileInput, type: 'file'/)
   assert.match(client, /'aria-label': '导入角色卡 PNG 或 JSON'/)
   assert.doesNotMatch(client, /\.current\?\.click\(\)|hidden: true/)

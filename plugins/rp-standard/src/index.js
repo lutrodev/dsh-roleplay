@@ -9,7 +9,7 @@ import { normalizeInitialSubagents } from 'dsh-roleplay-rp-subagent-manager'
 const PRESET_ID = 'roleplay'
 const PRESET_OWNER = 'dsh-roleplay-rp-standard'
 // Bump whenever managed composition or bundled guidance Skill files change.
-const PRESET_VERSION = 35
+const PRESET_VERSION = 36
 const MARKER_FILE = '.rp-standard.json'
 const COMPOSITION_FILE = 'agent.cordis.yml'
 const METADATA_FILE = 'preset.yml'
@@ -74,8 +74,8 @@ export const Config = Schema.object({
   maxWriterBriefCharacters: Schema.number().default(4096),
   maxSubagentPromptCharacters: Schema.number().default(20000),
   maxSessionProfileBytes: Schema.number().default(262144),
-  maxCardInputBytes: Schema.number().default(8388608),
-  maxCardTextCharacters: Schema.number().default(1000000),
+  maxCardInputBytes: Schema.number().default(20971520),
+  maxCardTextCharacters: Schema.number().default(2000000),
   maxStateNamespacesInContext: Schema.number().default(32),
   maxLoreInputBytes: Schema.number().default(2097152),
   maxLoreTokens: Schema.number().default(4096),

@@ -10485,6 +10485,7 @@ get: (_target, key) => {
 		];
 		const h = react.default.createElement;
 		const MODAL_SCROLL_LOCK = Symbol.for("dsh-roleplay.asset-modal-scroll-lock");
+		const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
 			ctx.effect(() => ctx.rpAssetEditors.register("character", CharacterSessionEditor), "rp-character-card: canonical session editor");
@@ -10573,7 +10574,7 @@ get: (_target, key) => {
 				setError(null);
 				try {
 					for (const file of files) {
-						if (file.size > 8 * 1024 * 1024) throw Object.assign(/* @__PURE__ */ new Error("文件超过 8 MiB"), { code: "LIMIT_EXCEEDED" });
+						if (file.size > MAX_IMPORT_BYTES) throw Object.assign(/* @__PURE__ */ new Error("文件超过 20 MiB"), { code: "LIMIT_EXCEEDED" });
 						await rpc(connection, "import", {
 							name: file.name,
 							mimeType: normalizedMime(file),
@@ -11144,7 +11145,7 @@ get: (_target, key) => {
 			if (code === "ASSET_CORRUPT") return "暂时无法读取这张角色卡的必要信息，角色卡没有删除。请返回列表刷新后重试。";
 			if (code === "ASSET_NOT_FOUND") return "这张角色卡已不存在，请返回列表后刷新。";
 			if (code === "REVISION_CONFLICT") return "相关对话的资料刚刚发生变化，角色卡没有删除。请重试。";
-			if (code === "LIMIT_EXCEEDED") return "文件太大，请选择不超过 8 MiB 的文件。";
+			if (code === "LIMIT_EXCEEDED") return "文件或文本内容过大，请选择不超过 20 MiB、文本总量不超过 2,000,000 字符的角色卡。";
 			if (code === "DUPLICATE_CARD" || code === "DUPLICATE_ASSET") return "这张角色卡已经导入过了。";
 			if (code === "UNSUPPORTED_FORMAT") return "请选择 PNG 或 JSON 格式的角色卡文件。";
 			if (code === "INVALID_CHARACTER_DATA" || code === "INVALID_PNG" || code === "INVALID_PNG_TEXT" || code === "INVALID_REQUEST") return "无法识别这张角色卡，请检查文件后再试。";
