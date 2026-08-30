@@ -27,7 +27,7 @@ dsh plugin --profile web add -w @lutrodev/dsh-roleplay
 
 GitHub 仓库用于查看源码、调试和参与开发；普通使用请安装 npm 包。
 
-> 当前 `main` 上的 0.1.7 正在适配 DSH `0.1.2-alpha.1`。该 DSH alpha 的 workspace packages 尚未发布到 npm，因此 0.1.7 暂不能从全新 checkout 独立安装或发布；上面的 npm 命令仍对应已发布的稳定版。维护者联调请使用同时包含 `deepseek-harness/`、`dsh-roleplay/` 与根目录 `dev.sh` 的本地集成工作区。
+> 当前 `main` 保持 Roleplay 版本 0.1.7，并适配已经发布到 npm 的 DSH `0.1.2-alpha.2`。全新 checkout 可以按下方流程独立安装；与最新 Harness 源码联调时，仍建议使用同时包含 `deepseek-harness/`、`dsh-roleplay/` 与根目录 `dev.sh` 的本地集成工作区。
 
 ## 使用方式
 
@@ -51,7 +51,7 @@ corepack enable
 pnpm install --frozen-lockfile
 ```
 
-上述独立安装流程适用于已发布依赖。开发 0.1.7 alpha 适配时，先把上游 `deepseek-harness` checkout 放在同一集成工作区，再从工作区根目录运行 `./dev.sh --dump-config` 做无端口配置校验，或运行 `./dev.sh` 联调；启动脚本会把所需 DSH packages 链接到固定的本地 checkout，且不会把本地路径写进公开 lockfile。
+当前锁文件使用已发布的 DSH `0.1.2-alpha.2`，可直接完成独立安装。需要与上游最新源码联调时，把 `deepseek-harness` checkout 放在同一集成工作区，再从工作区根目录运行 `./dev.sh --dump-config` 做无端口配置校验，或运行 `./dev.sh` 联调；启动脚本会把所需 DSH packages 链接到固定的本地 checkout，且不会把本地路径写进公开 lockfile。
 
 ### 检查与构建
 

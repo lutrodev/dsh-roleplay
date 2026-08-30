@@ -6,6 +6,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import LlmRuntime, { ToolCallId, LlmAdapter, createUserMessage } from '@deepseek-ai/dsh-llm'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import * as RpCore from '../src/index.js'
@@ -62,6 +63,7 @@ async function loopContext(adapter, writerOutputs) {
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(TokenMeter)
   await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt, { includeHarnessIdentity: false })
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)

@@ -3,8 +3,6 @@ import { readFileSync } from 'node:fs'
 import { dirname, parse, resolve } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
-import { FIRST_PARTY_SECTION_ORDER } from '@deepseek-ai/dsh-system-prompt'
 import { buildRoleplayPromptPreview } from 'dsh-roleplay-rp-core/prompts'
 import {
   CORE_PACKAGES,
@@ -35,12 +33,7 @@ export * from './version.js'
 const require = createRequire(import.meta.url)
 const FEATURE_IDS = FEATURE_CATALOG.map(item => item.id)
 const RP_PACKAGE_RANGE = ROLEPLAY_SUITE_VERSION
-const ROLEPLAY_SETTINGS_NAMESPACE = settingsNamespace(SETTINGS_NAMESPACE)
-const HARNESS_PROMPT_SECTIONS = new Map([
-  ['harness:identity', { id: 'harness-identity', order: FIRST_PARTY_SECTION_ORDER.HARNESS_IDENTITY, source: 'dsh-system-prompt' }],
-  ['harness:source', { id: 'harness-source', order: FIRST_PARTY_SECTION_ORDER.HARNESS_SOURCE, source: 'dsh-app-boot' }],
-  ['app:web-surface', { id: 'app-web-surface', order: FIRST_PARTY_SECTION_ORDER.WEB_SURFACE, source: 'dsh-web-app' }],
-])
+const ROLEPLAY_SETTINGS_NAMESPACE = SETTINGS_NAMESPACE
 
 /** Maximum length of the Roleplay-wide Harness identity override. */
 export const MAX_HARNESS_IDENTITY_CHARACTERS = 4000
@@ -70,16 +63,16 @@ export class RpFeatureManager extends Service {
     this.migrationTail = Promise.resolve()
     this.environment = inspectEnvironment()
 
-    installSettingsSection(ctx, ROLEPLAY_SETTINGS_NAMESPACE, Config, config, {
-      setSource: source => { this.source = source },
-      validate: value => {
-        migrateLegacyFeatureSelection(value.enabledFeatures)
-        assertSkillSelection(value.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
-        normalizeHarnessIdentityOverride(value.harnessIdentity)
-      },
-      onChange: () => { this.refresh() },
-    })
     ctx.inject(['settings'], settingsCtx => {
+      settingsCtx.settings.installSection(ctx, ROLEPLAY_SETTINGS_NAMESPACE, Config, config, {
+        setSource: source => { this.source = source },
+        validate: value => {
+          migrateLegacyFeatureSelection(value.enabledFeatures)
+          assertSkillSelection(value.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
+          normalizeHarnessIdentityOverride(value.harnessIdentity)
+        },
+        onChange: () => { this.refresh() },
+      })
       this.migrationTail = this.migrationTail.then(() => migratePersistedSelection(settingsCtx.settings))
     })
 
@@ -350,10 +343,15 @@ export function loaderEntriesFor(ctx) {
 
 /** Read the exact Harness-owned System sections from the active Web runtime. */
 async function resolveHarnessPromptSections(ctx) {
+  const harnessPromptSections = new Map([
+    ['harness:identity', { id: 'harness-identity', order: ctx.systemPrompt.getSectionOrder('HARNESS_IDENTITY'), source: 'dsh-system-prompt' }],
+    ['harness:source', { id: 'harness-source', order: ctx.systemPrompt.getSectionOrder('HARNESS_SOURCE'), source: 'dsh-app-boot' }],
+    ['app:web-surface', { id: 'app-web-surface', order: ctx.systemPrompt.getSectionOrder('WEB_SURFACE'), source: 'dsh-web-app' }],
+  ])
   const assembly = await ctx.systemPrompt.assemble()
   const sections = []
   for (const section of assembly.sections) {
-    const metadata = HARNESS_PROMPT_SECTIONS.get(section.name)
+    const metadata = harnessPromptSections.get(section.name)
     if (metadata === undefined || typeof section.text !== 'string' || section.text.length === 0) continue
     sections.push({ ...metadata, name: section.name, text: section.text })
   }

@@ -26,7 +26,13 @@ test('Roleplay shadows harness:identity from the shared live identity provider',
   const ctx = new Context()
   const sections = []
   let identity = 'You are the shared Roleplay identity.'
-  ctx.provide('systemPrompt', { section(definition) { sections.push(definition) } })
+  ctx.provide('systemPrompt', {
+    getSectionOrder(name) {
+      assert.equal(name, 'HARNESS_IDENTITY')
+      return -1000
+    },
+    section(definition) { sections.push(definition) },
+  })
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return undefined } })
   ctx.provide('subagents', { async start() { throw new Error('not used') } })

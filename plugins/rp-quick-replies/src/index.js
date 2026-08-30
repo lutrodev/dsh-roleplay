@@ -1,5 +1,4 @@
 import Schema from '@deepseek-ai/schemastery'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import {
   DEFAULT_QUICK_REPLIES,
   MAX_QUICK_REPLIES,
@@ -11,7 +10,7 @@ import {
   normalizeQuickReplies,
 } from './protocol.js'
 
-const QUICK_REPLIES_NAMESPACE = settingsNamespace(QUICK_REPLIES_SETTINGS_NAMESPACE)
+const QUICK_REPLIES_NAMESPACE = QUICK_REPLIES_SETTINGS_NAMESPACE
 const QUICK_REPLY_CONFIG = Schema.object({
   id: Schema.string().required(),
   label: Schema.string().required(),
@@ -30,10 +29,12 @@ export class RpQuickReplies {
     this.ctx = ctx
     this.entry = { replies: normalizeQuickReplies(config.replies) }
     this.source = () => this.entry
-    installSettingsSection(ctx, QUICK_REPLIES_NAMESPACE, Config, this.entry, {
-      setSource: source => { this.source = source },
-      validate: value => { normalizeQuickReplies(value.replies) },
-      onChange: () => {},
+    ctx.inject(['settings'], settingsCtx => {
+      settingsCtx.settings.installSection(ctx, QUICK_REPLIES_NAMESPACE, Config, this.entry, {
+        setSource: source => { this.source = source },
+        validate: value => { normalizeQuickReplies(value.replies) },
+        onChange: () => {},
+      })
     })
   }
 

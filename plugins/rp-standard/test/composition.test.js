@@ -96,7 +96,13 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
       ] },
     },
   }))
-  ctx.provide('systemPrompt', { section() {} })
+  ctx.provide('systemPrompt', {
+    getSectionOrder(name) {
+      assert.equal(name, 'HARNESS_IDENTITY')
+      return -1000
+    },
+    section() {},
+  })
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('fs', {
     async resolve(path) { return { displayPath: path } },

@@ -26,13 +26,13 @@
     }
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.1"
+    "@deepseek-ai/schemastery": "^3.18.2"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-commands": "^0.1.2-alpha.1",
-    "@deepseek-ai/dsh-llm": "^0.1.2-alpha.1",
-    "@deepseek-ai/dsh-session-projection": "^0.1.2-alpha.1",
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-commands": "^0.1.2-alpha.2",
+    "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
+    "@deepseek-ai/dsh-session-projection": "^0.1.2-alpha.2",
     "dsh-roleplay-rp-core": "^0.1.0"
   },
   "peerDependenciesMeta": {
@@ -41,11 +41,11 @@
     }
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.1",
-    "@deepseek-ai/dsh-commands": "0.1.2-alpha.1",
-    "@deepseek-ai/dsh-llm": "0.1.2-alpha.1",
-    "@deepseek-ai/dsh-session": "0.1.2-alpha.1",
-    "@deepseek-ai/dsh-session-projection": "0.1.2-alpha.1",
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-commands": "0.1.2-alpha.2",
+    "@deepseek-ai/dsh-llm": "0.1.2-alpha.2",
+    "@deepseek-ai/dsh-session": "0.1.2-alpha.2",
+    "@deepseek-ai/dsh-session-projection": "0.1.2-alpha.2",
     "dsh-roleplay-rp-core": "workspace:^"
   },
   "engines": {

@@ -255,7 +255,6 @@ test('Roleplay pre-step context survives consecutive rerolls in the same Agent',
     textResponse('第二次重新生成'),
   ])
   const ctx = await loopContext(adapter)
-  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(Commands)
   ctx.provide('subagents', { async start() { throw new Error('subagent execution is outside this reroll test') } })
   ctx.provide('rpFeatures', { harnessIdentity: () => 'You are the Roleplay test identity.' })
@@ -505,6 +504,7 @@ async function loopContext(adapter) {
   })
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt, { includeHarnessIdentity: false })
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)

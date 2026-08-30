@@ -21,7 +21,7 @@
     "dev:config": "node scripts/dev.mjs --dump-config"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh": "0.1.2-alpha.1",
+    "@deepseek-ai/dsh": "0.1.2-alpha.2",
     "typescript": "6.0.3"
   },
   "engines": {

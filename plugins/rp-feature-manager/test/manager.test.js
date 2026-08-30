@@ -13,6 +13,11 @@ const HARNESS_SECTIONS = [
   { name: 'app:web-surface', text: 'You are using the Harness Web GUI.' },
   { name: 'deployment:persona', text: 'Host persona outside the Harness preamble.' },
 ]
+const HARNESS_SECTION_ORDERS = {
+  HARNESS_IDENTITY: -1000,
+  HARNESS_SOURCE: -900,
+  WEB_SURFACE: -800,
+}
 
 class MemorySettings extends SettingsProvider {
   constructor(ctx, config = {}) {
@@ -31,6 +36,7 @@ class MemorySettings extends SettingsProvider {
 
 function provideSystemPrompt(ctx, rpRemote = { register: () => () => {} }) {
   ctx.provide('systemPrompt', {
+    getSectionOrder(name) { return HARNESS_SECTION_ORDERS[name] },
     async assemble() {
       return { sections: structuredClone(HARNESS_SECTIONS), contexts: [], tools: [], variables: {} }
     },

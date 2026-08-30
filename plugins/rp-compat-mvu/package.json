@@ -30,7 +30,7 @@
     }
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.1",
+    "@deepseek-ai/schemastery": "^3.18.2",
     "yaml": "2.9.0"
   },
   "peerDependencies": {

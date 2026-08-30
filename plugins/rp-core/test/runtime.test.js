@@ -22,7 +22,7 @@ test('collects ordered context, validates effects and produces the sole commit m
   assert.equal(commitTool.parameters.additionalProperties, false)
   assert.equal(commitTool.parameters.properties.effects.items, undefined)
   const contractText = runtimeContract.text({ agent: { session: { header: {} } } })
-  assert.match(contractText, /adaptive mode.*infer from each user message/i)
+  assert.match(contractText, /adaptive mode, infer what the user is portraying or directing in each message/i)
   assert.match(contractText, /completed prose is inserted into the next assistant message/i)
   assert.match(contractText, /do not reproduce, quote, summarize, or revise it/i)
   assert.doesNotMatch(contractText, /required starting draft/i)

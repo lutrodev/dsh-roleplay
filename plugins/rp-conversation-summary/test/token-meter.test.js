@@ -3,12 +3,15 @@ import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import { createAssistantMessage } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { createRpMessageActionMetadata } from 'dsh-roleplay-rp-core/conversation'
 import { roleplayCompactionTokenMeter } from '../src/token-meter.js'
 
 test('compatibility metering is limited to validated Roleplay message-action assistants', () => {
-  const native = new TokenMeter(new Context())
+  const ctx = new Context()
+  new SessionProjectionRegistry(ctx)
+  const native = new TokenMeter(ctx)
   const meter = roleplayCompactionTokenMeter(native)
   const session = completedAssistantSession('rp-meter-action', '原始正文')
   const original = session.events.find(event => event.type === 'assistant/message')

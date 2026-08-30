@@ -106,7 +106,7 @@ function t(key) { return copy[key] ?? key }
 function statusView(enabledFeatures, enabledSkills, revision = 0) {
   return {
     roleplay: { version: '0.1.7' },
-    dsh: { version: '0.1.2-alpha.1', compatible: true },
+    dsh: { version: '0.1.2-alpha.2', compatible: true },
     compatible: true,
     problems: [],
     enabledFeatures: [...enabledFeatures],

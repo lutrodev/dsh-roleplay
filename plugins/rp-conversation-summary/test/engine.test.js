@@ -7,6 +7,7 @@ import LlmRuntime, {
   LlmAdapter,
 } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { isCompactCheckpointSource } from '@deepseek-ai/dsh-compaction'
 import {
@@ -383,6 +384,7 @@ async function createContext(adapter) {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(TokenMeter)
   ctx.llm.registerAdapter(['mock'], adapter)
   ctx.summaryFiber = await ctx.plugin(RpConversationSummaryEngine)
