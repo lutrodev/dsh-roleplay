@@ -321,6 +321,9 @@ importers:
       dsh-roleplay-rp-remote:
         specifier: workspace:^
         version: link:../../packages/rp-remote
+      dsh-roleplay-rp-reply-options:
+        specifier: workspace:^
+        version: link:../rp-reply-options
       dsh-roleplay-rp-session:
         specifier: workspace:^
         version: link:../rp-session
@@ -790,6 +793,52 @@ importers:
         specifier: 4.1.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(jsdom@29.1.1)(vite@8.2.2(@types/node@26.2.0)(yaml@2.9.0))
 
+  plugins/rp-reply-options:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: ^3.18.2
+        version: 3.18.2
+      motion:
+        specifier: 12.43.0
+        version: 12.43.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.0.2
+        version: 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.7)(@deepseek-ai/cordis-plugin-loader@1.0.3)
+      '@deepseek-ai/dsh-api-session-controller':
+        specifier: 0.1.2-alpha.2
+        version: 0.1.2-alpha.2(27f9c86387a2f40056a811357e76250d)
+      '@deepseek-ai/dsh-client-ui-conversation':
+        specifier: 0.1.2-alpha.2
+        version: 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.2)(typescript@6.0.3)
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: 0.1.2-alpha.2
+        version: 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.2)(react@18.3.1)
+      '@testing-library/react':
+        specifier: 16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      dsh-roleplay-rp-core:
+        specifier: workspace:^
+        version: link:../rp-core
+      dsh-roleplay-rp-ui:
+        specifier: workspace:^
+        version: link:../../packages/rp-ui
+      jsdom:
+        specifier: 29.1.1
+        version: 29.1.1
+      react:
+        specifier: 18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: 18.3.1
+        version: 18.3.1(react@18.3.1)
+      tsdown:
+        specifier: 0.22.2
+        version: 0.22.2(typescript@6.0.3)
+      vitest:
+        specifier: 4.1.8
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(jsdom@29.1.1)(vite@8.2.2(@types/node@26.2.0)(yaml@2.9.0))
+
   plugins/rp-session:
     dependencies:
       '@deepseek-ai/schemastery':
@@ -904,6 +953,9 @@ importers:
       dsh-roleplay-rp-quick-replies:
         specifier: workspace:^
         version: link:../rp-quick-replies
+      dsh-roleplay-rp-reply-options:
+        specifier: workspace:^
+        version: link:../rp-reply-options
       dsh-roleplay-rp-session:
         specifier: workspace:^
         version: link:../rp-session

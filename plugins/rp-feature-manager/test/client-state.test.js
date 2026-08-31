@@ -5,6 +5,7 @@ import {
   planFeatureToggle,
   planSkillToggle,
   promptPreview,
+  setReplyOptionsSettings,
   setRoleplaySetting,
   skillAvailability,
   toggleAnnouncement,
@@ -52,6 +53,7 @@ test('Roleplay setting writes use the suite RPC with revision guards', async () 
     { settings: { writable: true, revision: 4 } },
   )
   await unsetRoleplaySetting(connection, 'harnessIdentity', 4)
+  await setReplyOptionsSettings(connection, 3, ['试探', '', '离开'], 5)
   assert.deepEqual(calls, [
     {
       path: '/rp-features', endpoint: 'settings/set',
@@ -60,6 +62,10 @@ test('Roleplay setting writes use the suite RPC with revision guards', async () 
     {
       path: '/rp-features', endpoint: 'settings/unset',
       payload: { field: 'harnessIdentity', expectedRevision: 4 },
+    },
+    {
+      path: '/rp-features', endpoint: 'settings/reply-options',
+      payload: { count: 3, keywords: ['试探', '', '离开'], expectedRevision: 5 },
     },
   ])
 })

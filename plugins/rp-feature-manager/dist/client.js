@@ -6969,6 +6969,15 @@ get: (_target, key) => {
 				hostEntryIds: ["rp-quick-replies"]
 			}),
 			feature({
+				id: "reply-options",
+				category: "conversation",
+				label: "回复选项",
+				description: "在成功的剧情回复后提供由主模型生成的主角对白与行动，点击后直接发送。",
+				packageName: "dsh-roleplay-rp-reply-options",
+				hostEntryIds: ["rp-reply-options"],
+				runtimeKey: "replyOptions"
+			}),
+			feature({
 				id: "message-actions",
 				category: "conversation",
 				label: "消息操作",
@@ -7044,8 +7053,8 @@ get: (_target, key) => {
 		const KNOWN_SKILL_IDS = new Set(SKILL_IDS);
 		const RETIRED_FEATURE_IDS = Object.freeze(["writer-history"]);
 		new Set(RETIRED_FEATURE_IDS);
-		Object.freeze(FEATURE_IDS.filter((id) => id !== "state-display" && id !== "compact-access-mode"));
-		Object.freeze(FEATURE_IDS.filter((id) => id !== "state-display"));
+		Object.freeze(FEATURE_IDS.filter((id) => id !== "state-display" && id !== "compact-access-mode" && id !== "reply-options"));
+		Object.freeze(FEATURE_IDS.filter((id) => id !== "state-display" && id !== "reply-options"));
 		/** Normalize, close over hard prerequisites, and return catalog order. */
 		function normalizeFeatureSelection(value) {
 			if (!Array.isArray(value)) throw new TypeError("enabledFeatures must be an array");
@@ -7155,6 +7164,13 @@ get: (_target, key) => {
 			return roleplayFeatureRequest(connection, "settings/set", "Roleplay 设置保存失败", {
 				field,
 				value,
+				expectedRevision
+			});
+		}
+		async function setReplyOptionsSettings(connection, count, keywords, expectedRevision) {
+			return roleplayFeatureRequest(connection, "settings/reply-options", "回复选项设置保存失败", {
+				count,
+				keywords,
 				expectedRevision
 			});
 		}
@@ -7446,6 +7462,22 @@ get: (_target, key) => {
 			"quickResetButton": "rp-features-quickResetButton",
 			"quickRowAction": "rp-features-quickRowAction",
 			"quickRowActions": "rp-features-quickRowActions",
+			"replyOptionsCountField": "rp-features-replyOptionsCountField",
+			"replyOptionsCountSection": "rp-features-replyOptionsCountSection",
+			"replyOptionsDialog": "rp-features-replyOptionsDialog",
+			"replyOptionsDialogContent": "rp-features-replyOptionsDialogContent",
+			"replyOptionsKeywordCount": "rp-features-replyOptionsKeywordCount",
+			"replyOptionsKeywordField": "rp-features-replyOptionsKeywordField",
+			"replyOptionsKeywordHeader": "rp-features-replyOptionsKeywordHeader",
+			"replyOptionsKeywordList": "rp-features-replyOptionsKeywordList",
+			"replyOptionsKeywordNote": "rp-features-replyOptionsKeywordNote",
+			"replyOptionsKeywordNumber": "rp-features-replyOptionsKeywordNumber",
+			"replyOptionsKeywordRow": "rp-features-replyOptionsKeywordRow",
+			"replyOptionsKeywordSection": "rp-features-replyOptionsKeywordSection",
+			"replyOptionsSettingsError": "rp-features-replyOptionsSettingsError",
+			"replyOptionsSettingsFooter": "rp-features-replyOptionsSettingsFooter",
+			"replyOptionsSettingsForm": "rp-features-replyOptionsSettingsForm",
+			"replyOptionsSettingsHint": "rp-features-replyOptionsSettingsHint",
 			"section": "rp-features-section",
 			"sectionHeading": "rp-features-sectionHeading",
 			"skill": "rp-features-skill",
@@ -7469,7 +7501,7 @@ get: (_target, key) => {
 		};
 		const STYLE_ID = "dsh-roleplay-rp-feature-manager-styles";
 		const STYLE_OWNER = "dsh-roleplay-rp-feature-manager";
-		const STYLE_TEXT = ".rp-features-page {\n  display: flex;\n  flex-direction: column;\n  gap: 18px;\n  width: 100%;\n  max-width: 820px;\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-header {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 24px;\n}\n\n.rp-features-header h2,\n.rp-features-header p,\n.rp-features-panelIntro h3,\n.rp-features-panelIntro p,\n.rp-features-sectionHeading h3,\n.rp-features-sectionHeading p,\n.rp-features-core h3,\n.rp-features-core p,\n.rp-features-feature p,\n.rp-features-applies,\n.rp-features-failure p {\n  margin: 0;\n}\n\n.rp-features-header h2 {\n  font-size: 18px;\n  line-height: 26px;\n  font-weight: 650;\n}\n\n.rp-features-header p {\n  max-width: 560px;\n  margin-top: 4px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-tabs {\n  display: flex;\n  gap: 24px;\n  border-bottom: 1px solid var(--dsw-alias-separator-primary);\n}\n\n.rp-features-tabs button {\n  position: relative;\n  min-height: 40px;\n  border: 0;\n  padding: 0 2px;\n  background: transparent;\n  color: var(--dsw-alias-label-tertiary);\n  cursor: pointer;\n  font: 13px/20px var(--dsw-font-family);\n}\n\n.rp-features-tabs button[aria-selected='true'] {\n  color: var(--dsw-alias-label-primary);\n  font-weight: 600;\n}\n\n.rp-features-tabs button:focus-visible {\n  border-radius: 4px;\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-tabIndicator {\n  position: absolute;\n  right: 0;\n  bottom: -1px;\n  left: 0;\n  height: 2px;\n  border-radius: 2px 2px 0 0;\n  background: var(--dsw-alias-label-primary);\n}\n\n.rp-features-tabPanel {\n  display: flex;\n  flex-direction: column;\n  gap: 18px;\n}\n\n.rp-features-panelIntro h3 {\n  font-size: 16px;\n  line-height: 24px;\n  font-weight: 650;\n}\n\n.rp-features-panelIntro p {\n  max-width: 620px;\n  margin-top: 3px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 19px;\n}\n\n.rp-features-versionSummary {\n  display: grid;\n  flex: none;\n  grid-template-columns: auto auto;\n  gap: 2px 12px;\n  border-radius: 8px;\n  padding: 8px 10px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-versionState {\n  grid-column: 1 / -1;\n  color: var(--dsw-alias-state-success-primary);\n  font-weight: 600;\n}\n\n.rp-features-versionSummary[data-compatible='false'] .rp-features-versionState {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-versionWarning {\n  border-radius: 8px;\n  padding: 10px 12px;\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 9%, transparent);\n  color: var(--dsw-alias-state-error-primary);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-applies {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-core {\n  display: grid;\n  grid-template-columns: 38px minmax(0, 1fr);\n  gap: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 14px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-coreIcon {\n  display: grid;\n  width: 38px;\n  height: 38px;\n  place-items: center;\n  border-radius: 9px;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-coreCopy {\n  min-width: 0;\n}\n\n.rp-features-coreTitle {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n}\n\n.rp-features-coreTitle h3 {\n  font-size: 14px;\n  line-height: 20px;\n}\n\n.rp-features-coreTitle > span {\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  color: var(--dsw-alias-state-success-primary);\n  font-size: 11px;\n  white-space: nowrap;\n}\n\n.rp-features-coreCopy > p {\n  margin-top: 3px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-coreVersions {\n  margin-top: 8px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n}\n\n.rp-features-coreVersions summary {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  cursor: pointer;\n}\n\n.rp-features-coreVersions summary:focus-visible {\n  border-radius: 4px;\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-coreVersions[open] summary svg {\n  transform: rotate(180deg);\n}\n\n.rp-features-coreVersions ul {\n  display: grid;\n  grid-template-columns: repeat(2, minmax(0, 1fr));\n  gap: 8px;\n  margin: 10px 0 0;\n  padding: 0;\n  list-style: none;\n}\n\n.rp-features-coreVersions li {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 4px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  padding: 10px 11px;\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-corePluginHeader {\n  display: flex;\n  min-width: 0;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 10px;\n}\n\n.rp-features-corePluginHeader strong {\n  min-width: 0;\n  overflow: hidden;\n  color: var(--dsw-alias-label-primary);\n  font-size: 12px;\n  line-height: 18px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-corePluginDescription {\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-coreVersions code,\n.rp-features-featureVersion,\n.rp-features-skillMeta code {\n  color: var(--dsw-alias-label-tertiary);\n  font-family: var(--ds-font-family-code);\n}\n\n.rp-features-coreVersions code {\n  flex: none;\n  font-size: 10px;\n  line-height: 16px;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-skillScope {\n  margin: -8px 0 0;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-visibility {\n  display: grid;\n  grid-template-columns: 38px minmax(0, 1fr);\n  gap: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 14px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-visibilityIcon,\n.rp-features-skillMark {\n  display: grid;\n  place-items: center;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-visibilityIcon {\n  width: 38px;\n  height: 38px;\n  border-radius: 9px;\n}\n\n.rp-features-visibilityBody h3 {\n  margin: 0;\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-visibilityBody dl {\n  display: grid;\n  gap: 4px;\n  margin: 7px 0 0;\n}\n\n.rp-features-visibilityBody dl > div {\n  display: grid;\n  grid-template-columns: 110px minmax(0, 1fr);\n  gap: 8px;\n}\n\n.rp-features-visibilityBody dt,\n.rp-features-visibilityBody dd {\n  margin: 0;\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-visibilityBody dt {\n  color: var(--dsw-alias-label-primary);\n  font-weight: 600;\n}\n\n.rp-features-visibilityBody dd {\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-skillList {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.rp-features-skill {\n  display: grid;\n  grid-template-columns: 32px minmax(0, 1fr) 38px;\n  align-items: start;\n  gap: 11px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 12px 13px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-skill[data-available='false'] {\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-skillMark {\n  width: 32px;\n  height: 32px;\n  border-radius: 8px;\n}\n\n.rp-features-skill[data-available='false'] .rp-features-skillMark {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-features-skillCopy {\n  min-width: 0;\n}\n\n.rp-features-skillCopy > p {\n  margin: 4px 0 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-skillMeta {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 3px 10px;\n  margin-top: 6px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-skillVisibility {\n  color: var(--dsw-alias-label-tertiary) !important;\n  font-size: 10px !important;\n  line-height: 16px !important;\n}\n\n.rp-features-section {\n  display: flex;\n  flex-direction: column;\n  gap: 9px;\n}\n\n.rp-features-sectionHeading {\n  padding: 0 2px;\n}\n\n.rp-features-sectionHeading h3 {\n  font-size: 13px;\n  line-height: 20px;\n  font-weight: 650;\n}\n\n.rp-features-sectionHeading p {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-featureList {\n  display: grid;\n  grid-template-columns: repeat(2, minmax(0, 1fr));\n  gap: 8px;\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.rp-features-feature {\n  position: relative;\n  display: flex;\n  min-width: 0;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 14px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 12px 13px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-featureCopy {\n  min-width: 0;\n}\n\n.rp-features-featureTitle {\n  display: flex;\n  align-items: center;\n  gap: 7px;\n}\n\n.rp-features-featureTitle strong {\n  min-width: 0;\n  overflow: hidden;\n  font-size: 13px;\n  line-height: 19px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-featureTitle span {\n  flex: none;\n  border-radius: 5px;\n  padding: 1px 5px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-featureTitle span[data-enabled='true'] {\n  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 9%, transparent);\n  color: var(--dsw-alias-state-success-primary);\n}\n\n.rp-features-feature p {\n  margin-top: 4px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-dependencies {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 2px 9px;\n  margin-top: 5px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-featureVersion {\n  display: block;\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-featureMeta {\n  display: flex;\n  min-height: 26px;\n  align-items: center;\n  gap: 10px;\n  margin-top: 5px;\n}\n\n.rp-features-featureSettings {\n  position: absolute;\n  right: 13px;\n  bottom: 12px;\n  display: inline-flex;\n  width: 26px;\n  height: 26px;\n  align-items: center;\n  justify-content: center;\n  flex: none;\n  border: 0;\n  border-radius: 7px;\n  padding: 0;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n}\n\n.rp-features-featureSettings:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-featureSettings:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-featureSettings:disabled {\n  color: var(--dsw-alias-label-tertiary);\n  cursor: default;\n  opacity: .72;\n}\n\n.rp-features-quickDialog {\n  width: min(760px, calc(100vw - 32px));\n  max-height: min(760px, calc(100dvh - 32px));\n}\n\n.rp-features-quickDialogContent {\n  min-height: 0;\n}\n\n.rp-features-quickLoadState {\n  display: flex;\n  min-height: 150px;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 10px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-quickLoadState p {\n  margin: 0;\n}\n\n.rp-features-quickLoadState button {\n  min-height: 30px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  padding: 0 10px;\n  background: transparent;\n  color: var(--dsw-alias-label-primary);\n  cursor: pointer;\n  font: 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-quickManager {\n  display: flex;\n  min-height: 0;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.rp-features-quickManagerToolbar {\n  display: flex;\n  min-height: 36px;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n}\n\n.rp-features-quickAddButton {\n  display: inline-flex;\n  min-height: 34px;\n  flex: none;\n  align-items: center;\n  justify-content: center;\n  gap: 6px;\n  padding: 0 11px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 9px;\n  background: transparent;\n  color: var(--dsw-alias-label-primary);\n  cursor: pointer;\n  font: 600 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-quickAddButton:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n\n.rp-features-quickAddButton:disabled {\n  cursor: not-allowed;\n  opacity: .45;\n}\n\n.rp-features-quickNotice,\n.rp-features-quickError {\n  padding: 9px 11px;\n  border-radius: 9px;\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-quickNotice {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-quickError {\n  background: var(--dsw-alias-state-error-tertiary);\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-quickReplyList {\n  display: flex;\n  max-height: min(500px, 55dvh);\n  min-height: 0;\n  flex-direction: column;\n  gap: 9px;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n  margin: 0;\n  padding: 1px 3px 3px 1px;\n  list-style: none;\n}\n\n.rp-features-quickReplyRow {\n  display: grid;\n  grid-template-columns: 28px minmax(0, 1fr) auto;\n  align-items: start;\n  gap: 10px;\n  padding: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 12px;\n  background: var(--dsw-alias-bg-layer-1);\n}\n\n.rp-features-quickOrder {\n  display: inline-flex;\n  width: 26px;\n  height: 26px;\n  align-items: center;\n  justify-content: center;\n  margin-top: 20px;\n  border-radius: 8px;\n  background: var(--dsw-specific-tip);\n  color: var(--dsw-alias-state-business-primary);\n  font-size: 11px;\n  font-weight: 650;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-quickFields {\n  display: grid;\n  min-width: 0;\n  grid-template-columns: minmax(105px, .32fr) minmax(0, 1fr) minmax(90px, .22fr);\n  gap: 10px;\n}\n\n.rp-features-quickLabelField,\n.rp-features-quickCursorField,\n.rp-features-quickContentField {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 5px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.rp-features-quickLabelField > span,\n.rp-features-quickCursorField > span,\n.rp-features-quickContentField > span {\n  display: flex;\n  justify-content: space-between;\n  gap: 8px;\n}\n\n.rp-features-quickLabelField small,\n.rp-features-quickContentField small {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  font-weight: 400;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-quickLabelField input,\n.rp-features-quickCursorField select,\n.rp-features-quickContentField textarea {\n  width: 100%;\n  box-sizing: border-box;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 9px;\n  outline: none;\n  background: var(--dsw-alias-bg-layer-2);\n  color: var(--dsw-alias-label-primary);\n  font: 13px/20px var(--dsw-font-family);\n}\n\n.rp-features-quickLabelField input {\n  min-height: 38px;\n  padding: 8px 9px;\n}\n\n.rp-features-quickCursorField select {\n  min-height: 38px;\n  padding: 8px 9px;\n  cursor: pointer;\n}\n\n.rp-features-quickContentField textarea {\n  min-height: 58px;\n  resize: vertical;\n  padding: 7px 9px;\n}\n\n.rp-features-quickLabelField input:focus,\n.rp-features-quickCursorField select:focus,\n.rp-features-quickContentField textarea:focus {\n  border-color: var(--dsw-alias-state-business-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);\n}\n\n.rp-features-quickRowActions {\n  display: grid;\n  grid-template-columns: repeat(3, 30px);\n  gap: 5px;\n  padding-top: 18px;\n}\n\n.rp-features-quickRowAction,\n.rp-features-quickDangerAction {\n  display: inline-flex;\n  width: 30px;\n  height: 30px;\n  align-items: center;\n  justify-content: center;\n  padding: 0;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n}\n\n.rp-features-quickRowAction:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-quickDangerAction:hover:not(:disabled) {\n  background: var(--dsw-alias-state-error-tertiary);\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-quickRowAction:disabled,\n.rp-features-quickDangerAction:disabled {\n  cursor: default;\n  opacity: .3;\n}\n\n.rp-features-quickEmpty {\n  display: flex;\n  min-height: 180px;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 5px;\n  color: var(--dsw-alias-label-tertiary);\n  text-align: center;\n  font-size: 12px;\n}\n\n.rp-features-quickEmpty strong {\n  color: var(--dsw-alias-label-primary);\n  font-size: 15px;\n}\n\n.rp-features-quickFooter {\n  display: flex;\n  width: 100%;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n}\n\n.rp-features-quickFooter > span {\n  display: flex;\n  gap: 8px;\n}\n\n.rp-features-quickResetButton {\n  min-height: 34px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n  font: 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-quickResetButton:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-quickResetButton:disabled {\n  cursor: not-allowed;\n  opacity: .45;\n}\n\n.rp-features-quickAddButton:focus-visible,\n.rp-features-quickRowAction:focus-visible,\n.rp-features-quickDangerAction:focus-visible,\n.rp-features-quickResetButton:focus-visible,\n.rp-features-quickLoadState button:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-switch {\n  position: relative;\n  width: 38px;\n  height: 22px;\n  flex: none;\n  border: 0;\n  border-radius: 999px;\n  padding: 0;\n  background: var(--dsw-alias-border-l1);\n  cursor: pointer;\n}\n\n.rp-features-switch[aria-checked='true'] {\n  background: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-switch:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-switch:disabled {\n  cursor: not-allowed;\n  opacity: 0.55;\n}\n\n.rp-features-switch span {\n  position: absolute;\n  top: 2px;\n  left: 0;\n  width: 18px;\n  height: 18px;\n  border-radius: 50%;\n  background: white;\n  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);\n}\n\n.rp-features-promptScope {\n  display: grid;\n  grid-template-columns: 38px minmax(0, 1fr);\n  gap: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 13px 14px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-promptScope p {\n  align-self: center;\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-features-promptScopeIcon {\n  display: grid;\n  width: 38px;\n  height: 38px;\n  place-items: center;\n  border-radius: 9px;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-identityPanel {\n  display: flex;\n  flex-direction: column;\n  gap: 9px;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 24%, var(--dsw-alias-border-l2));\n  border-radius: 10px;\n  padding: 13px 14px;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 5%, var(--dsw-alias-bg-layer-3));\n}\n\n.rp-features-identityHeader {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 14px;\n}\n\n.rp-features-identityTitle {\n  display: flex;\n  min-width: 0;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 7px;\n}\n\n.rp-features-identityTitle > div {\n  display: flex;\n  min-width: 0;\n  align-items: baseline;\n  gap: 7px;\n}\n\n.rp-features-identityTitle h4 {\n  margin: 0;\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-identityTitle code {\n  color: var(--dsw-alias-label-tertiary);\n  font: 9px/14px var(--ds-font-family-code);\n}\n\n.rp-features-identityTitle > span {\n  border-radius: 5px;\n  padding: 1px 5px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 14px;\n}\n\n.rp-features-identityTitle > span[data-customized='true'] {\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-identityDescription {\n  max-width: 660px;\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-features-identityEdit,\n.rp-features-identityReset,\n.rp-features-identityCancel,\n.rp-features-identitySave {\n  display: inline-flex;\n  min-height: 30px;\n  align-items: center;\n  justify-content: center;\n  gap: 5px;\n  border-radius: 7px;\n  padding: 5px 10px;\n  cursor: pointer;\n  font: 11px/18px var(--dsw-font-family);\n}\n\n.rp-features-identityEdit,\n.rp-features-identityReset,\n.rp-features-identityCancel {\n  border: 1px solid var(--dsw-alias-border-l2);\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-identitySave {\n  border: 1px solid var(--dsw-alias-state-business-primary);\n  background: var(--dsw-alias-state-business-primary);\n  color: white;\n}\n\n.rp-features-identityEdit:disabled,\n.rp-features-identityReset:disabled,\n.rp-features-identityCancel:disabled,\n.rp-features-identitySave:disabled {\n  cursor: not-allowed;\n  opacity: 0.5;\n}\n\n.rp-features-identityPreview {\n  border-radius: 8px;\n  padding: 9px 11px;\n  background: var(--dsw-alias-markdown-code-block);\n}\n\n.rp-features-identityPreview pre {\n  max-height: 140px;\n  overflow: auto;\n  margin: 0;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n}\n\n.rp-features-identityPreview code {\n  color: var(--dsw-alias-label-secondary);\n  font: 10px/17px var(--ds-font-family-code);\n}\n\n.rp-features-identityEditor {\n  display: flex;\n  flex-direction: column;\n  gap: 7px;\n}\n\n.rp-features-identityField {\n  display: flex;\n  flex-direction: column;\n  gap: 5px;\n  color: var(--dsw-alias-label-primary);\n  font-size: 11px;\n  line-height: 17px;\n  font-weight: 600;\n}\n\n.rp-features-identityField textarea {\n  width: 100%;\n  min-height: 108px;\n  resize: vertical;\n  box-sizing: border-box;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  padding: 9px 10px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-primary);\n  font: 11px/18px var(--ds-font-family-code);\n}\n\n.rp-features-identityMeta {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 15px;\n}\n\n.rp-features-identityMeta > span:first-child {\n  max-width: 570px;\n}\n\n.rp-features-identityMeta > span:last-child {\n  flex: none;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-identityMeta > span[data-invalid='true'],\n.rp-features-identityError {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-identityError {\n  min-height: 15px;\n  font-size: 9px;\n  line-height: 15px;\n}\n\n.rp-features-identityEditorActions {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n}\n\n.rp-features-identityEditorActions > span:last-child {\n  display: flex;\n  gap: 7px;\n}\n\n.rp-features-promptWorkspace {\n  display: grid;\n  grid-template-columns: 164px minmax(0, 1fr);\n  align-items: start;\n  gap: 16px;\n}\n\n.rp-features-promptRoleNav {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.rp-features-promptRoleButton {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 1px;\n  border: 1px solid transparent;\n  border-radius: 8px;\n  padding: 9px 10px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  text-align: left;\n  cursor: pointer;\n}\n\n.rp-features-promptRoleButton strong {\n  font: 600 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-promptRoleButton span {\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n  font: 10px/16px var(--dsw-font-family);\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-promptRoleButton:hover {\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-promptRoleButton[data-selected='true'] {\n  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 24%, var(--dsw-alias-border-l2));\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-promptRoleButton:focus-visible,\n.rp-features-promptLayer summary:focus-visible,\n.rp-features-promptSelect select:focus-visible,\n.rp-features-identityEdit:focus-visible,\n.rp-features-identityReset:focus-visible,\n.rp-features-identityCancel:focus-visible,\n.rp-features-identitySave:focus-visible,\n.rp-features-identityField textarea:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-promptDetail,\n.rp-features-promptProfile,\n.rp-features-promptProfileHeader > div:first-child {\n  min-width: 0;\n}\n\n.rp-features-promptSelect {\n  display: grid;\n  grid-template-columns: auto minmax(0, 220px);\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  margin-bottom: 12px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-promptSelect select {\n  min-width: 0;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 7px;\n  padding: 6px 28px 6px 9px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-primary);\n  font: 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-promptEmpty {\n  border: 1px dashed var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 28px 24px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 19px;\n  text-align: center;\n}\n\n.rp-features-promptProfile {\n  display: flex;\n  flex-direction: column;\n  gap: 11px;\n}\n\n.rp-features-promptProfileHeader {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 16px;\n}\n\n.rp-features-promptProfileHeader h4,\n.rp-features-promptProfileHeader p {\n  margin: 0;\n}\n\n.rp-features-promptProfileHeader h4 {\n  font-size: 14px;\n  line-height: 21px;\n}\n\n.rp-features-promptProfileHeader p {\n  margin-top: 2px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-promptRoute {\n  display: flex;\n  flex: none;\n  align-items: center;\n  gap: 6px;\n  border-radius: 6px;\n  padding: 4px 7px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 16px;\n}\n\n.rp-features-promptRoute strong {\n  color: var(--dsw-alias-label-secondary);\n  font-weight: 600;\n}\n\n.rp-features-promptNotes {\n  display: grid;\n  gap: 3px;\n  margin: 0;\n  padding: 9px 12px 9px 26px;\n  border-left: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent);\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 5%, transparent);\n  color: var(--dsw-alias-label-secondary);\n  font-size: 10px;\n  line-height: 16px;\n}\n\n.rp-features-promptOrderHeading {\n  color: var(--dsw-alias-label-primary);\n  font-size: 11px;\n  line-height: 17px;\n  font-weight: 650;\n}\n\n.rp-features-promptLayerList {\n  overflow: hidden;\n  margin: -3px 0 0;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 0;\n  background: var(--dsw-alias-bg-layer-3);\n  list-style: none;\n}\n\n.rp-features-promptLayerList > li:not(:last-child) {\n  border-bottom: 1px solid var(--dsw-alias-separator-primary);\n}\n\n.rp-features-promptLayer summary {\n  display: grid;\n  grid-template-columns: 22px minmax(130px, 1fr) auto auto 12px;\n  align-items: center;\n  gap: 8px;\n  padding: 10px 11px;\n  cursor: pointer;\n  list-style: none;\n}\n\n.rp-features-promptLayer summary::-webkit-details-marker {\n  display: none;\n}\n\n.rp-features-promptLayer summary > svg {\n  color: var(--dsw-alias-label-tertiary);\n  transition: transform 140ms ease;\n}\n\n.rp-features-promptLayer[open] summary > svg {\n  transform: rotate(180deg);\n}\n\n.rp-features-promptLayerIndex {\n  display: grid;\n  width: 20px;\n  height: 20px;\n  place-items: center;\n  border-radius: 50%;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-promptLayerTitle {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n}\n\n.rp-features-promptLayerTitle strong {\n  overflow: hidden;\n  font-size: 11px;\n  line-height: 17px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-promptLayerTitle small {\n  display: flex;\n  min-width: 0;\n  overflow: hidden;\n  align-items: center;\n  gap: 5px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 14px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-promptLayerTitle small span {\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n\n.rp-features-promptLayerTitle small code {\n  flex: none;\n  color: inherit;\n  font: inherit;\n}\n\n.rp-features-promptRole,\n.rp-features-promptKind {\n  border-radius: 5px;\n  padding: 2px 6px;\n  font-size: 9px;\n  line-height: 14px;\n  white-space: nowrap;\n}\n\n.rp-features-promptRole {\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n  font-family: var(--ds-font-family-code);\n}\n\n.rp-features-promptRole[data-role='user'] {\n  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 9%, transparent);\n  color: var(--dsw-alias-state-success-primary);\n}\n\n.rp-features-promptRole[data-role='tools'] {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-promptKind {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-features-promptLayerBody {\n  border-top: 1px solid var(--dsw-alias-separator-primary);\n  padding: 10px 12px 12px 41px;\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-promptLayerBody p {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 10px;\n  line-height: 17px;\n}\n\n.rp-features-promptLayerBody pre {\n  max-height: 360px;\n  overflow: auto;\n  margin: 0;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n}\n\n.rp-features-promptLayerBody pre code {\n  color: var(--dsw-alias-label-secondary);\n  font: 10px/17px var(--ds-font-family-code);\n}\n\n.rp-features-promptToolBlock {\n  display: grid;\n  gap: 6px;\n  margin-top: 9px;\n}\n\n.rp-features-promptToolBlock > span,\n.rp-features-promptNoTools {\n  color: var(--dsw-alias-label-tertiary) !important;\n  font-size: 9px !important;\n  line-height: 14px !important;\n}\n\n.rp-features-promptTools {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 5px;\n}\n\n.rp-features-promptTools code {\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 5px;\n  padding: 2px 6px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-secondary);\n  font: 9px/14px var(--ds-font-family-code);\n}\n\n.rp-features-state,\n.rp-features-failure {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-failure {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-failure button {\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 6px;\n  padding: 4px 10px;\n  background: transparent;\n  color: var(--dsw-alias-label-primary);\n  font: inherit;\n  cursor: pointer;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .rp-features-promptLayer summary > svg {\n    transition: none;\n  }\n}\n\n.rp-features-liveNotice {\n  min-height: 18px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n@media (max-width: 720px) {\n  .rp-features-header {\n    flex-direction: column;\n    gap: 12px;\n  }\n\n  .rp-features-versionSummary,\n  .rp-features-featureList {\n    width: 100%;\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .rp-features-coreVersions ul {\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .rp-features-visibilityBody dl > div {\n    grid-template-columns: minmax(0, 1fr);\n    gap: 0;\n  }\n\n  .rp-features-skill {\n    grid-template-columns: 32px minmax(0, 1fr) 38px;\n  }\n\n  .rp-features-promptWorkspace {\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .rp-features-promptRoleNav {\n    display: grid;\n    grid-template-columns: repeat(2, minmax(0, 1fr));\n  }\n\n  .rp-features-promptProfileHeader,\n  .rp-features-promptSelect {\n    grid-template-columns: minmax(0, 1fr);\n    flex-direction: column;\n    align-items: stretch;\n  }\n\n  .rp-features-identityHeader,\n  .rp-features-identityMeta,\n  .rp-features-identityEditorActions {\n    align-items: stretch;\n    flex-direction: column;\n  }\n\n  .rp-features-identityEdit {\n    align-self: flex-start;\n  }\n\n  .rp-features-identityEditorActions > span:last-child {\n    justify-content: flex-end;\n  }\n\n  .rp-features-promptLayer summary {\n    grid-template-columns: 22px minmax(0, 1fr) auto 12px;\n  }\n\n  .rp-features-promptKind {\n    display: none;\n  }\n\n  .rp-features-promptLayerBody {\n    padding-left: 12px;\n  }\n\n  .rp-features-quickDialog {\n    width: calc(100vw - 16px);\n    max-height: calc(100dvh - 16px);\n  }\n\n  .rp-features-quickManagerToolbar {\n    align-items: flex-start;\n    flex-direction: column;\n  }\n\n  .rp-features-quickFields {\n    grid-template-columns: 1fr;\n  }\n\n  .rp-features-quickReplyRow {\n    grid-template-columns: 24px minmax(0, 1fr);\n    padding: 10px;\n  }\n\n  .rp-features-quickOrder {\n    width: 24px;\n    height: 24px;\n    margin-top: 20px;\n  }\n\n  .rp-features-quickRowActions {\n    grid-column: 2;\n    grid-template-columns: repeat(3, 34px);\n    padding-top: 0;\n  }\n\n  .rp-features-quickRowAction,\n  .rp-features-quickDangerAction {\n    width: 34px;\n    height: 34px;\n  }\n\n  .rp-features-quickFooter {\n    align-items: stretch;\n    flex-direction: column-reverse;\n  }\n\n  .rp-features-quickFooter > span {\n    display: grid;\n    grid-template-columns: 1fr 1fr;\n  }\n\n  .rp-features-quickResetButton {\n    align-self: flex-start;\n  }\n}\n";
+		const STYLE_TEXT = ".rp-features-page {\n  display: flex;\n  flex-direction: column;\n  gap: 18px;\n  width: 100%;\n  max-width: 820px;\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-header {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 24px;\n}\n\n.rp-features-header h2,\n.rp-features-header p,\n.rp-features-panelIntro h3,\n.rp-features-panelIntro p,\n.rp-features-sectionHeading h3,\n.rp-features-sectionHeading p,\n.rp-features-core h3,\n.rp-features-core p,\n.rp-features-feature p,\n.rp-features-applies,\n.rp-features-failure p {\n  margin: 0;\n}\n\n.rp-features-header h2 {\n  font-size: 18px;\n  line-height: 26px;\n  font-weight: 650;\n}\n\n.rp-features-header p {\n  max-width: 560px;\n  margin-top: 4px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-tabs {\n  display: flex;\n  gap: 24px;\n  border-bottom: 1px solid var(--dsw-alias-separator-primary);\n}\n\n.rp-features-tabs button {\n  position: relative;\n  min-height: 40px;\n  border: 0;\n  padding: 0 2px;\n  background: transparent;\n  color: var(--dsw-alias-label-tertiary);\n  cursor: pointer;\n  font: 13px/20px var(--dsw-font-family);\n}\n\n.rp-features-tabs button[aria-selected='true'] {\n  color: var(--dsw-alias-label-primary);\n  font-weight: 600;\n}\n\n.rp-features-tabs button:focus-visible {\n  border-radius: 4px;\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-tabIndicator {\n  position: absolute;\n  right: 0;\n  bottom: -1px;\n  left: 0;\n  height: 2px;\n  border-radius: 2px 2px 0 0;\n  background: var(--dsw-alias-label-primary);\n}\n\n.rp-features-tabPanel {\n  display: flex;\n  flex-direction: column;\n  gap: 18px;\n}\n\n.rp-features-panelIntro h3 {\n  font-size: 16px;\n  line-height: 24px;\n  font-weight: 650;\n}\n\n.rp-features-panelIntro p {\n  max-width: 620px;\n  margin-top: 3px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 19px;\n}\n\n.rp-features-versionSummary {\n  display: grid;\n  flex: none;\n  grid-template-columns: auto auto;\n  gap: 2px 12px;\n  border-radius: 8px;\n  padding: 8px 10px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-versionState {\n  grid-column: 1 / -1;\n  color: var(--dsw-alias-state-success-primary);\n  font-weight: 600;\n}\n\n.rp-features-versionSummary[data-compatible='false'] .rp-features-versionState {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-versionWarning {\n  border-radius: 8px;\n  padding: 10px 12px;\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 9%, transparent);\n  color: var(--dsw-alias-state-error-primary);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-applies {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-core {\n  display: grid;\n  grid-template-columns: 38px minmax(0, 1fr);\n  gap: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 14px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-coreIcon {\n  display: grid;\n  width: 38px;\n  height: 38px;\n  place-items: center;\n  border-radius: 9px;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-coreCopy {\n  min-width: 0;\n}\n\n.rp-features-coreTitle {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n}\n\n.rp-features-coreTitle h3 {\n  font-size: 14px;\n  line-height: 20px;\n}\n\n.rp-features-coreTitle > span {\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  color: var(--dsw-alias-state-success-primary);\n  font-size: 11px;\n  white-space: nowrap;\n}\n\n.rp-features-coreCopy > p {\n  margin-top: 3px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-coreVersions {\n  margin-top: 8px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n}\n\n.rp-features-coreVersions summary {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  cursor: pointer;\n}\n\n.rp-features-coreVersions summary:focus-visible {\n  border-radius: 4px;\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-coreVersions[open] summary svg {\n  transform: rotate(180deg);\n}\n\n.rp-features-coreVersions ul {\n  display: grid;\n  grid-template-columns: repeat(2, minmax(0, 1fr));\n  gap: 8px;\n  margin: 10px 0 0;\n  padding: 0;\n  list-style: none;\n}\n\n.rp-features-coreVersions li {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 4px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  padding: 10px 11px;\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-corePluginHeader {\n  display: flex;\n  min-width: 0;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 10px;\n}\n\n.rp-features-corePluginHeader strong {\n  min-width: 0;\n  overflow: hidden;\n  color: var(--dsw-alias-label-primary);\n  font-size: 12px;\n  line-height: 18px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-corePluginDescription {\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-coreVersions code,\n.rp-features-featureVersion,\n.rp-features-skillMeta code {\n  color: var(--dsw-alias-label-tertiary);\n  font-family: var(--ds-font-family-code);\n}\n\n.rp-features-coreVersions code {\n  flex: none;\n  font-size: 10px;\n  line-height: 16px;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-skillScope {\n  margin: -8px 0 0;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-visibility {\n  display: grid;\n  grid-template-columns: 38px minmax(0, 1fr);\n  gap: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 14px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-visibilityIcon,\n.rp-features-skillMark {\n  display: grid;\n  place-items: center;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-visibilityIcon {\n  width: 38px;\n  height: 38px;\n  border-radius: 9px;\n}\n\n.rp-features-visibilityBody h3 {\n  margin: 0;\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-visibilityBody dl {\n  display: grid;\n  gap: 4px;\n  margin: 7px 0 0;\n}\n\n.rp-features-visibilityBody dl > div {\n  display: grid;\n  grid-template-columns: 110px minmax(0, 1fr);\n  gap: 8px;\n}\n\n.rp-features-visibilityBody dt,\n.rp-features-visibilityBody dd {\n  margin: 0;\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-visibilityBody dt {\n  color: var(--dsw-alias-label-primary);\n  font-weight: 600;\n}\n\n.rp-features-visibilityBody dd {\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-skillList {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.rp-features-skill {\n  display: grid;\n  grid-template-columns: 32px minmax(0, 1fr) 38px;\n  align-items: start;\n  gap: 11px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 12px 13px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-skill[data-available='false'] {\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-skillMark {\n  width: 32px;\n  height: 32px;\n  border-radius: 8px;\n}\n\n.rp-features-skill[data-available='false'] .rp-features-skillMark {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-features-skillCopy {\n  min-width: 0;\n}\n\n.rp-features-skillCopy > p {\n  margin: 4px 0 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-skillMeta {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 3px 10px;\n  margin-top: 6px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-skillVisibility {\n  color: var(--dsw-alias-label-tertiary) !important;\n  font-size: 10px !important;\n  line-height: 16px !important;\n}\n\n.rp-features-section {\n  display: flex;\n  flex-direction: column;\n  gap: 9px;\n}\n\n.rp-features-sectionHeading {\n  padding: 0 2px;\n}\n\n.rp-features-sectionHeading h3 {\n  font-size: 13px;\n  line-height: 20px;\n  font-weight: 650;\n}\n\n.rp-features-sectionHeading p {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-featureList {\n  display: grid;\n  grid-template-columns: repeat(2, minmax(0, 1fr));\n  gap: 8px;\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.rp-features-feature {\n  position: relative;\n  display: flex;\n  min-width: 0;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 14px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 12px 13px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-featureCopy {\n  min-width: 0;\n}\n\n.rp-features-featureTitle {\n  display: flex;\n  align-items: center;\n  gap: 7px;\n}\n\n.rp-features-featureTitle strong {\n  min-width: 0;\n  overflow: hidden;\n  font-size: 13px;\n  line-height: 19px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-featureTitle span {\n  flex: none;\n  border-radius: 5px;\n  padding: 1px 5px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-featureTitle span[data-enabled='true'] {\n  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 9%, transparent);\n  color: var(--dsw-alias-state-success-primary);\n}\n\n.rp-features-feature p {\n  margin-top: 4px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-dependencies {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 2px 9px;\n  margin-top: 5px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-featureVersion {\n  display: block;\n  font-size: 10px;\n  line-height: 15px;\n}\n\n.rp-features-featureMeta {\n  display: flex;\n  min-height: 26px;\n  align-items: center;\n  gap: 10px;\n  margin-top: 5px;\n}\n\n.rp-features-featureSettings {\n  position: absolute;\n  right: 4px;\n  bottom: 3px;\n  display: inline-flex;\n  width: 44px;\n  height: 44px;\n  align-items: center;\n  justify-content: center;\n  flex: none;\n  border: 0;\n  border-radius: 7px;\n  padding: 0;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n}\n\n.rp-features-featureSettings:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-featureSettings:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-featureSettings:disabled {\n  color: var(--dsw-alias-label-tertiary);\n  cursor: default;\n  opacity: .72;\n}\n\n.rp-features-replyOptionsDialog {\n  width: min(560px, calc(100vw - 32px));\n}\n\n.rp-features-replyOptionsDialogContent {\n  min-height: 0;\n  max-height: min(640px, calc(100dvh - 210px));\n  overflow-y: auto;\n}\n\n.rp-features-replyOptionsSettingsForm {\n  display: flex;\n  flex-direction: column;\n  gap: 18px;\n}\n\n.rp-features-replyOptionsCountSection {\n  display: flex;\n  flex-direction: column;\n  gap: 5px;\n}\n\n.rp-features-replyOptionsCountField {\n  display: grid;\n  grid-template-columns: minmax(0, 1fr) 96px;\n  align-items: center;\n  gap: 16px;\n  color: var(--dsw-alias-label-primary);\n  font-size: 12px;\n  line-height: 18px;\n  font-weight: 600;\n}\n\n.rp-features-replyOptionsCountField input {\n  width: 100%;\n  min-height: 44px;\n  box-sizing: border-box;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 9px;\n  outline: none;\n  padding: 9px 11px;\n  background: var(--dsw-alias-bg-layer-2);\n  color: var(--dsw-alias-label-primary);\n  font: 14px/20px var(--dsw-font-family);\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-replyOptionsCountField input:focus-visible {\n  border-color: var(--dsw-alias-state-business-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);\n}\n\n.rp-features-replyOptionsCountField input[aria-invalid='true'] {\n  border-color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-replyOptionsKeywordSection {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 10px;\n  border-top: 1px solid var(--dsw-alias-separator-primary);\n  padding-top: 16px;\n}\n\n.rp-features-replyOptionsKeywordHeader {\n  display: flex;\n  min-width: 0;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 12px;\n}\n\n.rp-features-replyOptionsKeywordHeader h3,\n.rp-features-replyOptionsKeywordHeader p,\n.rp-features-replyOptionsKeywordNote {\n  margin: 0;\n}\n\n.rp-features-replyOptionsKeywordHeader h3 {\n  color: var(--dsw-alias-label-primary);\n  font-size: 12px;\n  line-height: 18px;\n  font-weight: 650;\n}\n\n.rp-features-replyOptionsKeywordHeader p,\n.rp-features-replyOptionsKeywordNote {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 17px;\n}\n\n.rp-features-replyOptionsKeywordHeader > span {\n  flex: none;\n  border-radius: 5px;\n  padding: 1px 6px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 16px;\n}\n\n.rp-features-replyOptionsKeywordList {\n  display: grid;\n  min-width: 0;\n  gap: 8px;\n}\n\n.rp-features-replyOptionsKeywordRow {\n  display: grid;\n  min-width: 0;\n  grid-template-columns: 28px minmax(0, 1fr) 34px;\n  align-items: end;\n  gap: 9px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 9px 10px;\n  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 80%, transparent);\n}\n\n.rp-features-replyOptionsKeywordNumber {\n  display: grid;\n  width: 28px;\n  height: 44px;\n  place-items: center;\n  border-radius: 8px;\n  color: var(--dsw-alias-state-business-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent);\n  font-size: 11px;\n  line-height: 1;\n  font-weight: 650;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-replyOptionsKeywordField {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.rp-features-replyOptionsKeywordField > span {\n  color: var(--dsw-alias-label-secondary);\n  font-size: 10px;\n  line-height: 16px;\n  font-weight: 560;\n}\n\n.rp-features-replyOptionsKeywordField input {\n  width: 100%;\n  min-height: 44px;\n  min-width: 0;\n  box-sizing: border-box;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  outline: none;\n  padding: 10px 11px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-primary);\n  font: 12px/20px var(--dsw-font-family);\n}\n\n.rp-features-replyOptionsKeywordField input::placeholder {\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-features-replyOptionsKeywordField input:focus-visible {\n  border-color: var(--dsw-alias-state-business-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);\n}\n\n.rp-features-replyOptionsKeywordField input[aria-invalid='true'] {\n  border-color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-replyOptionsKeywordCount {\n  padding-bottom: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 16px;\n  text-align: right;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-replyOptionsKeywordCount[data-invalid='true'] {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-replyOptionsSettingsHint,\n.rp-features-replyOptionsSettingsError {\n  margin: 0;\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-features-replyOptionsSettingsHint {\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-features-replyOptionsSettingsError {\n  min-height: 18px;\n  margin-top: -10px;\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-replyOptionsSettingsFooter {\n  display: flex;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 8px;\n}\n\n@media (max-width: 480px) {\n  .rp-features-replyOptionsDialog {\n    width: calc(100vw - 16px);\n  }\n\n  .rp-features-replyOptionsDialogContent {\n    max-height: calc(100dvh - 190px);\n  }\n\n  .rp-features-replyOptionsCountField {\n    grid-template-columns: minmax(0, 1fr) 88px;\n  }\n\n  .rp-features-replyOptionsKeywordRow {\n    grid-template-columns: 28px minmax(0, 1fr);\n  }\n\n  .rp-features-replyOptionsKeywordCount {\n    display: none;\n  }\n}\n\n.rp-features-quickDialog {\n  width: min(760px, calc(100vw - 32px));\n  max-height: min(760px, calc(100dvh - 32px));\n}\n\n.rp-features-quickDialogContent {\n  min-height: 0;\n}\n\n.rp-features-quickLoadState {\n  display: flex;\n  min-height: 150px;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 10px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-quickLoadState p {\n  margin: 0;\n}\n\n.rp-features-quickLoadState button {\n  min-height: 30px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  padding: 0 10px;\n  background: transparent;\n  color: var(--dsw-alias-label-primary);\n  cursor: pointer;\n  font: 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-quickManager {\n  display: flex;\n  min-height: 0;\n  flex-direction: column;\n  gap: 12px;\n}\n\n.rp-features-quickManagerToolbar {\n  display: flex;\n  min-height: 36px;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n}\n\n.rp-features-quickAddButton {\n  display: inline-flex;\n  min-height: 34px;\n  flex: none;\n  align-items: center;\n  justify-content: center;\n  gap: 6px;\n  padding: 0 11px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 9px;\n  background: transparent;\n  color: var(--dsw-alias-label-primary);\n  cursor: pointer;\n  font: 600 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-quickAddButton:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n\n.rp-features-quickAddButton:disabled {\n  cursor: not-allowed;\n  opacity: .45;\n}\n\n.rp-features-quickNotice,\n.rp-features-quickError {\n  padding: 9px 11px;\n  border-radius: 9px;\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-features-quickNotice {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-quickError {\n  background: var(--dsw-alias-state-error-tertiary);\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-quickReplyList {\n  display: flex;\n  max-height: min(500px, 55dvh);\n  min-height: 0;\n  flex-direction: column;\n  gap: 9px;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n  margin: 0;\n  padding: 1px 3px 3px 1px;\n  list-style: none;\n}\n\n.rp-features-quickReplyRow {\n  display: grid;\n  grid-template-columns: 28px minmax(0, 1fr) auto;\n  align-items: start;\n  gap: 10px;\n  padding: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 12px;\n  background: var(--dsw-alias-bg-layer-1);\n}\n\n.rp-features-quickOrder {\n  display: inline-flex;\n  width: 26px;\n  height: 26px;\n  align-items: center;\n  justify-content: center;\n  margin-top: 20px;\n  border-radius: 8px;\n  background: var(--dsw-specific-tip);\n  color: var(--dsw-alias-state-business-primary);\n  font-size: 11px;\n  font-weight: 650;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-quickFields {\n  display: grid;\n  min-width: 0;\n  grid-template-columns: minmax(105px, .32fr) minmax(0, 1fr) minmax(90px, .22fr);\n  gap: 10px;\n}\n\n.rp-features-quickLabelField,\n.rp-features-quickCursorField,\n.rp-features-quickContentField {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 5px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.rp-features-quickLabelField > span,\n.rp-features-quickCursorField > span,\n.rp-features-quickContentField > span {\n  display: flex;\n  justify-content: space-between;\n  gap: 8px;\n}\n\n.rp-features-quickLabelField small,\n.rp-features-quickContentField small {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  font-weight: 400;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-quickLabelField input,\n.rp-features-quickCursorField select,\n.rp-features-quickContentField textarea {\n  width: 100%;\n  box-sizing: border-box;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 9px;\n  outline: none;\n  background: var(--dsw-alias-bg-layer-2);\n  color: var(--dsw-alias-label-primary);\n  font: 13px/20px var(--dsw-font-family);\n}\n\n.rp-features-quickLabelField input {\n  min-height: 38px;\n  padding: 8px 9px;\n}\n\n.rp-features-quickCursorField select {\n  min-height: 38px;\n  padding: 8px 9px;\n  cursor: pointer;\n}\n\n.rp-features-quickContentField textarea {\n  min-height: 58px;\n  resize: vertical;\n  padding: 7px 9px;\n}\n\n.rp-features-quickLabelField input:focus,\n.rp-features-quickCursorField select:focus,\n.rp-features-quickContentField textarea:focus {\n  border-color: var(--dsw-alias-state-business-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);\n}\n\n.rp-features-quickRowActions {\n  display: grid;\n  grid-template-columns: repeat(3, 30px);\n  gap: 5px;\n  padding-top: 18px;\n}\n\n.rp-features-quickRowAction,\n.rp-features-quickDangerAction {\n  display: inline-flex;\n  width: 30px;\n  height: 30px;\n  align-items: center;\n  justify-content: center;\n  padding: 0;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n}\n\n.rp-features-quickRowAction:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-quickDangerAction:hover:not(:disabled) {\n  background: var(--dsw-alias-state-error-tertiary);\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-quickRowAction:disabled,\n.rp-features-quickDangerAction:disabled {\n  cursor: default;\n  opacity: .3;\n}\n\n.rp-features-quickEmpty {\n  display: flex;\n  min-height: 180px;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 5px;\n  color: var(--dsw-alias-label-tertiary);\n  text-align: center;\n  font-size: 12px;\n}\n\n.rp-features-quickEmpty strong {\n  color: var(--dsw-alias-label-primary);\n  font-size: 15px;\n}\n\n.rp-features-quickFooter {\n  display: flex;\n  width: 100%;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n}\n\n.rp-features-quickFooter > span {\n  display: flex;\n  gap: 8px;\n}\n\n.rp-features-quickResetButton {\n  min-height: 34px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: 8px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n  font: 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-quickResetButton:hover:not(:disabled) {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-quickResetButton:disabled {\n  cursor: not-allowed;\n  opacity: .45;\n}\n\n.rp-features-quickAddButton:focus-visible,\n.rp-features-quickRowAction:focus-visible,\n.rp-features-quickDangerAction:focus-visible,\n.rp-features-quickResetButton:focus-visible,\n.rp-features-quickLoadState button:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-switch {\n  position: relative;\n  width: 38px;\n  height: 22px;\n  flex: none;\n  border: 0;\n  border-radius: 999px;\n  padding: 0;\n  background: var(--dsw-alias-border-l1);\n  cursor: pointer;\n}\n\n.rp-features-switch[aria-checked='true'] {\n  background: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-switch:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-switch:disabled {\n  cursor: not-allowed;\n  opacity: 0.55;\n}\n\n.rp-features-switch span {\n  position: absolute;\n  top: 2px;\n  left: 0;\n  width: 18px;\n  height: 18px;\n  border-radius: 50%;\n  background: white;\n  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);\n}\n\n.rp-features-promptScope {\n  display: grid;\n  grid-template-columns: 38px minmax(0, 1fr);\n  gap: 12px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 13px 14px;\n  background: var(--dsw-alias-bg-layer-3);\n}\n\n.rp-features-promptScope p {\n  align-self: center;\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-features-promptScopeIcon {\n  display: grid;\n  width: 38px;\n  height: 38px;\n  place-items: center;\n  border-radius: 9px;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-identityPanel {\n  display: flex;\n  flex-direction: column;\n  gap: 9px;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 24%, var(--dsw-alias-border-l2));\n  border-radius: 10px;\n  padding: 13px 14px;\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 5%, var(--dsw-alias-bg-layer-3));\n}\n\n.rp-features-identityHeader {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 14px;\n}\n\n.rp-features-identityTitle {\n  display: flex;\n  min-width: 0;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 7px;\n}\n\n.rp-features-identityTitle > div {\n  display: flex;\n  min-width: 0;\n  align-items: baseline;\n  gap: 7px;\n}\n\n.rp-features-identityTitle h4 {\n  margin: 0;\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-identityTitle code {\n  color: var(--dsw-alias-label-tertiary);\n  font: 9px/14px var(--ds-font-family-code);\n}\n\n.rp-features-identityTitle > span {\n  border-radius: 5px;\n  padding: 1px 5px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 14px;\n}\n\n.rp-features-identityTitle > span[data-customized='true'] {\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-features-identityDescription {\n  max-width: 660px;\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-features-identityEdit,\n.rp-features-identityReset,\n.rp-features-identityCancel,\n.rp-features-identitySave {\n  display: inline-flex;\n  min-height: 30px;\n  align-items: center;\n  justify-content: center;\n  gap: 5px;\n  border-radius: 7px;\n  padding: 5px 10px;\n  cursor: pointer;\n  font: 11px/18px var(--dsw-font-family);\n}\n\n.rp-features-identityEdit,\n.rp-features-identityReset,\n.rp-features-identityCancel {\n  border: 1px solid var(--dsw-alias-border-l2);\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-identitySave {\n  border: 1px solid var(--dsw-alias-state-business-primary);\n  background: var(--dsw-alias-state-business-primary);\n  color: white;\n}\n\n.rp-features-identityEdit:disabled,\n.rp-features-identityReset:disabled,\n.rp-features-identityCancel:disabled,\n.rp-features-identitySave:disabled {\n  cursor: not-allowed;\n  opacity: 0.5;\n}\n\n.rp-features-identityPreview {\n  border-radius: 8px;\n  padding: 9px 11px;\n  background: var(--dsw-alias-markdown-code-block);\n}\n\n.rp-features-identityPreview pre {\n  max-height: 140px;\n  overflow: auto;\n  margin: 0;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n}\n\n.rp-features-identityPreview code {\n  color: var(--dsw-alias-label-secondary);\n  font: 10px/17px var(--ds-font-family-code);\n}\n\n.rp-features-identityEditor {\n  display: flex;\n  flex-direction: column;\n  gap: 7px;\n}\n\n.rp-features-identityField {\n  display: flex;\n  flex-direction: column;\n  gap: 5px;\n  color: var(--dsw-alias-label-primary);\n  font-size: 11px;\n  line-height: 17px;\n  font-weight: 600;\n}\n\n.rp-features-identityField textarea {\n  width: 100%;\n  min-height: 108px;\n  resize: vertical;\n  box-sizing: border-box;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  padding: 9px 10px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-primary);\n  font: 11px/18px var(--ds-font-family-code);\n}\n\n.rp-features-identityMeta {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 15px;\n}\n\n.rp-features-identityMeta > span:first-child {\n  max-width: 570px;\n}\n\n.rp-features-identityMeta > span:last-child {\n  flex: none;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-identityMeta > span[data-invalid='true'],\n.rp-features-identityError {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-identityError {\n  min-height: 15px;\n  font-size: 9px;\n  line-height: 15px;\n}\n\n.rp-features-identityEditorActions {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n}\n\n.rp-features-identityEditorActions > span:last-child {\n  display: flex;\n  gap: 7px;\n}\n\n.rp-features-promptWorkspace {\n  display: grid;\n  grid-template-columns: 164px minmax(0, 1fr);\n  align-items: start;\n  gap: 16px;\n}\n\n.rp-features-promptRoleNav {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.rp-features-promptRoleButton {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n  gap: 1px;\n  border: 1px solid transparent;\n  border-radius: 8px;\n  padding: 9px 10px;\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  text-align: left;\n  cursor: pointer;\n}\n\n.rp-features-promptRoleButton strong {\n  font: 600 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-promptRoleButton span {\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n  font: 10px/16px var(--dsw-font-family);\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-promptRoleButton:hover {\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-promptRoleButton[data-selected='true'] {\n  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 24%, var(--dsw-alias-border-l2));\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-features-promptRoleButton:focus-visible,\n.rp-features-promptLayer summary:focus-visible,\n.rp-features-promptSelect select:focus-visible,\n.rp-features-identityEdit:focus-visible,\n.rp-features-identityReset:focus-visible,\n.rp-features-identityCancel:focus-visible,\n.rp-features-identitySave:focus-visible,\n.rp-features-identityField textarea:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-business-primary);\n  outline-offset: 2px;\n}\n\n.rp-features-promptDetail,\n.rp-features-promptProfile,\n.rp-features-promptProfileHeader > div:first-child {\n  min-width: 0;\n}\n\n.rp-features-promptSelect {\n  display: grid;\n  grid-template-columns: auto minmax(0, 220px);\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  margin-bottom: 12px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-promptSelect select {\n  min-width: 0;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 7px;\n  padding: 6px 28px 6px 9px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-primary);\n  font: 12px/18px var(--dsw-font-family);\n}\n\n.rp-features-promptEmpty {\n  border: 1px dashed var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 28px 24px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  line-height: 19px;\n  text-align: center;\n}\n\n.rp-features-promptProfile {\n  display: flex;\n  flex-direction: column;\n  gap: 11px;\n}\n\n.rp-features-promptProfileHeader {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 16px;\n}\n\n.rp-features-promptProfileHeader h4,\n.rp-features-promptProfileHeader p {\n  margin: 0;\n}\n\n.rp-features-promptProfileHeader h4 {\n  font-size: 14px;\n  line-height: 21px;\n}\n\n.rp-features-promptProfileHeader p {\n  margin-top: 2px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  line-height: 17px;\n}\n\n.rp-features-promptRoute {\n  display: flex;\n  flex: none;\n  align-items: center;\n  gap: 6px;\n  border-radius: 6px;\n  padding: 4px 7px;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 16px;\n}\n\n.rp-features-promptRoute strong {\n  color: var(--dsw-alias-label-secondary);\n  font-weight: 600;\n}\n\n.rp-features-promptNotes {\n  display: grid;\n  gap: 3px;\n  margin: 0;\n  padding: 9px 12px 9px 26px;\n  border-left: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent);\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 5%, transparent);\n  color: var(--dsw-alias-label-secondary);\n  font-size: 10px;\n  line-height: 16px;\n}\n\n.rp-features-promptOrderHeading {\n  color: var(--dsw-alias-label-primary);\n  font-size: 11px;\n  line-height: 17px;\n  font-weight: 650;\n}\n\n.rp-features-promptLayerList {\n  overflow: hidden;\n  margin: -3px 0 0;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  padding: 0;\n  background: var(--dsw-alias-bg-layer-3);\n  list-style: none;\n}\n\n.rp-features-promptLayerList > li:not(:last-child) {\n  border-bottom: 1px solid var(--dsw-alias-separator-primary);\n}\n\n.rp-features-promptLayer summary {\n  display: grid;\n  grid-template-columns: 22px minmax(130px, 1fr) auto auto 12px;\n  align-items: center;\n  gap: 8px;\n  padding: 10px 11px;\n  cursor: pointer;\n  list-style: none;\n}\n\n.rp-features-promptLayer summary::-webkit-details-marker {\n  display: none;\n}\n\n.rp-features-promptLayer summary > svg {\n  color: var(--dsw-alias-label-tertiary);\n  transition: transform 140ms ease;\n}\n\n.rp-features-promptLayer[open] summary > svg {\n  transform: rotate(180deg);\n}\n\n.rp-features-promptLayerIndex {\n  display: grid;\n  width: 20px;\n  height: 20px;\n  place-items: center;\n  border-radius: 50%;\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-features-promptLayerTitle {\n  display: flex;\n  min-width: 0;\n  flex-direction: column;\n}\n\n.rp-features-promptLayerTitle strong {\n  overflow: hidden;\n  font-size: 11px;\n  line-height: 17px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-promptLayerTitle small {\n  display: flex;\n  min-width: 0;\n  overflow: hidden;\n  align-items: center;\n  gap: 5px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 9px;\n  line-height: 14px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.rp-features-promptLayerTitle small span {\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n\n.rp-features-promptLayerTitle small code {\n  flex: none;\n  color: inherit;\n  font: inherit;\n}\n\n.rp-features-promptRole,\n.rp-features-promptKind {\n  border-radius: 5px;\n  padding: 2px 6px;\n  font-size: 9px;\n  line-height: 14px;\n  white-space: nowrap;\n}\n\n.rp-features-promptRole {\n  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent);\n  color: var(--dsw-alias-state-business-primary);\n  font-family: var(--ds-font-family-code);\n}\n\n.rp-features-promptRole[data-role='user'] {\n  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 9%, transparent);\n  color: var(--dsw-alias-state-success-primary);\n}\n\n.rp-features-promptRole[data-role='tools'] {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-secondary);\n}\n\n.rp-features-promptKind {\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-tertiary);\n}\n\n.rp-features-promptLayerBody {\n  border-top: 1px solid var(--dsw-alias-separator-primary);\n  padding: 10px 12px 12px 41px;\n  background: var(--dsw-alias-bg-layer-2);\n}\n\n.rp-features-promptLayerBody p {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 10px;\n  line-height: 17px;\n}\n\n.rp-features-promptLayerBody pre {\n  max-height: 360px;\n  overflow: auto;\n  margin: 0;\n  white-space: pre-wrap;\n  overflow-wrap: anywhere;\n}\n\n.rp-features-promptLayerBody pre code {\n  color: var(--dsw-alias-label-secondary);\n  font: 10px/17px var(--ds-font-family-code);\n}\n\n.rp-features-promptToolBlock {\n  display: grid;\n  gap: 6px;\n  margin-top: 9px;\n}\n\n.rp-features-promptToolBlock > span,\n.rp-features-promptNoTools {\n  color: var(--dsw-alias-label-tertiary) !important;\n  font-size: 9px !important;\n  line-height: 14px !important;\n}\n\n.rp-features-promptTools {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 5px;\n}\n\n.rp-features-promptTools code {\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 5px;\n  padding: 2px 6px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-secondary);\n  font: 9px/14px var(--ds-font-family-code);\n}\n\n.rp-features-state,\n.rp-features-failure {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-features-failure {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-features-failure button {\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 6px;\n  padding: 4px 10px;\n  background: transparent;\n  color: var(--dsw-alias-label-primary);\n  font: inherit;\n  cursor: pointer;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .rp-features-promptLayer summary > svg {\n    transition: none;\n  }\n}\n\n.rp-features-liveNotice {\n  min-height: 18px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n@media (max-width: 720px) {\n  .rp-features-header {\n    flex-direction: column;\n    gap: 12px;\n  }\n\n  .rp-features-versionSummary,\n  .rp-features-featureList {\n    width: 100%;\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .rp-features-coreVersions ul {\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .rp-features-visibilityBody dl > div {\n    grid-template-columns: minmax(0, 1fr);\n    gap: 0;\n  }\n\n  .rp-features-skill {\n    grid-template-columns: 32px minmax(0, 1fr) 38px;\n  }\n\n  .rp-features-promptWorkspace {\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .rp-features-promptRoleNav {\n    display: grid;\n    grid-template-columns: repeat(2, minmax(0, 1fr));\n  }\n\n  .rp-features-promptProfileHeader,\n  .rp-features-promptSelect {\n    grid-template-columns: minmax(0, 1fr);\n    flex-direction: column;\n    align-items: stretch;\n  }\n\n  .rp-features-identityHeader,\n  .rp-features-identityMeta,\n  .rp-features-identityEditorActions {\n    align-items: stretch;\n    flex-direction: column;\n  }\n\n  .rp-features-identityEdit {\n    align-self: flex-start;\n  }\n\n  .rp-features-identityEditorActions > span:last-child {\n    justify-content: flex-end;\n  }\n\n  .rp-features-promptLayer summary {\n    grid-template-columns: 22px minmax(0, 1fr) auto 12px;\n  }\n\n  .rp-features-promptKind {\n    display: none;\n  }\n\n  .rp-features-promptLayerBody {\n    padding-left: 12px;\n  }\n\n  .rp-features-quickDialog {\n    width: calc(100vw - 16px);\n    max-height: calc(100dvh - 16px);\n  }\n\n  .rp-features-quickManagerToolbar {\n    align-items: flex-start;\n    flex-direction: column;\n  }\n\n  .rp-features-quickFields {\n    grid-template-columns: 1fr;\n  }\n\n  .rp-features-quickReplyRow {\n    grid-template-columns: 24px minmax(0, 1fr);\n    padding: 10px;\n  }\n\n  .rp-features-quickOrder {\n    width: 24px;\n    height: 24px;\n    margin-top: 20px;\n  }\n\n  .rp-features-quickRowActions {\n    grid-column: 2;\n    grid-template-columns: repeat(3, 34px);\n    padding-top: 0;\n  }\n\n  .rp-features-quickRowAction,\n  .rp-features-quickDangerAction {\n    width: 34px;\n    height: 34px;\n  }\n\n  .rp-features-quickFooter {\n    align-items: stretch;\n    flex-direction: column-reverse;\n  }\n\n  .rp-features-quickFooter > span {\n    display: grid;\n    grid-template-columns: 1fr 1fr;\n  }\n\n  .rp-features-quickResetButton {\n    align-self: flex-start;\n  }\n}\n";
 		function ensureStyles() {
 			document.getElementById(STYLE_ID)?.remove();
 			const style = document.createElement("style");
@@ -7481,7 +7513,7 @@ get: (_target, key) => {
 		}
 		//#endregion
 		//#region src/quick-reply-settings.js
-		const h$1 = react.default.createElement;
+		const h$2 = react.default.createElement;
 		/** Roleplay Settings owns customization; the composer only inserts saved replies. */
 		function QuickReplyManager({ open, store, onClose }) {
 			const state = (0, react.useSyncExternalStore)(store.subscribe, store.getSnapshot);
@@ -7496,7 +7528,7 @@ get: (_target, key) => {
 			if (!open) return null;
 			if (!(state.phase === "ready" || state.phase === "saving")) {
 				const failed = state.phase === "error";
-				return h$1(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+				return h$2(_deepseek_ai_dsh_client_ui_primitives.Modal, {
 					open: true,
 					onClose,
 					title: "设置快捷回复",
@@ -7504,14 +7536,14 @@ get: (_target, key) => {
 					description: "前三项会显示在输入栏；更多项目会收进“更多快捷回复”菜单。",
 					className: css.quickDialog,
 					contentClassName: css.quickDialogContent
-				}, h$1("div", { className: css.quickLoadState }, h$1("p", { role: failed ? "alert" : "status" }, failed ? state.error : "正在读取快捷回复…"), failed ? h$1("button", {
+				}, h$2("div", { className: css.quickLoadState }, h$2("p", { role: failed ? "alert" : "status" }, failed ? state.error : "正在读取快捷回复…"), failed ? h$2("button", {
 					type: "button",
 					onClick: () => {
 						store.load().catch(() => {});
 					}
 				}, "重新加载") : null));
 			}
-			return h$1(QuickReplyEditor, {
+			return h$2(QuickReplyEditor, {
 				state,
 				store,
 				onClose
@@ -7559,7 +7591,7 @@ get: (_target, key) => {
 					setError(friendlyQuickReplyRequestError(requestError, "save"));
 				}
 			};
-			const footer = h$1("div", { className: css.quickFooter }, h$1("button", {
+			const footer = h$2("div", { className: css.quickFooter }, h$2("button", {
 				type: "button",
 				className: css.quickResetButton,
 				disabled: saving,
@@ -7567,18 +7599,18 @@ get: (_target, key) => {
 					setDraft(DEFAULT_QUICK_REPLIES.map((reply) => ({ ...reply })));
 					setError("");
 				}
-			}, "恢复默认"), h$1("span", null, h$1(_deepseek_ai_dsh_client_ui_primitives.Button, {
+			}, "恢复默认"), h$2("span", null, h$2(_deepseek_ai_dsh_client_ui_primitives.Button, {
 				variant: "outline",
 				disabled: saving,
 				onClick: onClose
-			}, "取消"), h$1(_deepseek_ai_dsh_client_ui_primitives.Button, {
+			}, "取消"), h$2(_deepseek_ai_dsh_client_ui_primitives.Button, {
 				variant: "primary",
 				disabled: !state.writable || saving || !changed,
 				onClick: (event) => {
 					save(event);
 				}
 			}, saving ? "正在保存…" : "保存快捷回复")));
-			return h$1(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+			return h$2(_deepseek_ai_dsh_client_ui_primitives.Modal, {
 				open: true,
 				onClose: saving ? () => {} : onClose,
 				title: "设置快捷回复",
@@ -7587,24 +7619,24 @@ get: (_target, key) => {
 				className: css.quickDialog,
 				contentClassName: css.quickDialogContent,
 				footer
-			}, h$1("form", {
+			}, h$2("form", {
 				className: css.quickManager,
 				onSubmit: (event) => {
 					save(event);
 				}
-			}, h$1("div", { className: css.quickManagerToolbar }, h$1("span", null, `${draft.length} / ${state.limits.replies} 项 · ${totalCharacters} / ${state.limits.totalCharacters} 字符`), h$1(m.button, {
+			}, h$2("div", { className: css.quickManagerToolbar }, h$2("span", null, `${draft.length} / ${state.limits.replies} 项 · ${totalCharacters} / ${state.limits.totalCharacters} 字符`), h$2(m.button, {
 				type: "button",
 				className: css.quickAddButton,
 				disabled: saving || draft.length >= state.limits.replies,
 				whileTap: { scale: .98 },
 				onClick: add
-			}, h$1(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 15 }), "新增快捷回复")), !state.writable ? h$1("div", {
+			}, h$2(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 15 }), "新增快捷回复")), !state.writable ? h$2("div", {
 				className: css.quickNotice,
 				role: "status"
-			}, "当前环境可以使用已有快捷回复，但不能保存修改。") : null, error.length > 0 ? h$1("div", {
+			}, "当前环境可以使用已有快捷回复，但不能保存修改。") : null, error.length > 0 ? h$2("div", {
 				className: css.quickError,
 				role: "alert"
-			}, error) : null, draft.length === 0 ? h$1("div", { className: css.quickEmpty }, h$1("strong", null, "还没有快捷回复"), h$1("span", null, "新增一项后，输入时就能一键插入常用内容。")) : h$1("ol", { className: css.quickReplyList }, h$1(AnimatePresence, { initial: false }, ...draft.map((reply, index) => h$1(ReplyEditorRow, {
+			}, error) : null, draft.length === 0 ? h$2("div", { className: css.quickEmpty }, h$2("strong", null, "还没有快捷回复"), h$2("span", null, "新增一项后，输入时就能一键插入常用内容。")) : h$2("ol", { className: css.quickReplyList }, h$2(AnimatePresence, { initial: false }, ...draft.map((reply, index) => h$2(ReplyEditorRow, {
 				key: reply.id,
 				reply,
 				index,
@@ -7618,7 +7650,7 @@ get: (_target, key) => {
 			}))))));
 		}
 		function ReplyEditorRow({ reply, index, total, limits, saving, reduced, onUpdate, onMove, onRemove }) {
-			return h$1(m.li, {
+			return h$2(m.li, {
 				className: css.quickReplyRow,
 				layout: true,
 				initial: reduced ? false : {
@@ -7634,49 +7666,49 @@ get: (_target, key) => {
 					x: 12
 				},
 				transition: { duration: reduced ? 0 : .14 }
-			}, h$1("span", {
+			}, h$2("span", {
 				className: css.quickOrder,
 				"aria-hidden": true
-			}, index + 1), h$1("div", { className: css.quickFields }, h$1("label", { className: css.quickLabelField }, h$1("span", null, "按钮名称", h$1("small", null, `${characters(reply.label)} / ${limits.labelCharacters}`)), h$1("input", {
+			}, index + 1), h$2("div", { className: css.quickFields }, h$2("label", { className: css.quickLabelField }, h$2("span", null, "按钮名称", h$2("small", null, `${characters(reply.label)} / ${limits.labelCharacters}`)), h$2("input", {
 				value: reply.label,
 				disabled: saving,
 				placeholder: "例如：继续",
 				"aria-label": `第 ${index + 1} 项按钮名称`,
 				onChange: (event) => onUpdate("label", event.target.value)
-			})), h$1("label", { className: css.quickContentField }, h$1("span", null, "插入内容", h$1("small", null, `${characters(reply.content)} / ${limits.contentCharacters}`)), h$1("textarea", {
+			})), h$2("label", { className: css.quickContentField }, h$2("span", null, "插入内容", h$2("small", null, `${characters(reply.content)} / ${limits.contentCharacters}`)), h$2("textarea", {
 				rows: 2,
 				value: reply.content,
 				disabled: saving,
 				placeholder: "填写点击后插入输入框的完整内容",
 				"aria-label": `第 ${index + 1} 项插入内容`,
 				onChange: (event) => onUpdate("content", event.target.value)
-			})), h$1("label", { className: css.quickCursorField }, h$1("span", null, "光标位置"), h$1("select", {
+			})), h$2("label", { className: css.quickCursorField }, h$2("span", null, "光标位置"), h$2("select", {
 				value: reply.cursorPosition,
 				disabled: saving,
 				"aria-label": `第 ${index + 1} 项光标位置`,
 				onChange: (event) => onUpdate("cursorPosition", event.target.value)
-			}, h$1("option", { value: QUICK_REPLY_CURSOR_POSITION_MIDDLE }, "中间"), h$1("option", { value: "end" }, "末尾")))), h$1("div", { className: css.quickRowActions }, h$1(ActionButton, {
+			}, h$2("option", { value: QUICK_REPLY_CURSOR_POSITION_MIDDLE }, "中间"), h$2("option", { value: "end" }, "末尾")))), h$2("div", { className: css.quickRowActions }, h$2(ActionButton, {
 				label: "上移",
 				disabled: saving || index === 0,
 				onClick: () => onMove(-1)
-			}, h$1(_deepseek_ai_dsh_client_ui_primitives.IconChevronUpOutline14, { size: 14 })), h$1(ActionButton, {
+			}, h$2(_deepseek_ai_dsh_client_ui_primitives.IconChevronUpOutline14, { size: 14 })), h$2(ActionButton, {
 				label: "下移",
 				disabled: saving || index === total - 1,
 				onClick: () => onMove(1)
-			}, h$1(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 })), h$1(ActionButton, {
+			}, h$2(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 })), h$2(ActionButton, {
 				label: "删除",
 				danger: true,
 				disabled: saving,
 				onClick: onRemove
-			}, h$1(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, { size: 14 }))));
+			}, h$2(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, { size: 14 }))));
 		}
 		function ActionButton({ label, disabled, danger = false, onClick, children }) {
-			return h$1(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
+			return h$2(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
 				label,
 				side: "top",
 				delayMs: 400,
 				disabled
-			}, h$1(m.button, {
+			}, h$2(m.button, {
 				type: "button",
 				className: danger ? css.quickDangerAction : css.quickRowAction,
 				disabled,
@@ -7703,6 +7735,197 @@ get: (_target, key) => {
 			if (error?.code === "DUPLICATE_LABEL" || error?.code === "DUPLICATE_REPLY") return "每个快捷回复需要使用不同的名称。";
 			if (error?.code === "LIMIT_EXCEEDED") return "快捷回复数量或内容超过上限，请精简后再保存。";
 			return "请填写每项快捷回复的按钮名称和插入内容。";
+		}
+		const DEFAULT_REPLY_OPTION_KEYWORDS = Object.freeze(Array.from({ length: 3 }, () => ""));
+		/**
+		* Normalize optional per-option direction keywords for runtime configuration.
+		* Older settings may have fewer or more slots than the current count, so this
+		* boundary pads missing values and drops slots that are no longer visible.
+		*/
+		function normalizeReplyOptionKeywords(value = DEFAULT_REPLY_OPTION_KEYWORDS, count = 3) {
+			const normalizedCount = normalizeReplyOptionsCount(count);
+			if (!Array.isArray(value)) throw new TypeError("reply option keywords must be an array");
+			if (value.length > 5) throw new RangeError(`reply option keywords must contain at most 5 items`);
+			const normalized = value.map((candidate, index) => normalizeKeyword(candidate, index));
+			return Array.from({ length: normalizedCount }, (_, index) => normalized[index] ?? "");
+		}
+		/** Normalize the user-configurable exact option count. */
+		function normalizeReplyOptionsCount(value = 3) {
+			if (!Number.isSafeInteger(value)) throw new TypeError("reply options count must be a safe integer");
+			if (value < 1 || value > 5) throw new RangeError(`reply options count must be between 1 and 5`);
+			return value;
+		}
+		function normalizeKeyword(candidate, index) {
+			if (typeof candidate !== "string") throw new TypeError(`reply option keywords[${index}] must be a string`);
+			const normalized = candidate.replaceAll(/\s+/gu, " ").trim();
+			if ([...normalized].length > 40) throw new RangeError(`reply option keywords[${index}] exceeds 40 Unicode characters`);
+			return normalized;
+		}
+		//#endregion
+		//#region src/reply-options-settings.js
+		const h$1 = react.default.createElement;
+		const MotionForm = m.form;
+		const KEYWORD_PLACEHOLDERS = Object.freeze([
+			"例如：试探",
+			"例如：反抗",
+			"例如：暂时退让",
+			"例如：寻求帮助",
+			"例如：离开现场"
+		]);
+		/** Configure the exact option count and one optional main-model direction per option. */
+		function ReplyOptionsSettingsDialog({ open, count, keywords, writable, saving, onSave, onClose }) {
+			const reduced = useReducedMotion();
+			const countHelpId = (0, react.useId)();
+			const directionHelpId = (0, react.useId)();
+			const errorId = (0, react.useId)();
+			const currentCount = validCount(count) ? count : 3;
+			const currentKeywords = normalizeReplyOptionKeywords(keywords, currentCount);
+			const [countDraft, setCountDraft] = (0, react.useState)(String(currentCount));
+			const [keywordDrafts, setKeywordDrafts] = (0, react.useState)(() => keywordSlots(currentKeywords));
+			const [saveError, setSaveError] = (0, react.useState)("");
+			const parsedCount = parseCountDraft(countDraft);
+			const visibleCount = parsedCount ?? currentCount;
+			const keywordErrorIndex = keywordDrafts.slice(0, visibleCount).findIndex((value) => [...normalizeKeywordDraft(value)].length > 40);
+			const validationError = parsedCount === void 0 ? "请输入 1 到 5 之间的整数。" : keywordErrorIndex >= 0 ? `选项 ${keywordErrorIndex + 1} 的方向关键词最多 40 个字符。` : "";
+			const nextKeywords = parsedCount === void 0 || keywordErrorIndex >= 0 ? void 0 : normalizeReplyOptionKeywords(keywordDrafts.slice(0, parsedCount), parsedCount);
+			const changed = parsedCount !== void 0 && nextKeywords !== void 0 && (parsedCount !== currentCount || !sameStrings(nextKeywords, currentKeywords));
+			if (!open) return null;
+			const save = async () => {
+				if (!writable || saving || parsedCount === void 0 || nextKeywords === void 0 || !changed) return;
+				setSaveError("");
+				try {
+					if (await onSave({
+						count: parsedCount,
+						keywords: nextKeywords
+					})) onClose();
+					else setSaveError("回复选项设置没有保存，请稍后重试。");
+				} catch {
+					setSaveError("回复选项设置没有保存，请稍后重试。");
+				}
+			};
+			const footer = h$1("div", { className: css.replyOptionsSettingsFooter }, h$1(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				type: "button",
+				variant: "outline",
+				disabled: saving,
+				onClick: onClose
+			}, "取消"), h$1(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				type: "button",
+				variant: "primary",
+				disabled: !writable || saving || validationError.length > 0 || !changed,
+				onClick: () => {
+					save();
+				}
+			}, saving ? "正在保存…" : "保存设置"));
+			return h$1(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+				open: true,
+				onClose: saving ? () => {} : onClose,
+				title: "设置回复选项",
+				closeLabel: "关闭回复选项设置",
+				description: "设置主模型生成的选项数量，并为每个编号指定可选的剧情方向。",
+				className: css.replyOptionsDialog,
+				contentClassName: css.replyOptionsDialogContent,
+				footer
+			}, h$1(MotionForm, {
+				className: css.replyOptionsSettingsForm,
+				onSubmit: (event) => {
+					event.preventDefault();
+					save();
+				},
+				initial: reduced ? false : {
+					opacity: 0,
+					y: 4
+				},
+				animate: {
+					opacity: 1,
+					y: 0
+				},
+				transition: { duration: reduced ? 0 : .14 }
+			}, h$1("div", { className: css.replyOptionsCountSection }, h$1("label", { className: css.replyOptionsCountField }, h$1("span", null, "回复条数"), h$1("input", {
+				type: "number",
+				inputMode: "numeric",
+				min: 1,
+				max: 5,
+				step: 1,
+				value: countDraft,
+				autoFocus: true,
+				disabled: saving,
+				"aria-invalid": parsedCount === void 0 ? "true" : "false",
+				"aria-describedby": `${countHelpId} ${errorId}`,
+				onInput: (event) => {
+					setCountDraft(event.currentTarget.value);
+					setSaveError("");
+				}
+			})), h$1("p", {
+				id: countHelpId,
+				className: css.replyOptionsSettingsHint
+			}, "可填写 1–5；下方方向输入框会与条数同步。")), h$1("section", {
+				className: css.replyOptionsKeywordSection,
+				"aria-labelledby": "rp-reply-options-keywords-title"
+			}, h$1("header", { className: css.replyOptionsKeywordHeader }, h$1("div", null, h$1("h3", { id: "rp-reply-options-keywords-title" }, "方向关键词"), h$1("p", { id: directionHelpId }, "每条选项对应一个方向；留空时由模型自行决定。")), h$1("span", null, "可选")), h$1("div", { className: css.replyOptionsKeywordList }, h$1(AnimatePresence, { initial: false }, ...Array.from({ length: visibleCount }, (_, index) => {
+				const value = keywordDrafts[index] ?? "";
+				const characters = [...normalizeKeywordDraft(value)].length;
+				const invalid = characters > 40;
+				return h$1(m.label, {
+					key: index,
+					className: css.replyOptionsKeywordRow,
+					layout: !reduced,
+					initial: reduced ? false : {
+						opacity: 0,
+						y: -4
+					},
+					animate: {
+						opacity: 1,
+						y: 0
+					},
+					exit: reduced ? { opacity: 1 } : {
+						opacity: 0,
+						y: -4
+					},
+					transition: { duration: reduced ? 0 : .12 }
+				}, h$1("span", {
+					className: css.replyOptionsKeywordNumber,
+					"aria-hidden": true
+				}, index + 1), h$1("span", { className: css.replyOptionsKeywordField }, h$1("span", null, `选项 ${index + 1} 的方向关键词`), h$1("input", {
+					type: "text",
+					value,
+					placeholder: KEYWORD_PLACEHOLDERS[index],
+					autoComplete: "off",
+					disabled: saving,
+					"aria-label": `选项 ${index + 1} 的方向关键词`,
+					"aria-invalid": invalid ? "true" : "false",
+					"aria-describedby": `${directionHelpId} ${errorId}`,
+					onChange: (event) => {
+						const next = [...keywordDrafts];
+						next[index] = event.currentTarget.value;
+						setKeywordDrafts(next);
+						setSaveError("");
+					}
+				})), h$1("span", {
+					className: css.replyOptionsKeywordCount,
+					"data-invalid": invalid ? "true" : "false",
+					"aria-hidden": true
+				}, `${characters}/40`));
+			}))), h$1("p", { className: css.replyOptionsKeywordNote }, "关键词只指导对应编号的生成方向，不会作为标题或标签拼入发送消息。")), h$1("p", {
+				id: errorId,
+				className: css.replyOptionsSettingsError,
+				role: validationError.length > 0 || saveError.length > 0 ? "alert" : void 0
+			}, validationError || saveError)));
+		}
+		function parseCountDraft(value) {
+			if (typeof value !== "string" || !/^[1-5]$/u.test(value.trim())) return void 0;
+			return Number(value.trim());
+		}
+		function keywordSlots(value) {
+			return Array.from({ length: 5 }, (_, index) => value[index] ?? "");
+		}
+		function normalizeKeywordDraft(value) {
+			return typeof value === "string" ? value.replaceAll(/\s+/gu, " ").trim() : "";
+		}
+		function validCount(value) {
+			return Number.isSafeInteger(value) && value >= 1 && value <= 5;
+		}
+		function sameStrings(left, right) {
+			return left.length === right.length && left.every((value, index) => value === right[index]);
 		}
 		//#endregion
 		//#region src/client.js
@@ -7751,7 +7974,10 @@ get: (_target, key) => {
 			applies: "资料入口会立即调整；Roleplay 运行能力从下一次新建或重新打开对话开始生效。",
 			saveError: "启用状态没有保存，请稍后重试。",
 			quickRepliesConfigure: "设置快捷回复",
-			quickRepliesEnableFirst: "启用后设置",
+			quickRepliesEnableFirst: "启用快捷回复后设置",
+			replyOptionsConfigure: "设置回复选项",
+			replyOptionsEnableFirst: "启用回复选项后设置",
+			replyOptionsSettingsSaved: "回复条数和方向关键词已保存；新建或重新打开对话后生效。",
 			skillsTitle: "Roleplay Skills",
 			skillsDescription: "逐项选择 Roleplay 插件向 Agent 提供的工作指南。停用 Skill 不会停用插件，也不会删除资料。",
 			skillsScope: "这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。",
@@ -7878,7 +8104,10 @@ get: (_target, key) => {
 			applies: "Material entries update immediately. Runtime changes apply to newly created or reopened conversations.",
 			saveError: "The enabled state was not saved. Try again.",
 			quickRepliesConfigure: "Configure quick replies",
-			quickRepliesEnableFirst: "Enable to configure",
+			quickRepliesEnableFirst: "Enable Quick replies to configure",
+			replyOptionsConfigure: "Configure reply options",
+			replyOptionsEnableFirst: "Enable Reply options to configure",
+			replyOptionsSettingsSaved: "The reply count and direction keywords are saved and apply to newly created or reopened conversations.",
 			skillsTitle: "Roleplay Skills",
 			skillsDescription: "Select the guides Roleplay plugins expose to agents. Disabling a Skill does not disable its plugin or delete data.",
 			skillsScope: "This page only manages Skills contributed by Roleplay plugins. Project and user Skills are unaffected.",
@@ -8008,6 +8237,7 @@ get: (_target, key) => {
 			const [promptStatus, setPromptStatus] = (0, react.useState)({ phase: "idle" });
 			const [promptRequest, setPromptRequest] = (0, react.useState)(0);
 			const [quickReplyManagerOpen, setQuickReplyManagerOpen] = (0, react.useState)(false);
+			const [replyOptionsSettingsOpen, setReplyOptionsSettingsOpen] = (0, react.useState)(false);
 			const quickReplyStore = (0, react.useMemo)(() => createQuickReplyStore(connection), [connection]);
 			(0, react.useEffect)(() => {
 				let live = true;
@@ -8055,7 +8285,8 @@ get: (_target, key) => {
 			const selectedSkills = (0, react.useMemo)(() => new Set(enabledSkills), [enabledSkills]);
 			const compatible = status.phase === "ready" && status.value.compatible === true;
 			const settingsRevision = status.phase === "ready" ? status.value.settings?.revision : null;
-			const canWrite = status.phase === "ready" && status.value.settings?.writable === true && Number.isSafeInteger(settingsRevision) && compatible && pending === null;
+			const settingsWritable = status.phase === "ready" && status.value.settings?.writable === true && Number.isSafeInteger(settingsRevision) && compatible;
+			const canWrite = settingsWritable && pending === null;
 			const toggleFeature = async (feature) => {
 				if (!canWrite) return;
 				const nextEnabled = !enabled.has(feature.id);
@@ -8121,6 +8352,25 @@ get: (_target, key) => {
 					return true;
 				} catch {
 					setNotice(t("identitySaveError"));
+					return false;
+				} finally {
+					setPending(null);
+				}
+			};
+			const updateReplyOptions = async ({ count, keywords }) => {
+				if (!canWrite) return false;
+				setPending("reply-options-settings");
+				setNotice("");
+				try {
+					const nextStatus = await setReplyOptionsSettings(connection, count, keywords, settingsRevision);
+					if (nextStatus.replyOptionsCount !== count || !sameSelection(nextStatus.replyOptionsKeywords, keywords)) throw new Error("Roleplay reply option settings were not applied");
+					setStatus({
+						phase: "ready",
+						value: nextStatus
+					});
+					setNotice(t("replyOptionsSettingsSaved"));
+					return true;
+				} catch {
 					return false;
 				} finally {
 					setPending(null);
@@ -8198,6 +8448,7 @@ get: (_target, key) => {
 				},
 				onConfigure: (feature) => {
 					if (feature.id === "quick-replies") setQuickReplyManagerOpen(true);
+					if (feature.id === "reply-options") setReplyOptionsSettingsOpen(true);
 				},
 				t
 			}) : activeTab === "skills" ? h(SkillsPanel, {
@@ -8223,7 +8474,15 @@ get: (_target, key) => {
 				open: quickReplyManagerOpen,
 				store: quickReplyStore,
 				onClose: () => setQuickReplyManagerOpen(false)
-			}), h("div", {
+			}), replyOptionsSettingsOpen ? h(ReplyOptionsSettingsDialog, {
+				open: true,
+				count: status.value.replyOptionsCount,
+				keywords: status.value.replyOptionsKeywords,
+				writable: settingsWritable,
+				saving: pending === "reply-options-settings",
+				onSave: updateReplyOptions,
+				onClose: () => setReplyOptionsSettingsOpen(false)
+			}) : null, h("div", {
 				className: css.liveNotice,
 				"aria-live": "polite"
 			}, notice))));
@@ -8245,7 +8504,7 @@ get: (_target, key) => {
 				status: status.features.find((item) => item.id === feature.id),
 				reduced,
 				onToggle: () => onToggle(feature),
-				onConfigure: feature.id === "quick-replies" ? () => onConfigure(feature) : void 0,
+				onConfigure: feature.id === "quick-replies" || feature.id === "reply-options" ? () => onConfigure(feature) : void 0,
 				t
 			}))))));
 		}
@@ -8576,8 +8835,8 @@ get: (_target, key) => {
 		function FeatureRow({ feature, checked, pending, disabled, status, reduced, onToggle, onConfigure, t }) {
 			const requires = dependencyLabels(feature);
 			const recommends = dependencyLabels(feature, "recommends");
-			const configureReady = checked && status?.active === true && !pending;
-			const configureLabel = t(configureReady ? "quickRepliesConfigure" : "quickRepliesEnableFirst");
+			const configureReady = checked && status?.active === true && !pending && !disabled;
+			const configureLabel = feature.id === "reply-options" ? t(configureReady ? "replyOptionsConfigure" : "replyOptionsEnableFirst") : t(configureReady ? "quickRepliesConfigure" : "quickRepliesEnableFirst");
 			return h(m.li, {
 				className: css.feature,
 				layout: !reduced

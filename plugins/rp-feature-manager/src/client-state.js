@@ -59,6 +59,14 @@ export async function setRoleplaySetting(connection, field, value, expectedRevis
   })
 }
 
+export async function setReplyOptionsSettings(connection, count, keywords, expectedRevision) {
+  return roleplayFeatureRequest(connection, 'settings/reply-options', '回复选项设置保存失败', {
+    count,
+    keywords,
+    expectedRevision,
+  })
+}
+
 export async function unsetRoleplaySetting(connection, field, expectedRevision) {
   return roleplayFeatureRequest(connection, 'settings/unset', 'Roleplay 设置重置失败', {
     field,

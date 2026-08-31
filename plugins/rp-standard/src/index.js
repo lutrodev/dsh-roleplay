@@ -9,7 +9,7 @@ import { normalizeInitialSubagents } from 'dsh-roleplay-rp-subagent-manager'
 const PRESET_ID = 'roleplay'
 const PRESET_OWNER = 'dsh-roleplay-rp-standard'
 // Bump whenever managed composition or bundled guidance Skill files change.
-const PRESET_VERSION = 36
+const PRESET_VERSION = 39
 const MARKER_FILE = '.rp-standard.json'
 const COMPOSITION_FILE = 'agent.cordis.yml'
 const METADATA_FILE = 'preset.yml'
@@ -46,6 +46,7 @@ const MODULES = {
   '__TOOL_WEB_MODULE__': '@deepseek-ai/dsh-tool-web',
   '__TOOL_PRESENTATION_MODULE__': '@deepseek-ai/dsh-agent-tool-presentation',
   '__RP_CORE_MODULE__': 'dsh-roleplay-rp-core',
+  '__RP_REPLY_OPTIONS_MODULE__': 'dsh-roleplay-rp-reply-options',
   '__RP_SUBAGENT_MANAGER_MODULE__': 'dsh-roleplay-rp-subagent-manager',
   '__RP_SESSION_MODULE__': 'dsh-roleplay-rp-session',
   '__RP_CHARACTER_CARD_MODULE__': 'dsh-roleplay-rp-character-card',
@@ -206,6 +207,9 @@ async function buildPresetFiles(config, presetDirectory, features) {
     '__MAX_SUBAGENT_INSTRUCTIONS_CHARACTERS__': config.maxSubagentInstructionsCharacters,
     '__INITIAL_SUBAGENTS__': config.initialSubagents ?? [],
     '__RP_SUBAGENT_MANAGER_DISABLED__': !features.isEnabled('subagent-manager'),
+    '__RP_REPLY_OPTIONS_DISABLED__': !features.isEnabled('reply-options'),
+    '__RP_REPLY_OPTIONS_COUNT__': features.replyOptionsCount(),
+    '__RP_REPLY_OPTIONS_KEYWORDS__': features.replyOptionsKeywords(),
     '__RP_CHARACTER_CARD_DISABLED__': !features.isEnabled('character-card'),
     '__RP_STATE_DISABLED__': !features.isEnabled('state'),
     '__RP_COMPAT_MVU_DISABLED__': !features.isEnabled('compat-mvu'),

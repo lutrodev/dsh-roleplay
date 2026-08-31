@@ -187,10 +187,10 @@ test('manager enables the display entry from the persisted feature selection', a
   }
 })
 
-test('manager settles new 0.1.5 entries without changing stored old-feature switches', async () => {
+test('manager settles parked browser entries without changing stored old-feature switches', async () => {
   const ctx = new Context()
   provideSystemPrompt(ctx)
-  const newEntries = new Set(['rp-quick-replies', 'rp-state-display', 'rp-compact-access-mode'])
+  const newEntries = new Set(['rp-quick-replies', 'rp-reply-options', 'rp-state-display', 'rp-compact-access-mode'])
   const entries = [
     'rp-character-library',
     'rp-message-actions',
@@ -212,11 +212,12 @@ test('manager settles new 0.1.5 entries without changing stored old-feature swit
     assert.equal(byId['rp-character-library'].options.disabled, false)
     assert.equal(byId['rp-message-actions'].options.disabled, true)
     assert.equal(byId['rp-quick-replies'].options.disabled, true)
+    assert.equal(byId['rp-reply-options'].options.disabled, true)
     assert.equal(byId['rp-state-display'].options.disabled, true)
     assert.equal(byId['rp-compact-access-mode'].options.disabled, true)
     assert.deepEqual(ctx.settings.get('roleplay-features').enabledFeatures, ['character-card'])
     assert.deepEqual(ctx.get('rpFeatures').snapshot().enabledFeatures, ['character-card'])
-    for (const id of ['quick-replies', 'state-display', 'compact-access-mode']) {
+    for (const id of ['quick-replies', 'reply-options', 'state-display', 'compact-access-mode']) {
       const status = ctx.get('rpFeatures').status().features.find(feature => feature.id === id)
       assert.equal(status.enabled, false)
       assert.equal(status.active, false)
@@ -226,11 +227,12 @@ test('manager settles new 0.1.5 entries without changing stored old-feature swit
   }
 })
 
-test('fresh 0.1.5 defaults activate all three parked entries before reporting them enabled', async () => {
+test('fresh defaults activate every parked browser entry before reporting it enabled', async () => {
   const ctx = new Context()
   provideSystemPrompt(ctx)
   const entries = [
     loaderEntry('rp-quick-replies', true),
+    loaderEntry('rp-reply-options', true),
     loaderEntry('rp-state-display', true),
     loaderEntry('rp-compact-access-mode', true),
   ]
@@ -239,7 +241,7 @@ test('fresh 0.1.5 defaults activate all three parked entries before reporting th
     await ctx.plugin(MemorySettings)
     await ctx.plugin(ManagerPlugin, { enabledFeatures: DEFAULT_ENABLED_FEATURES })
     for (const entry of entries) assert.equal(entry.disabled, false)
-    for (const id of ['quick-replies', 'state-display', 'compact-access-mode']) {
+    for (const id of ['quick-replies', 'reply-options', 'state-display', 'compact-access-mode']) {
       const status = ctx.get('rpFeatures').status().features.find(feature => feature.id === id)
       assert.equal(status.enabled, true)
       assert.equal(status.active, true)
@@ -260,6 +262,8 @@ test('manager publishes its enabled selection through the shared settings namesp
     assert.deepEqual(namespace?.value, {
       enabledFeatures: ['lore-book', 'state'],
       enabledSkills: DEFAULT_ENABLED_SKILLS,
+      replyOptionsCount: 3,
+      replyOptionsKeywords: ['', '', ''],
       harnessIdentity: '',
     })
     assert.equal(namespace?.applies, 'live')
@@ -325,16 +329,28 @@ test('browser API follows the typed Remote boundary and persists Roleplay settin
     assert.deepEqual(updated.value.value.settings, { writable: true, revision: 1 })
     assert.deepEqual(ctx.settings.get('roleplay-features').enabledFeatures, ['state'])
 
-    const identity = await handler('settings/set', {
-      field: 'harnessIdentity', value: 'Remote Roleplay identity.', expectedRevision: 1,
+    const count = await handler('settings/reply-options', {
+      count: 5,
+      keywords: ['试探', '反抗', '', '求助', '离开'],
+      expectedRevision: 1,
     })
-    assert.equal(identity.value.value.settings.revision, 2)
+    assert.equal(count.value.ok, true)
+    assert.equal(count.value.value.replyOptionsCount, 5)
+    assert.deepEqual(count.value.value.replyOptionsKeywords, ['试探', '反抗', '', '求助', '离开'])
+    assert.equal(count.value.value.settings.revision, 2)
+    assert.equal(ctx.get('rpFeatures').replyOptionsCount(), 5)
+    assert.deepEqual(ctx.get('rpFeatures').replyOptionsKeywords(), ['试探', '反抗', '', '求助', '离开'])
+
+    const identity = await handler('settings/set', {
+      field: 'harnessIdentity', value: 'Remote Roleplay identity.', expectedRevision: 2,
+    })
+    assert.equal(identity.value.value.settings.revision, 3)
     assert.equal(ctx.get('rpFeatures').harnessIdentity(), 'Remote Roleplay identity.')
 
     const reset = await handler('settings/unset', {
-      field: 'harnessIdentity', expectedRevision: 2,
+      field: 'harnessIdentity', expectedRevision: 3,
     })
-    assert.equal(reset.value.value.settings.revision, 3)
+    assert.equal(reset.value.value.settings.revision, 4)
     assert.equal(ctx.get('rpFeatures').harnessIdentity(), DEFAULT_IDENTITY)
 
     const stale = await handler('settings/set', {
@@ -345,6 +361,66 @@ test('browser API follows the typed Remote boundary and persists Roleplay settin
       error: { code: 'ROLEPLAY_SETTINGS_UPDATE_FAILED', message: 'Roleplay 设置没有保存，请稍后重试。' },
     })
     assert.deepEqual(ctx.settings.get('roleplay-features').enabledSkills, ['rp-guide-lorebook'])
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('manager atomically validates reply option count and index-aligned direction keywords', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  ctx.provide('loader', { entries: () => [], async await() {} })
+  try {
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(ManagerPlugin, { enabledFeatures: ['reply-options'] })
+    const manager = ctx.get('rpFeatures')
+    const snapshots = []
+    manager.subscribe(snapshot => { snapshots.push(snapshot) })
+
+    for (const value of [0, 6, 1.5]) {
+      await assert.rejects(
+        manager.setReplyOptionsSettings({ count: value, keywords: [], expectedRevision: 0 }),
+        /integer|between 1 and 5/,
+      )
+    }
+    assert.equal(manager.replyOptionsCount(), 3)
+    assert.deepEqual(manager.replyOptionsKeywords(), ['', '', ''])
+    await assert.rejects(
+      manager.setReplyOptionsSettings({ count: 3, keywords: ['试探'], expectedRevision: 0 }),
+      /exactly 3 items/,
+    )
+    await assert.rejects(
+      manager.setReplyOptionsSettings({ count: 1, keywords: ['界'.repeat(41)], expectedRevision: 0 }),
+      /exceeds 40 Unicode/,
+    )
+    const status = await manager.setReplyOptionsSettings({ count: 1, keywords: [' 试探\n对方 '], expectedRevision: 0 })
+    assert.equal(status.replyOptionsCount, 1)
+    assert.deepEqual(status.replyOptionsKeywords, ['试探 对方'])
+    assert.equal(manager.snapshot().replyOptionsCount, 1)
+    assert.deepEqual(manager.snapshot().replyOptionsKeywords, ['试探 对方'])
+    assert.equal(snapshots.at(-1).replyOptionsCount, 1)
+    assert.deepEqual(snapshots.at(-1).replyOptionsKeywords, ['试探 对方'])
+    await assert.rejects(ctx.settings.update('roleplay-features', { replyOptionsCount: 6 }), /<= 5|between 1 and 5/)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('manager pads legacy keyword settings to the configured option count', async () => {
+  const ctx = new Context()
+  provideSystemPrompt(ctx)
+  ctx.provide('loader', { entries: () => [], async await() {} })
+  try {
+    await ctx.plugin(MemorySettings)
+    await ctx.plugin(ManagerPlugin, {
+      enabledFeatures: ['reply-options'],
+      replyOptionsCount: 5,
+      replyOptionsKeywords: ['试探'],
+    })
+    const manager = ctx.get('rpFeatures')
+    assert.equal(manager.replyOptionsCount(), 5)
+    assert.deepEqual(manager.replyOptionsKeywords(), ['试探', '', '', '', ''])
+    assert.deepEqual(manager.status().replyOptionsKeywords, ['试探', '', '', '', ''])
   } finally {
     await ctx.fiber.dispose()
   }
@@ -369,6 +445,8 @@ test('manager persists the legacy implicit-State MVU selection as an explicit de
     assert.deepEqual(namespace?.value, {
       enabledFeatures: ['character-card', 'lore-book', 'state', 'compat-mvu'],
       enabledSkills: DEFAULT_ENABLED_SKILLS,
+      replyOptionsCount: 3,
+      replyOptionsKeywords: ['', '', ''],
       harnessIdentity: '',
     })
     assert.deepEqual(manager.snapshot().enabledFeatures, ['character-card', 'lore-book', 'state', 'compat-mvu'])
@@ -383,8 +461,8 @@ test('manager persists compact access mode without changing the saved display ch
   provideSystemPrompt(ctx)
   ctx.provide('loader', { entries: () => [], async await() {} })
   try {
-    const previousDefaults = DEFAULT_ENABLED_FEATURES.filter(id => id !== 'state-display' && id !== 'compact-access-mode')
-    const migratedDefaults = DEFAULT_ENABLED_FEATURES.filter(id => id !== 'state-display')
+    const previousDefaults = DEFAULT_ENABLED_FEATURES.filter(id => id !== 'state-display' && id !== 'compact-access-mode' && id !== 'reply-options')
+    const migratedDefaults = DEFAULT_ENABLED_FEATURES.filter(id => id !== 'state-display' && id !== 'reply-options')
     await ctx.plugin(MemorySettings, {
       document: {
         'roleplay-features': {

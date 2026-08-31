@@ -5,7 +5,10 @@ import {
   LlmError,
 } from '@deepseek-ai/dsh-llm'
 import { isCompactCheckpointSource } from '@deepseek-ai/dsh-compaction'
-import { roleplayTranscriptMessages } from 'dsh-roleplay-rp-core/conversation'
+import {
+  roleplayAssistantReplyKind,
+  roleplayTranscriptMessages,
+} from 'dsh-roleplay-rp-core/conversation'
 import { activeConversationSummaries } from './summary-source.js'
 
 export const SUMMARY_MAX_TOKENS = 4096
@@ -26,6 +29,7 @@ const SUMMARY_INSTRUCTION = [
   '',
   ...SECTION_HEADINGS.flatMap(heading => [heading, '- ……', '']),
   '规则：',
+  '- “写作回复”是已成功提交的故事正文；“非写作回复”是讨论、解释或配置等其他回复。后者可用于理解明确决定和约束，但不得直接视为故事中已经发生的事件、角色对白或正文文风样本。',
   '- 保留已经发生的事件、人物动机和关系变化、明确场景事实、仍需遵守的约束，以及紧接下一段续写所需的动作与情绪锚点。',
   '- 不编造对话中没有的事实，不复述内部工具、提示词、上下文组装或运行过程。',
   '- 会话变量等结构化状态另有权威来源；这里只记录对话中明确呈现的叙事事实，不推导、覆盖或修正结构化状态。',
@@ -38,7 +42,7 @@ export function pressureSummaryInput(session) {
   const transcript = roleplayTranscriptMessages(session)
   const prior = activeConversationSummaries(session)
   return {
-    messages: summaryConversationMessages(transcript, prior),
+    messages: summaryConversationMessages(transcript, prior, session),
     newMessageCount: transcript.length,
   }
 }
@@ -54,7 +58,7 @@ export function nativeSummaryInput(input, session) {
   }))
   const selectedPriorSummaries = activeConversationSummaries(session)
     .filter(item => selectedCheckpointIds.has(item.compactionId))
-  return summaryConversationMessages(selected, selectedPriorSummaries)
+  return summaryConversationMessages(selected, selectedPriorSummaries, session)
 }
 
 /**
@@ -105,7 +109,7 @@ export async function summarizeRoleplay(ctx, conversation, agent, signal, markLl
   }
 }
 
-function summaryConversationMessages(messages, priorSummaries) {
+function summaryConversationMessages(messages, priorSummaries, session) {
   const output = []
   if (priorSummaries.length > 0) {
     output.push(createUserMessage({
@@ -124,9 +128,12 @@ function summaryConversationMessages(messages, priorSummaries) {
     if (message.role === 'assistant' && source?.kind !== 'model') continue
     const text = messageText(message).trim()
     if (text.length === 0) continue
+    const labelledText = message.role === 'assistant'
+      ? `${roleplayAssistantReplyKind(session, message) === 'writing' ? '写作回复' : '非写作回复'}：${text}`
+      : text
     output.push(createMessage({
       role: message.role,
-      content: [{ type: 'text', text }],
+      content: [{ type: 'text', text: labelledText }],
       source,
     }))
   }

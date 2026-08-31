@@ -7,6 +7,11 @@
         - settings
       config:
         harnessIdentity: ''
+        replyOptionsCount: 3
+        replyOptionsKeywords:
+          - ''
+          - ''
+          - ''
         enabledFeatures:
           - character-card
           - lore-book
@@ -17,6 +22,7 @@
           - compat-mvu
           - subagent-manager
           - quick-replies
+          - reply-options
           - message-actions
           - state-display
           - message-avatar
@@ -140,8 +146,8 @@
         maxTextCharacters: 30000
         maxStylesPerSession: 16
         exposeBrowser: true
-    # New 0.1.5 browser contributions start parked. rp-feature-manager removes
-    # this flag only after the saved 0.1.5 selection has settled, then
+    # Browser contributions introduced after the initial suite start parked.
+    # rp-feature-manager removes this flag only after the saved selection has settled, then
     # reasserts that selection if app-owned Profile startup replays --patch.
     # A feature therefore cannot mount briefly while its settings card says it
     # is off, nor remain parked after its saved switch says it is on.
@@ -149,6 +155,11 @@
       name: dsh-roleplay-rp-quick-replies
       disabled: true
       config: {}
+    - id: rp-reply-options
+      name: dsh-roleplay-rp-reply-options
+      disabled: true
+      config:
+        registerRuntime: false
     - id: rp-message-actions
       name: dsh-roleplay-rp-message-actions
       config: {}

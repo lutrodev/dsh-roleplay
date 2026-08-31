@@ -150,6 +150,14 @@
       name: __RP_CONVERSATION_SUMMARY_BRIDGE_MODULE__
       config: {}
 
+    - id: rp-reply-options
+      name: __RP_REPLY_OPTIONS_MODULE__
+      disabled: __RP_REPLY_OPTIONS_DISABLED__
+      config:
+        registerRuntime: true
+        count: __RP_REPLY_OPTIONS_COUNT__
+        keywords: __RP_REPLY_OPTIONS_KEYWORDS__
+
     - id: rp-subagent-manager
       name: __RP_SUBAGENT_MANAGER_MODULE__
       disabled: __RP_SUBAGENT_MANAGER_DISABLED__

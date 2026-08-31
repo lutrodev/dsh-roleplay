@@ -5,7 +5,7 @@ export const CUSTOM_CONTEXT_SOURCE_PREFIX = 'rp.custom:'
 
 const SOURCE_KINDS = new Set(['shared-reference', 'session-projection', 'conversation', 'runtime'])
 const SOURCE_DELIVERIES = new Set(['snapshot', 'native-history'])
-const PARENT_DELIVERIES = new Set(['none', 'commit'])
+const PARENT_DELIVERIES = new Set(['none', 'context', 'commit'])
 const PROMPT_CATEGORIES = new Set(['factual', 'instructional'])
 const ID_PATTERN = /^[a-z0-9][a-z0-9._:-]*$/
 const RESERVED_CONTEXT_TAG_PATTERN = /<\s*\/?\s*(?:section|item)(?=[\s/>])[^>]*>/giu
@@ -317,7 +317,7 @@ export function defaultContextBuild(definitions) {
  * remain the authority for the final context-window validation.
  *
  * @param {{ layout: { slots: Array<Record<string, unknown>> }, candidates: readonly Record<string, unknown>[], unavailable?: readonly Record<string, unknown>[] }} input Build inputs.
- * @returns {{ slots: Array<Record<string, unknown>>, fragments: Array<Record<string, unknown>>, excluded: Array<Record<string, unknown>>, contextText: string, usedCharacters: number }} Compiled build.
+ * @returns {{ slots: Array<Record<string, unknown>>, fragments: Array<Record<string, unknown>>, excluded: Array<Record<string, unknown>>, contextText: string, parentContextText: string, usedCharacters: number }} Compiled build.
  */
 export function compileContextBuild({ layout, candidates, unavailable = [] }) {
   const activeSlots = layout.slots.filter(slot => slot.idle !== true)
@@ -337,12 +337,14 @@ export function compileContextBuild({ layout, candidates, unavailable = [] }) {
   })
   const unavailableSelected = unavailable.filter(item => selectedIds.includes(item.id))
   const contextText = renderContextText(slots, candidateById, admitted)
+  const parentContextText = renderParentContextText(slots, fragments)
   return {
     slots,
     customSources: layout.customSources ?? [],
     fragments,
     excluded: unavailableSelected,
     contextText,
+    parentContextText,
     usedCharacters: [...contextText].length,
   }
 }
@@ -479,6 +481,17 @@ function renderContextText(slots, candidateById, admitted) {
     return `<section name="${escapeAttribute(slot.label)}">\n${body}\n</section>`
   })
   return renderedSlots.join('\n')
+}
+
+/** Serialize only sources explicitly selected for the parent's limited context view. */
+function renderParentContextText(slots, fragments) {
+  const selected = fragments.filter(fragment => fragment.parentDelivery === 'context')
+  if (selected.length === 0) return ''
+  const candidateById = new Map(selected.map(fragment => [fragment.id, {
+    ...fragment,
+    text: fragment.parentText ?? fragment.text,
+  }]))
+  return renderContextText(slots, candidateById, new Set(candidateById.keys()))
 }
 
 function stringIds(value, field) {

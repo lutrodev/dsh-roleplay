@@ -3,7 +3,7 @@ import { Service } from '@deepseek-ai/cordis'
 import { createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
 import { assertObjectJsonSchema, defineTool, ToolArgsError, validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
 import { assertCompletedSubagent, runFreshSubagent, subagentVisibleText } from './subagent-run.js'
-import { roleplayTranscriptMessages } from './conversation.js'
+import { roleplayAssistantReplyKind, roleplayTranscriptMessages } from './conversation.js'
 import {
   compileContextBuild,
   contextBuildCustomDefinitions,
@@ -45,7 +45,7 @@ import {
   TASK_SUBAGENT_TOOL_DESCRIPTION,
 } from './prompts.js'
 
-const CONVERSATION_HISTORY_CONTEXT_NOTE = '[Context note: Original dialogue text, including the latest events and wording. It takes precedence over Conversation Summary.]'
+const CONVERSATION_HISTORY_CONTEXT_NOTE = '[Context note: Original conversation text, including the latest events and wording. Entries labeled 写作回复 are successfully committed story prose. Entries labeled 非写作回复 are other assistant responses such as discussion, explanation, or configuration; use them as relevant context, but do not assume they describe events that occurred in the story. This original text takes precedence over Conversation Summary.]'
 const SHARED_REFERENCE_UNAVAILABLE_CODES = new Set([
   'ASSET_NOT_FOUND',
   'ASSET_CORRUPT',
@@ -153,7 +153,7 @@ export class RpRuntime extends Service {
     this.registerContextSource({
       id: 'rp.conversation',
       label: '对话历史',
-      description: '当前对话中用户可见的消息、开场白与每轮最终回复；运行过程和工具结果不进入预览。',
+      description: '当前对话中用户可见的消息、开场白与每轮最终回复；助手内容会标明是写作回复还是非写作回复，运行过程和工具结果不进入预览。',
       kind: 'conversation',
       promptCategory: 'factual',
       delivery: 'native-history',
@@ -317,7 +317,7 @@ export class RpRuntime extends Service {
 
   /**
    * A prepared source may return Writer-facing `text` and, when
-   * `parentDelivery` is `commit`, separate parent-only `parentText`.
+   * `parentDelivery` is `context` or `commit`, separate parent-only `parentText`.
    * Expanded sources use the same candidate fields.
    *
    * @param {{
@@ -326,7 +326,7 @@ export class RpRuntime extends Service {
    *   dependsOn?: string[],
    *   legacySlotIds?: string[],
    *   legacySourceIds?: string[],
-   *   parentDelivery?: 'none' | 'commit',
+   *   parentDelivery?: 'none' | 'context' | 'commit',
    *   prepare(context: object): unknown | Promise<unknown>,
    * }} definition
    */
@@ -370,7 +370,14 @@ export class RpRuntime extends Service {
 
   /** Return the live closed commit schema assembled from registered effect schemas. */
   commitParametersSchema() {
-    return commitParametersSchema([...this.effectTypes.values()].map(definition => definition.schema))
+    return commitParametersSchema(
+      [...this.effectTypes.values()].map(definition => definition.schema),
+      [...this.artifactExtensions.values()].map(definition => ({
+        namespace: definition.namespace,
+        schema: definition.schema,
+        required: definition.required,
+      })),
+    )
   }
 
   /** Collect bounded capability-owned hints for otherwise opaque nested schema failures. */
@@ -442,12 +449,35 @@ export class RpRuntime extends Service {
     return this.registerNamed(this.chatReadableTools, definition.name, definition, 'Chat-readable tool')
   }
 
-  /** @param {{ namespace: string, validate(value: unknown, context: object): unknown | Promise<unknown> }} definition */
+  /** @param {{ namespace: string, schema: object, required?: boolean, validate(value: unknown, context: object): unknown | Promise<unknown> }} definition */
   registerArtifactExtension(definition) {
-    if (!isRecord(definition) || typeof definition.namespace !== 'string' || typeof definition.validate !== 'function') {
-      throw new RpRuntimeError('RP_INVALID_REGISTRATION', 'artifact extension requires a namespace and validate function')
+    if (!isRecord(definition) || typeof definition.namespace !== 'string' || definition.namespace.length === 0
+      || typeof definition.validate !== 'function' || !isRecord(definition.schema)) {
+      throw new RpRuntimeError('RP_INVALID_REGISTRATION', 'artifact extension requires a non-empty namespace, object schema, and validate function')
     }
-    return this.registerNamed(this.artifactExtensions, definition.namespace, definition, 'artifact extension')
+    if (definition.required !== undefined && typeof definition.required !== 'boolean') {
+      throw new RpRuntimeError('RP_INVALID_REGISTRATION', `artifact extension "${definition.namespace}" required must be a boolean`)
+    }
+    const schema = jsonClone(definition.schema)
+    assertObjectJsonSchema(schema)
+    if (schema.additionalProperties !== false) {
+      throw new RpRuntimeError(
+        'RP_INVALID_REGISTRATION',
+        `artifact extension "${definition.namespace}" schema must be a closed object`,
+      )
+    }
+    if (this.artifactExtensions.has(definition.namespace)) {
+      throw new RpRuntimeError('RP_DUPLICATE_REGISTRATION', `artifact extension "${definition.namespace}" is already registered`)
+    }
+    const normalized = { ...definition, schema, required: definition.required === true }
+    this.artifactExtensions.set(definition.namespace, normalized)
+    this.ctx.emit('tools/change')
+    const dispose = this.ctx.effect(() => () => {
+      if (this.artifactExtensions.get(definition.namespace) !== normalized) return
+      this.artifactExtensions.delete(definition.namespace)
+      this.ctx.emit('tools/change')
+    }, `rpRuntime.register(artifact extension:${definition.namespace})`)
+    return () => void dispose()
   }
 
   /**
@@ -749,6 +779,7 @@ export class RpRuntime extends Service {
       contextBuild: null,
       contextBuilds: [],
       contextText: '',
+      parentContextText: '',
       commitContextText: '',
       catalog: [],
       contextEpoch: 0,
@@ -1071,6 +1102,7 @@ export class RpRuntime extends Service {
     run.fragments = build.fragments
     run.excludedFragments = build.excluded
     run.contextText = build.contextText
+    run.parentContextText = build.parentContextText
     run.commitContextText = renderParentCommitContext(build.fragments)
     run.contextBuild = { version: 1, owner, slots: build.slots }
     run.contextBuilds.push(run.contextBuild)
@@ -1102,7 +1134,7 @@ export class RpRuntime extends Service {
       executionMode: run.executionMode,
       assetBindings: rpCurrentAssetBindingManifest(run.profile),
       specialists: availableSubagents,
-      roleplayContext: run.contextText,
+      roleplayContext: run.executionMode === 'agent' ? run.contextText : run.parentContextText,
       commitContext: run.commitContextText,
     })
     return createUserMessage({
@@ -1429,7 +1461,11 @@ export class RpRuntime extends Service {
             },
           },
         },
-        extensions: { type: 'object', description: 'Optional registered extension results keyed by extension namespace. Omit when none are used.', additionalProperties: true },
+        extensions: {
+          type: 'object',
+          description: 'Optional registered extension results keyed by extension namespace. Omit when none are used.',
+          additionalProperties: true,
+        },
       },
       output: {
         schema: { type: 'json' },
@@ -1749,12 +1785,19 @@ function jsonClone(value) {
 }
 
 /** Build the closed live rp_commit_turn parameter schema. */
-function commitParametersSchema(effectSchemas) {
+function commitParametersSchema(effectSchemas, extensionDefinitions) {
   const effectItems = effectSchemas.length === 0
     ? undefined
     : effectSchemas.length === 1
       ? jsonClone(effectSchemas[0])
       : { oneOf: effectSchemas.map(jsonClone) }
+  const extensionProperties = Object.fromEntries(extensionDefinitions.map(definition => [
+    definition.namespace,
+    jsonClone(definition.schema),
+  ]))
+  const requiredExtensions = extensionDefinitions
+    .filter(definition => definition.required === true)
+    .map(definition => definition.namespace)
   const schema = {
     type: 'object',
     additionalProperties: false,
@@ -1779,8 +1822,17 @@ function commitParametersSchema(effectSchemas) {
           required: ['source', 'id', 'revision'],
         },
       },
-      extensions: { type: 'object', description: 'Optional registered extension results keyed by extension namespace.', additionalProperties: true },
+      extensions: {
+        type: 'object',
+        description: requiredExtensions.length === 0
+          ? 'Optional registered extension results keyed by extension namespace. Omit when none are used.'
+          : 'Required and optional registered extension results keyed by extension namespace.',
+        additionalProperties: false,
+        properties: extensionProperties,
+        ...(requiredExtensions.length === 0 ? {} : { required: requiredExtensions }),
+      },
     },
+    ...(requiredExtensions.length === 0 ? {} : { required: ['extensions'] }),
   }
   assertObjectJsonSchema(schema)
   return schema
@@ -2304,7 +2356,10 @@ function renderConversationHistory(session) {
     if (!isRecord(message)) return []
     const text = messageText(message)
     if (text.length === 0) return []
-    return [{ role: message.role === 'assistant' ? '回复' : '用户', text }]
+    const role = message.role === 'assistant'
+      ? roleplayAssistantReplyKind(session, message) === 'writing' ? '写作回复' : '非写作回复'
+      : '用户'
+    return [{ role, text }]
   })
   if (visible.length === 0) return undefined
   const dialogue = visible.map(item => `${item.role}：${item.text}`).join('\n\n')

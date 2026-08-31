@@ -30,6 +30,7 @@ export class RpCharacterCards extends Service {
       description: '当前 Session 绑定角色卡的身份、性格、场景与已信任指令。',
       kind: 'shared-reference',
       promptCategory: 'factual',
+      parentDelivery: 'context',
       order: -80,
       budgetPriority: -80,
       defaultSlot: { id: 'character', label: '角色卡信息', order: -80 },

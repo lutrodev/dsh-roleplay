@@ -1,3 +1,5 @@
+import { decodeRpCommitEvent, resolveRpCommitAssistant } from './protocol.js'
+
 /** Durable metadata kind carried by native Roleplay message replacements. */
 export const RP_MESSAGE_ACTION_META_KIND = 'rp-agent/message-action'
 
@@ -133,6 +135,32 @@ export function roleplayTranscriptMessages(session) {
   return messages
 }
 
+/**
+ * Classify one visible model reply for prompt presentation.
+ *
+ * A writing reply must be backed by a durable successful narrative commit.
+ * The selected opening is narrative prose created before the first commit and
+ * therefore uses its stable native provenance as the only special case.
+ *
+ * @param {unknown} session Harness Session.
+ * @param {unknown} message Native assistant message.
+ * @returns {'writing' | 'non-writing' | undefined}
+ */
+export function roleplayAssistantReplyKind(session, message) {
+  if (message?.role !== 'assistant'
+    || message?.source?.kind !== 'model'
+    || typeof message.id !== 'string'
+    || message.id.length === 0) return undefined
+  if (isSelectedOpeningMessage(message)) return 'writing'
+  const events = Array.isArray(session?.events) ? session.events : []
+  for (const event of events) {
+    const commit = decodeRpCommitEvent(event)
+    if (commit?.assistant?.messageId !== message.id) continue
+    if (resolveRpCommitAssistant(events, commit)?.data?.message?.id === message.id) return 'writing'
+  }
+  return 'non-writing'
+}
+
 /** Return the active surface event descending from one append-origin event. */
 export function currentSurfaceDescendant(session, originalSeq) {
   const seq = session?.surface?.nodes?.findLast(candidate => surfaceDescendsFrom(
@@ -216,6 +244,11 @@ function messageText(message) {
 function assistantCallsTool(message, name) {
   return Array.isArray(message?.content)
     && message.content.some(block => block?.type === 'tool-call' && block.name === name)
+}
+
+function isSelectedOpeningMessage(message) {
+  return message?.source?.provider === 'rp-session'
+    && message?.source?.model === 'selected-opening'
 }
 
 function record(value) {

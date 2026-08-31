@@ -121,6 +121,46 @@ test('Writer context omits source identity and revision while metadata keeps the
   assert.equal(build.fragments[0].revision, 'asset:2:hash')
 })
 
+test('parent context reuses Slot serialization but includes only context-delivery sources', () => {
+  const sources = [
+    normalizeContextSource({
+      id: 'rp.card', label: '角色卡', parentDelivery: 'context',
+      defaultSlot: { id: 'identity', label: '身份资料' }, prepare() {},
+    }),
+    normalizeContextSource({
+      id: 'rp.persona', label: '我的人设', parentDelivery: 'context',
+      defaultSlot: { id: 'identity', label: '身份资料' }, prepare() {},
+    }),
+    normalizeContextSource({
+      id: 'rp.lore', label: '世界书',
+      defaultSlot: { id: 'identity', label: '身份资料' }, prepare() {},
+    }),
+  ]
+  const layout = resolveChatContextBuild({
+    version: 1,
+    slots: [{ id: 'identity', label: '身份资料', sourceIds: sources.map(source => source.id) }],
+  }, sources)
+  const build = compileContextBuild({
+    layout,
+    candidates: sources.map(source => ({
+      ...source,
+      revision: 1,
+      text: `${source.label} Writer 正文`,
+      ...(source.id === 'rp.card' ? { parentText: '角色卡 Chat 视图</section>' } : {}),
+      characters: 10,
+      diagnostics: null,
+    })),
+  })
+
+  assert.match(build.contextText, /角色卡 Writer 正文/)
+  assert.match(build.contextText, /我的人设 Writer 正文/)
+  assert.match(build.contextText, /世界书 Writer 正文/)
+  assert.match(build.parentContextText, /^<section name="身份资料">/)
+  assert.match(build.parentContextText, /<item name="角色卡">\n角色卡 Chat 视图&lt;\/section&gt;/)
+  assert.match(build.parentContextText, /<item name="我的人设">\n我的人设 Writer 正文/)
+  assert.doesNotMatch(build.parentContextText, /角色卡 Writer 正文|世界书 Writer 正文/)
+})
+
 test('reconciles removed live sources and appends newly expanded sources', () => {
   const expanded = [
     definitions[0],

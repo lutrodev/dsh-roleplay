@@ -142,7 +142,92 @@ test('commit exposes registered effect schemas and returns structured correction
   await ctx.fiber.dispose()
 })
 
-test('Writer receives narrative context while both parent modes receive separate commit-delivery context', async () => {
+test('commit exposes required artifact extension schemas and persists canonical extension values', async () => {
+  const ctx = new Context()
+  const tools = new Map()
+  let toolChanges = 0
+  ctx.on('tools/change', () => { toolChanges += 1 })
+  ctx.provide('systemPrompt', { section() {} })
+  ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
+  ctx.provide('agents', { get() { return undefined } })
+  const runtime = new RpRuntime(ctx, {
+    chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8,
+    maxEffectsPerCommit: 2, maxArtifactBytes: 4096,
+  })
+  assert.throws(() => runtime.registerArtifactExtension({
+    namespace: 'missing.schema',
+    validate: value => value,
+  }), /object schema/)
+  assert.throws(() => runtime.registerArtifactExtension({
+    namespace: 'open.schema',
+    schema: { type: 'object', properties: {} },
+    validate: value => value,
+  }), /closed object/)
+  assert.throws(() => runtime.registerArtifactExtension({
+    namespace: 'invalid.required',
+    schema: { type: 'object', additionalProperties: false, properties: {} },
+    required: 'yes',
+    validate: value => value,
+  }), /required must be a boolean/)
+
+  const dispose = runtime.registerArtifactExtension({
+    namespace: 'test.options',
+    required: true,
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { choice: { type: 'string', description: 'One non-empty choice.' } },
+      required: ['choice'],
+    },
+    validate: value => ({ version: 1, choice: value.choice.trim() }),
+  })
+  const commit = tools.get('rp_commit_turn')
+  const extensionSchema = commit.parameters.properties.extensions
+  assert.equal(extensionSchema.additionalProperties, false)
+  assert.deepEqual(extensionSchema.required, ['test.options'])
+  assert.deepEqual(commit.parameters.required, ['extensions'])
+  assert.equal(extensionSchema.properties['test.options'].properties.choice.description, 'One non-empty choice.')
+  assert.equal(toolChanges, 1)
+
+  const invalidExec = {
+    agent: { session: { events: [] } },
+    callId: 'invalid-extension',
+    concludeTurn() { throw new Error('invalid arguments must not conclude') },
+  }
+  await assert.rejects(
+    commit.execute({}, invalidExec),
+    error => error.code === 'INVALID_ARGS' && error.violations.some(item => item.includes('extensions')),
+  )
+  await assert.rejects(
+    commit.execute({
+      extensions: { 'test.options': { choice: 'continue' }, unknown: {} },
+    }, invalidExec),
+    error => error.code === 'INVALID_ARGS' && error.violations.some(item => item.includes('unknown')),
+  )
+
+  const events = []
+  const agent = { session: { events, append() {} } }
+  const run = await runtime.prepareRun(agent, 1, [currentInput()])
+  seedWriter(run, 'The road continues.')
+  appendCommitCall(events, 1, 1, 'extension-commit', 'The road continues.')
+  let concluded = false
+  const result = await commit.execute({
+    extensions: { 'test.options': { choice: '  take the eastern road  ' } },
+  }, { agent, callId: 'extension-commit', concludeTurn() { concluded = true } })
+  assert.equal(concluded, true)
+  assert.deepEqual(result.meta.extensions, {
+    'test.options': { version: 1, choice: 'take the eastern road' },
+  })
+
+  dispose()
+  assert.equal(toolChanges, 2)
+  assert.equal(commit.parameters.required, undefined)
+  assert.deepEqual(commit.parameters.properties.extensions.properties, {})
+  assert.equal(commit.parameters.properties.extensions.additionalProperties, false)
+  await ctx.fiber.dispose()
+})
+
+test('Chat receives selected identity context while Writer and Agent retain the full context', async () => {
   const ctx = new Context()
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register() {} })
@@ -160,24 +245,43 @@ test('Writer receives narrative context while both parent modes receive separate
     id: 'rp.lore', label: '世界书', defaultSlot: { id: 'lore', label: '世界书' },
     prepare: () => ({ revision: 7, text: 'secret lore text' }),
   })
+  runtime.registerContextSource({
+    id: 'rp.card', label: '角色卡', parentDelivery: 'context',
+    defaultSlot: { id: 'character', label: '角色卡信息' },
+    prepare: () => ({ revision: 2, text: 'name: Wang Xiwen\npersonality: resolute' }),
+  })
+  runtime.registerContextSource({
+    id: 'rp.persona', label: '我的人设', parentDelivery: 'context',
+    defaultSlot: { id: 'persona', label: '人设信息' },
+    prepare: () => ({ revision: 4, text: 'name: Lin Che\ndescription: the user-controlled investigator' }),
+  })
   assert.throws(() => runtime.registerContextSource({ id: 'invalid', parentDelivery: 'full', prepare: () => ({ text: 'x' }) }), /parentDelivery/)
 
   const input = currentInput()
   const chatAgent = { session: { events: [], append() {} } }
   const chatRun = await runtime.prepareRun(chatAgent, 1, [input])
   const chatReady = runtime.writerReadyMessage(chatRun).content.map(block => block.text ?? '').join('')
+  assert.match(chatReady, /<roleplay_context read_only="true">/)
+  assert.match(chatReady, /complete identity context exposed to the Chat parent/)
+  assert.match(chatReady, /<section name="角色卡信息">\n(?:<item name="角色卡">\n)?name: Wang Xiwen/)
+  assert.match(chatReady, /<section name="人设信息">\n(?:<item name="我的人设">\n)?name: Lin Che/)
   assert.match(chatReady, /<commit_context read_only="true">/)
   assert.match(chatReady, /state revision 3 and update rules/)
-  assert.doesNotMatch(chatReady, /current state: gate open|secret lore text|<roleplay_context/)
+  assert.doesNotMatch(chatReady, /current state: gate open|secret lore text/)
   assert.match(chatRun.contextText, /current state: gate open/)
   assert.doesNotMatch(chatRun.contextText, /state revision 3 and update rules/)
   assert.match(chatRun.contextText, /secret lore text/)
+  assert.match(chatRun.parentContextText, /Wang Xiwen/)
+  assert.match(chatRun.parentContextText, /Lin Che/)
+  assert.doesNotMatch(chatRun.parentContextText, /current state: gate open|secret lore text/)
 
   ctx.provide('rpSessions', { get: () => ({
     runtime: { executionMode: 'agent' }, resources: { lorebooks: [], writingStyles: [] },
     contextBuild: { version: 1, slots: [
       { id: 'state', label: '状态', sourceIds: ['rp.state'] },
       { id: 'lore', label: '世界书', sourceIds: ['rp.lore'] },
+      { id: 'character', label: '角色卡信息', sourceIds: ['rp.card'] },
+      { id: 'persona', label: '人设信息', sourceIds: ['rp.persona'] },
       { id: 'current-input', label: '当前输入', sourceIds: ['rp.current-input'] },
     ] },
   }) })
@@ -186,10 +290,14 @@ test('Writer receives narrative context while both parent modes receive separate
   assert.match(agentReady, /<roleplay_context read_only="true">/)
   assert.match(agentReady, /current state: gate open/)
   assert.match(agentReady, /secret lore text/)
+  assert.match(agentReady, /name: Wang Xiwen/)
+  assert.match(agentReady, /name: Lin Che/)
+  assert.equal(agentReady.match(/<roleplay_context read_only="true">/g)?.length, 1)
   assert.match(agentReady, /<commit_context read_only="true">/)
   assert.match(agentReady, /state revision 3 and update rules/)
   assert.doesNotMatch(agentRun.contextText, /state revision 3 and update rules/)
   assert.equal(agentRun.commitContextText, chatRun.commitContextText)
+  assert.equal(agentRun.parentContextText, chatRun.parentContextText)
   assert.match(chatRun.commitContextText, /^<item source="rp.state">/)
 
   runtime.registerContextSource({ id: 'orphan-parent-text', prepare: () => ({ text: 'visible', parentText: 'hidden' }) })
@@ -736,6 +844,35 @@ test('reads Session settings through the registered profile provider across Cord
   await ctx.fiber.dispose()
 })
 
+test('conversation Prompt labels an ordinary completed assistant response as non-writing', async () => {
+  const ctx = new Context()
+  ctx.provide('systemPrompt', { section() {} })
+  ctx.provide('tools', { register() {} })
+  ctx.provide('agents', { get() { return undefined } })
+  const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
+  const session = Session.create(SessionId('rp-conversation-non-writing-label'))
+  session.append('turn/start', { turn: 1 })
+  session.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: '我们先讨论剧情。' }], source: { kind: 'user' },
+  }), { surfaceOp: 'append' })
+  session.append('assistant/message', {
+    turn: 1,
+    step: 1,
+    message: createAssistantMessage({
+      content: [{ type: 'text', text: '可以先确定反派的动机。' }],
+      source: { provider: 'mock', model: 'mock' },
+    }),
+  }, { surfaceOp: 'append' })
+  session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+
+  const history = (await runtime.previewContextBuild({ session })).contexts
+    .find(source => source.id === 'rp.conversation')
+  assert.match(history.text, /用户：我们先讨论剧情。/)
+  assert.match(history.text, /非写作回复：可以先确定反派的动机。/)
+  assert.equal(history.text.includes('\n\n写作回复：可以先确定反派的动机。'), false)
+  await ctx.fiber.dispose()
+})
+
 test('previews only settled visible dialogue bodies without changing native model history', async () => {
   const ctx = new Context()
   ctx.provide('systemPrompt', { section() {} })
@@ -826,6 +963,10 @@ test('previews only settled visible dialogue bodies without changing native mode
       content: [{ type: 'text', text: 'Committed.' }],
       isError: false,
     }),
+    meta: {
+      kind: 'rp-agent/turn-commit', version: 2, runId: 'run-commit-success', turn: 2,
+      assistant: { seq: final.seq, messageId: finalMessage.id },
+    },
   }, { surfaceOp: 'append' })
   session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
   const agent = { session }
@@ -845,7 +986,7 @@ test('previews only settled visible dialogue bodies without changing native mode
   assert.equal(preview.sources.find(source => source.id === 'rp.conversation').idleAllowed, false)
   assert.equal(preview.sources.find(source => source.id === 'rp.current-input').idleAllowed, false)
   assert.equal(history.diagnostics.messages, 3)
-  assert.equal(history.text, '[Context note: Original dialogue text, including the latest events and wording. It takes precedence over Conversation Summary.]\n\n回复：开场正文\n\n用户：继续故事\n\n回复：最终正文第一段\n最终正文第二段')
+  assert.equal(history.text, '[Context note: Original conversation text, including the latest events and wording. Entries labeled 写作回复 are successfully committed story prose. Entries labeled 非写作回复 are other assistant responses such as discussion, explanation, or configuration; use them as relevant context, but do not assume they describe events that occurred in the story. This original text takes precedence over Conversation Summary.]\n\n写作回复：开场正文\n\n用户：继续故事\n\n写作回复：最终正文第一段\n最终正文第二段')
   assert.doesNotMatch(history.text, /中间上下文|中间文字|invalid arguments|rp_runtime_context|推理|Committed/)
   assert.deepEqual(session.deriveMessages(), nativeHistory)
   assert.match(preview.contextText, /开场正文|继续故事|最终正文/)
@@ -880,7 +1021,7 @@ test('previews only settled visible dialogue bodies without changing native mode
     sourceEventSeqs: [final.seq],
   })
   const edited = await runtime.previewContextBuild(agent)
-  assert.match(edited.contexts.find(source => source.id === 'rp.conversation').text, /回复：编辑后的最终正文/)
+  assert.match(edited.contexts.find(source => source.id === 'rp.conversation').text, /写作回复：编辑后的最终正文/)
   assert.doesNotMatch(edited.contexts.find(source => source.id === 'rp.conversation').text, /最终正文第一段/)
 
   const shadowed = session.surface.nodes.slice(session.surface.nodes.indexOf(userEvent.seq))
@@ -904,7 +1045,7 @@ test('previews only settled visible dialogue bodies without changing native mode
   const deleted = await runtime.previewContextBuild(agent)
   const remainingHistory = deleted.contexts.find(source => source.id === 'rp.conversation')
   assert.equal(remainingHistory.diagnostics.messages, 1)
-  assert.equal(remainingHistory.text, '[Context note: Original dialogue text, including the latest events and wording. It takes precedence over Conversation Summary.]\n\n回复：开场正文')
+  assert.equal(remainingHistory.text, '[Context note: Original conversation text, including the latest events and wording. Entries labeled 写作回复 are successfully committed story prose. Entries labeled 非写作回复 are other assistant responses such as discussion, explanation, or configuration; use them as relevant context, but do not assume they describe events that occurred in the story. This original text takes precedence over Conversation Summary.]\n\n写作回复：开场正文')
 
   const saved = await runtime.resolveContextBuild({ version: 1, slots: preview.slots }, agent)
   assert.deepEqual(saved.slots.map(slot => slot.sourceIds), [

@@ -141,6 +141,7 @@ test('registers the card context source when the runtime becomes available later
   ctx.provide('rpRuntime', { registerContextSource(source) { sources.push(source); return () => {} } })
   await new Promise(resolve => setImmediate(resolve))
   assert.deepEqual(sources.map(source => source.id), ['rp.card'])
+  assert.equal(sources[0].parentDelivery, 'context')
   await ctx.fiber.dispose()
 })
 
@@ -162,6 +163,7 @@ test('card prompt selects characterization fields and excludes every greeting', 
       firstMessage: '雾港醒来。',
       alternateGreetings: ['悬崖路醒来。'],
     })).created
+    assert.equal(source.parentDelivery, 'context')
     const prepared = await source.prepare({ agent: {} })
     assert.match(prepared.text, /谨慎的旅人|善于观察|身处雾港|旅人：先听钟声/)
     assert.doesNotMatch(prepared.text, /雾港醒来|悬崖路醒来|opening/)

@@ -42,6 +42,7 @@ export class RpPersonas extends Service {
       description: '当前会话中由用户扮演的身份、性格、背景与表达方式。',
       kind: 'shared-reference',
       promptCategory: 'factual',
+      parentDelivery: 'context',
       order: -70,
       budgetPriority: -70,
       defaultSlot: { id: 'persona', label: '人设信息', order: -70 },

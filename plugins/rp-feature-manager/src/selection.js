@@ -11,10 +11,10 @@ const KNOWN_SKILL_IDS = new Set(SKILL_IDS)
 export const RETIRED_FEATURE_IDS = Object.freeze(['writer-history'])
 const RETIRED_IDS = new Set(RETIRED_FEATURE_IDS)
 const LEGACY_DEFAULTS_BEFORE_COMPACT_ACCESS_MODE = Object.freeze(
-  FEATURE_IDS.filter(id => id !== 'state-display' && id !== 'compact-access-mode'),
+  FEATURE_IDS.filter(id => id !== 'state-display' && id !== 'compact-access-mode' && id !== 'reply-options'),
 )
 const LEGACY_DEFAULTS_BEFORE_STATE_DISPLAY_DEFAULT_ON = Object.freeze(
-  FEATURE_IDS.filter(id => id !== 'state-display'),
+  FEATURE_IDS.filter(id => id !== 'state-display' && id !== 'reply-options'),
 )
 
 /** Normalize, close over hard prerequisites, and return catalog order. */

@@ -130,6 +130,7 @@ test('registers the selected live persona as user-controlled prompt context', as
   try {
     const created = await personas.create({ name: '林澈', description: '旧书修复师', personality: '谨慎而好奇', tags: ['资料库标签'] })
     selectedId = created.id
+    assert.equal(source.parentDelivery, 'context')
     const value = await source.prepare({ agent: {} })
     assert.match(value.text, /旧书修复师/)
     assert.doesNotMatch(value.text, /This persona is controlled|Never invent|资料库标签|revision|rp_persona/)

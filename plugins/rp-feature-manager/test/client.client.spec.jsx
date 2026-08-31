@@ -62,7 +62,9 @@ const copy = {
   loadError: '暂时无法读取 Roleplay 设置。', retry: '重试', compatible: '版本兼容', incompatible: '版本不兼容',
   versionProblem: '版本不兼容', roleplayVersion: 'Roleplay', dshVersion: 'DSH', versionDetails: '查看核心组件',
   applies: '下一次对话生效。', saveError: '启用状态没有保存，请稍后重试。',
-  quickRepliesConfigure: '设置快捷回复', quickRepliesEnableFirst: '启用后设置',
+  quickRepliesConfigure: '设置快捷回复', quickRepliesEnableFirst: '启用快捷回复后设置',
+  replyOptionsConfigure: '设置回复选项', replyOptionsEnableFirst: '启用回复选项后设置',
+  replyOptionsSettingsSaved: '回复条数和方向关键词已保存；新建或重新打开对话后生效。',
   skillsTitle: 'Roleplay Skills', skillsDescription: '逐项选择 Roleplay 插件向 Agent 提供的工作指南。',
   skillsScope: '这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。',
   visibilityTitle: '可见性预览', parentAgent: 'Agent 模式父代理',
@@ -103,7 +105,7 @@ const copy = {
 
 function t(key) { return copy[key] ?? key }
 
-function statusView(enabledFeatures, enabledSkills, revision = 0) {
+function statusView(enabledFeatures, enabledSkills, revision = 0, replyOptionsCount = 3, replyOptionsKeywords = Array.from({ length: replyOptionsCount }, () => '')) {
   return {
     roleplay: { version: '0.1.7' },
     dsh: { version: '0.1.2-alpha.2', compatible: true },
@@ -111,6 +113,8 @@ function statusView(enabledFeatures, enabledSkills, revision = 0) {
     problems: [],
     enabledFeatures: [...enabledFeatures],
     enabledSkills: [...enabledSkills],
+    replyOptionsCount,
+    replyOptionsKeywords: [...replyOptionsKeywords],
     settings: { writable: true, revision },
     core: [
       { label: '回复运行时', description: '协调父代理、Writer、上下文与每轮写作流程。', packageVersion: '0.1.7', versionCompatible: true },
@@ -141,15 +145,26 @@ function statusView(enabledFeatures, enabledSkills, revision = 0) {
 function harness(
   enabledFeatures = ['lore-book'],
   enabledSkills = ['rp-guide-lorebook', 'rp-guide-state'],
-  { remote = false } = {},
+  {
+    remote = false,
+    replyOptionsCount = 3,
+    replyOptionsKeywords = Array.from({ length: replyOptionsCount }, () => ''),
+    failReplyOptionsSave = false,
+  } = {},
 ) {
-  let status = statusView(enabledFeatures, enabledSkills)
+  let status = statusView(enabledFeatures, enabledSkills, 0, replyOptionsCount, replyOptionsKeywords)
   let quickReplies = readyQuickReplyState()
   let snapshot = {
     status: remote ? 'unavailable' : 'ready',
     writable: !remote,
     revision: 0,
-    value: { enabledFeatures: [...enabledFeatures], enabledSkills: [...enabledSkills], harnessIdentity: '' },
+    value: {
+      enabledFeatures: [...enabledFeatures],
+      enabledSkills: [...enabledSkills],
+      replyOptionsCount,
+      replyOptionsKeywords: [...replyOptionsKeywords],
+      harnessIdentity: '',
+    },
   }
   const listeners = new Set()
   const scope = {
@@ -165,7 +180,13 @@ function harness(
         revision: snapshot.revision + 1,
         value: { ...snapshot.value, [field]: stored },
       }
-      status = statusView(snapshot.value.enabledFeatures, snapshot.value.enabledSkills, snapshot.revision)
+      status = statusView(
+        snapshot.value.enabledFeatures,
+        snapshot.value.enabledSkills,
+        snapshot.revision,
+        snapshot.value.replyOptionsCount ?? 3,
+        snapshot.value.replyOptionsKeywords,
+      )
       for (const listener of listeners) listener()
     }),
     unset: vi.fn(async field => {
@@ -183,21 +204,53 @@ function harness(
           if (endpoint === 'replace') quickReplies = { ...quickReplies, replies: payload.replies, revision: quickReplies.revision + 1 }
           return { ok: true, value: { ok: true, value: structuredClone(quickReplies) } }
         }
-        if (endpoint === 'settings/set') {
+        if (endpoint === 'settings/reply-options' && failReplyOptionsSave) {
+          throw new Error('internal transport details')
+        }
+        if (endpoint === 'settings/reply-options') {
+          snapshot = {
+            ...snapshot,
+            revision: snapshot.revision + 1,
+            value: {
+              ...snapshot.value,
+              replyOptionsCount: payload.count,
+              replyOptionsKeywords: [...payload.keywords],
+            },
+          }
+          status = statusView(
+            snapshot.value.enabledFeatures,
+            snapshot.value.enabledSkills,
+            snapshot.revision,
+            snapshot.value.replyOptionsCount,
+            snapshot.value.replyOptionsKeywords,
+          )
+        } else if (endpoint === 'settings/set') {
           const stored = Array.isArray(payload.value) ? [...payload.value] : payload.value
           snapshot = {
             ...snapshot,
             revision: snapshot.revision + 1,
             value: { ...snapshot.value, [payload.field]: stored },
           }
-          status = statusView(snapshot.value.enabledFeatures, snapshot.value.enabledSkills, snapshot.revision)
+          status = statusView(
+            snapshot.value.enabledFeatures,
+            snapshot.value.enabledSkills,
+            snapshot.revision,
+            snapshot.value.replyOptionsCount ?? 3,
+            snapshot.value.replyOptionsKeywords,
+          )
         } else if (endpoint === 'settings/unset') {
           snapshot = {
             ...snapshot,
             revision: snapshot.revision + 1,
             value: { ...snapshot.value, [payload.field]: payload.field === 'harnessIdentity' ? '' : undefined },
           }
-          status = statusView(snapshot.value.enabledFeatures, snapshot.value.enabledSkills, snapshot.revision)
+          status = statusView(
+            snapshot.value.enabledFeatures,
+            snapshot.value.enabledSkills,
+            snapshot.revision,
+            snapshot.value.replyOptionsCount ?? 3,
+            snapshot.value.replyOptionsKeywords,
+          )
         }
         return {
           ok: true,
@@ -311,10 +364,83 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     })
   })
 
+  it('在回复选项齿轮中按条数显示对应关键词并原子保存', async () => {
+    const { scope, connection } = harness(['reply-options'], [], {
+      replyOptionsCount: 3,
+      replyOptionsKeywords: ['试探', '', '离开'],
+    })
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+
+    fireEvent.click(await screen.findByRole('button', { name: '设置回复选项' }))
+    expect(await screen.findByRole('dialog', { name: '设置回复选项' })).toBeTruthy()
+    const input = screen.getByRole('spinbutton', { name: '回复条数' })
+    expect(input.value).toBe('3')
+    expect(input.disabled).toBe(false)
+    expect(screen.getAllByRole('textbox')).toHaveLength(3)
+    expect(screen.getByLabelText('选项 1 的方向关键词').value).toBe('试探')
+    expect(screen.getByLabelText('选项 3 的方向关键词').value).toBe('离开')
+
+    fireEvent.input(input, { target: { value: '5' } })
+    expect(input.value).toBe('5')
+    expect(screen.getAllByRole('textbox')).toHaveLength(5)
+    fireEvent.change(screen.getByLabelText('选项 2 的方向关键词'), { target: { value: ' 直接反抗 ' } })
+    fireEvent.change(screen.getByLabelText('选项 4 的方向关键词'), { target: { value: '寻求帮助' } })
+    const saveButton = screen.getByRole('button', { name: '保存设置' })
+    await waitFor(() => expect(saveButton.disabled).toBe(false))
+    fireEvent.click(saveButton)
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-features', 'settings/reply-options', {
+      count: 5,
+      keywords: ['试探', '直接反抗', '离开', '寻求帮助', ''],
+      expectedRevision: 0,
+    }))
+    expect(await screen.findByText('回复条数和方向关键词已保存；新建或重新打开对话后生效。')).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: '设置回复选项' })).toBeNull()
+  })
+
+  it('回复条数超出 1–5 时保留输入并阻止保存', async () => {
+    const { scope, connection } = harness(['reply-options'], [])
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+
+    fireEvent.click(await screen.findByRole('button', { name: '设置回复选项' }))
+    const input = await screen.findByRole('spinbutton', { name: '回复条数' })
+    expect(input.disabled).toBe(false)
+    fireEvent.input(input, { target: { value: '6' } })
+    expect(input.value).toBe('6')
+    expect(screen.getAllByRole('textbox')).toHaveLength(3)
+    expect(screen.getByRole('alert').textContent).toBe('请输入 1 到 5 之间的整数。')
+    expect(screen.getByRole('button', { name: '保存设置' }).disabled).toBe(true)
+    expect(connection.call).not.toHaveBeenCalledWith('/rp-features', 'settings/reply-options', expect.anything())
+  })
+
+  it('方向关键词超过 40 个字符时保留编辑并阻止保存', async () => {
+    const { scope, connection } = harness(['reply-options'], [])
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+    fireEvent.click(await screen.findByRole('button', { name: '设置回复选项' }))
+    fireEvent.change(screen.getByLabelText('选项 2 的方向关键词'), { target: { value: '界'.repeat(41) } })
+    expect(screen.getByRole('alert').textContent).toBe('选项 2 的方向关键词最多 40 个字符。')
+    expect(screen.getByRole('button', { name: '保存设置' }).disabled).toBe(true)
+    expect(screen.getByLabelText('选项 2 的方向关键词').value).toBe('界'.repeat(41))
+    expect(connection.call).not.toHaveBeenCalledWith('/rp-features', 'settings/reply-options', expect.anything())
+  })
+
+  it('回复条数保存失败时保留弹窗并显示友好错误', async () => {
+    const { scope, connection } = harness(['reply-options'], [], { failReplyOptionsSave: true })
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+    fireEvent.click(await screen.findByRole('button', { name: '设置回复选项' }))
+    fireEvent.input(screen.getByRole('spinbutton', { name: '回复条数' }), { target: { value: '4' } })
+    fireEvent.change(screen.getByLabelText('选项 4 的方向关键词'), { target: { value: '主动离开' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存设置' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('回复选项设置没有保存，请稍后重试。')
+    expect(screen.getByRole('dialog', { name: '设置回复选项' })).toBeTruthy()
+    expect(screen.getByRole('spinbutton', { name: '回复条数' }).value).toBe('4')
+    expect(screen.getByLabelText('选项 4 的方向关键词').value).toBe('主动离开')
+  })
+
   it('功能未启用时保留可发现但不可点击的设置入口', async () => {
     const { scope, connection } = harness(['lore-book'])
     render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
-    expect((await screen.findByRole('button', { name: '启用后设置' })).disabled).toBe(true)
+    expect((await screen.findByRole('button', { name: '启用快捷回复后设置' })).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: '启用回复选项后设置' }).disabled).toBe(true)
   })
 
   it('快捷回复设置保留无效编辑并给出可执行错误', async () => {
@@ -389,7 +515,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     expect(promptLayers.every(layer => !layer.open)).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: /^Writer/ }))
-    expect(await screen.findByText(/Write the next user-visible narrative passage/)).toBeTruthy()
+    expect(await screen.findByText(/You are Writer\. Produce the requested user-visible output/)).toBeTruthy()
     expect(screen.getByText('不向这个代理提供工具。')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /自定义子代理/ }))

@@ -87,6 +87,12 @@ export const FEATURE_CATALOG = Object.freeze([
     hostEntryIds: ['rp-quick-replies'],
   }),
   feature({
+    id: 'reply-options', category: 'conversation', label: '回复选项',
+    description: '在成功的剧情回复后提供由主模型生成的主角对白与行动，点击后直接发送。',
+    packageName: 'dsh-roleplay-rp-reply-options',
+    hostEntryIds: ['rp-reply-options'], runtimeKey: 'replyOptions',
+  }),
+  feature({
     id: 'message-actions', category: 'conversation', label: '消息操作',
     description: '提供编辑、删除、重新生成和失败恢复等消息能力。',
     packageName: 'dsh-roleplay-rp-message-actions',

@@ -17,6 +17,7 @@ test('feature manager bundle provides the preset and every independently owned b
   assert.equal(patch.match(/id: rp-writing-style/g)?.length, 1)
   assert.equal(patch.match(/id: rp-mvu-import/g)?.length, 1)
   assert.equal(patch.match(/id: rp-quick-replies/g)?.length, 1)
+  assert.equal(patch.match(/id: rp-reply-options/g)?.length, 1)
   assert.equal(patch.match(/id: rp-message-actions/g)?.length, 1)
   assert.equal(patch.match(/id: rp-state-display/g)?.length, 1)
   assert.equal(patch.match(/id: rp-message-avatar/g)?.length, 1)
@@ -55,6 +56,7 @@ test('browser asset packages expose package metadata for Harness client discover
     'dsh-roleplay-rp-subagent-manager',
     'dsh-roleplay-rp-library',
     'dsh-roleplay-rp-quick-replies',
+    'dsh-roleplay-rp-reply-options',
     'dsh-roleplay-rp-message-actions',
     'dsh-roleplay-rp-state-display',
     'dsh-roleplay-rp-message-avatar',
@@ -87,7 +89,7 @@ test('foundational plugins never depend on the optional MVU adapter', async () =
 
 test('Roleplay preset composes every standard Roleplay capability once', async () => {
   const patch = await readFile(new URL('../presets/roleplay/agent.cordis.yml', import.meta.url), 'utf8')
-  const ids = ['core', 'subagent-manager', 'session', 'character-card', 'lore-book', 'state', 'compat-mvu', 'persona', 'macro', 'preset', 'writing-style', 'asset-tools']
+  const ids = ['core', 'reply-options', 'subagent-manager', 'session', 'character-card', 'lore-book', 'state', 'compat-mvu', 'persona', 'macro', 'preset', 'writing-style', 'asset-tools']
   for (const id of ids) assert.equal(patch.match(new RegExp(`id: rp-${id}`, 'g'))?.length, 1)
   assert.equal(patch.match(/exposeBrowser: false/g)?.length, 6)
   assert.equal(patch.match(/registerTool: true/g)?.length, 2)
@@ -106,6 +108,7 @@ test('Roleplay preset composes every standard Roleplay capability once', async (
   assert.match(patch, /id: rp-conversation-summary[\s\S]*?name: __RP_CONVERSATION_SUMMARY_MODULE__/)
   assert.match(patch, /id: rp-conversation-summary[\s\S]*?id: command-compact[\s\S]*?name: __COMMAND_COMPACT_MODULE__/)
   assert.match(patch, /id: rp-core[\s\S]*?id: rp-conversation-summary-bridge[\s\S]*?name: __RP_CONVERSATION_SUMMARY_BRIDGE_MODULE__/)
+  assert.match(patch, /id: rp-reply-options[\s\S]*?name: __RP_REPLY_OPTIONS_MODULE__[\s\S]*?registerRuntime: true[\s\S]*?count: __RP_REPLY_OPTIONS_COUNT__/)
   assert.equal(patch.match(/id: tool-subagent/g)?.length ?? 0, 0)
   for (const id of ['persistent-shell', 'pty', 'terminal-bash', 'persistent-bash', 'terminal-pwsh', 'persistent-pwsh', 'str-replace-editor']) {
     assert.equal(patch.match(new RegExp(`id: ${id}(?:\\n|$)`, 'g'))?.length, 1)

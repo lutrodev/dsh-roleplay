@@ -15,6 +15,7 @@ import {
 } from '@deepseek-ai/dsh-session'
 import * as Core from 'dsh-roleplay-rp-core'
 import * as ConversationSummaryBridge from 'dsh-roleplay-rp-conversation-summary/bridge'
+import * as ReplyOptions from 'dsh-roleplay-rp-reply-options'
 import * as SubagentManager from 'dsh-roleplay-rp-subagent-manager'
 import * as Session from 'dsh-roleplay-rp-session'
 import * as Character from 'dsh-roleplay-rp-character-card'
@@ -126,6 +127,11 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
   try {
     await ctx.plugin(Core, { chatMaxStepsPerRun: 5, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 64, maxArtifactBytes: 262144, maxNarrativeCharacters: 200000 })
     await ctx.plugin(ConversationSummaryBridge)
+    await ctx.plugin(ReplyOptions, {
+      registerRuntime: true,
+      count: 3,
+      keywords: ['调查线索', '', '离开现场'],
+    })
     await ctx.plugin(SubagentManager, {
       catalogDir: join(root, 'subagents'),
       maxSubagents: 32,
@@ -156,7 +162,19 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     assert.ok(tools.has('rp_asset_read'))
     assert.ok(tools.has('rp_asset'))
     assert.equal(tools.has('rp_build_context'), false)
-    const stateEffectSchema = tools.get('rp_commit_turn').parameters.properties.effects.items
+    const commitSchema = tools.get('rp_commit_turn').parameters
+    assert.deepEqual(commitSchema.required, ['extensions'])
+    assert.equal(commitSchema.properties.extensions.additionalProperties, false)
+    assert.deepEqual(commitSchema.properties.extensions.required, ['rp.reply-options'])
+    const replyOptionsSchema = commitSchema.properties.extensions.properties['rp.reply-options']
+    assert.ok(replyOptionsSchema)
+    assert.equal(replyOptionsSchema.additionalProperties, false)
+    assert.match(replyOptionsSchema.description, /option 1: "调查线索"/)
+    assert.match(replyOptionsSchema.description, /option 3: "离开现场"/)
+    assert.equal(Object.hasOwn(replyOptionsSchema.properties.options, 'minItems'), false)
+    assert.equal(Object.hasOwn(replyOptionsSchema.properties.options, 'maxItems'), false)
+
+    const stateEffectSchema = commitSchema.properties.effects.items
     assert.equal(stateEffectSchema.properties.kind.const, 'state.update')
     assert.equal(stateEffectSchema.additionalProperties, false)
     assert.equal(stateEffectSchema.properties.payload.additionalProperties, false)
@@ -347,8 +365,17 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
       header: { config: { provider: 'rp-test-provider', model: 'rp-test-model' } },
       reason: 'initial',
     })
+    const replyOptionExtensions = {
+      'rp.reply-options': {
+        options: [
+          'The hero listens at the door and asks who is outside.',
+          'She steps back toward the window and looks for another way out.',
+          'The hero opens the door and faces whoever is waiting there.',
+        ],
+      },
+    }
     const invalidArgs = {
-      runSummary: 'x', references: [], extensions: {},
+      runSummary: 'x', references: [], extensions: replyOptionExtensions,
       effects: [{ kind: 'state.update', namespace, expectedRevision: 0, payload: { changes: [{ op: 'set', path: '/hp', value: 9, reason: '错误的版本号' }] } }],
     }
     agent.session.append('assistant/message', {
@@ -366,7 +393,7 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     let concluded = false
     const loreRevision = run.fragments.find(fragment => fragment.id === 'rp.lore.character-descriptions').revision
     const commitArgs = {
-      runSummary: 'The hero heard the dawn bell.', references: [{ source: 'rp.lore.character-descriptions', id: '1', revision: loreRevision }], extensions: {},
+      runSummary: 'The hero heard the dawn bell.', references: [{ source: 'rp.lore.character-descriptions', id: '1', revision: loreRevision }], extensions: replyOptionExtensions,
       effects: [{
         kind: 'state.update', namespace, expectedRevision: 1,
         payload: { changes: [{ op: 'set', path: '/hp', value: 6, reason: '赶路让旧伤继续消耗体力' }] },
@@ -384,6 +411,10 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     const committed = await tools.get('rp_commit_turn').execute(commitArgs, { agent, callId: 'commit', turn: 2, step: 1, concludeTurn() { concluded = true } })
     assert.equal(concluded, true)
     assert.deepEqual(committed.meta.assistant, { seq: assistantEvent.seq, messageId: assistantEvent.data.message.id })
+    assert.deepEqual(committed.meta.extensions['rp.reply-options'], {
+      version: 1,
+      options: replyOptionExtensions['rp.reply-options'].options,
+    })
     assert.equal('narrative' in committed, false)
     agent.session.append('tool/result', {
       turn: 2,

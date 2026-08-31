@@ -5,6 +5,13 @@ import { Service } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { buildRoleplayPromptPreview } from 'dsh-roleplay-rp-core/prompts'
 import {
+  assertReplyOptionKeywords,
+  DEFAULT_REPLY_OPTION_KEYWORDS,
+  DEFAULT_REPLY_OPTIONS_COUNT,
+  normalizeReplyOptionKeywords,
+  normalizeReplyOptionsCount,
+} from 'dsh-roleplay-rp-reply-options/protocol'
+import {
   CORE_PACKAGES,
   DEFAULT_ENABLED_FEATURES,
   DEFAULT_ENABLED_SKILLS,
@@ -45,6 +52,8 @@ export const Config = Schema.object({
   // installSection can register the namespace before migration removes them.
   enabledFeatures: Schema.array(Schema.union([...FEATURE_IDS, ...RETIRED_FEATURE_IDS])).default(DEFAULT_ENABLED_FEATURES),
   enabledSkills: Schema.array(Schema.union(SKILL_IDS)).default(DEFAULT_ENABLED_SKILLS),
+  replyOptionsCount: Schema.number().min(1).max(5).step(1).default(DEFAULT_REPLY_OPTIONS_COUNT),
+  replyOptionsKeywords: Schema.array(Schema.string()).default([...DEFAULT_REPLY_OPTION_KEYWORDS]),
   harnessIdentity: Schema.string().default(''),
 })
 
@@ -60,6 +69,11 @@ export class RpFeatureManager extends Service {
     this.source = () => config
     this.enabled = migrateLegacyFeatureSelection(config.enabledFeatures)
     this.enabledSkills = normalizeSkillSelection(config.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
+    this.replyOptionsCountValue = normalizeReplyOptionsCount(config.replyOptionsCount)
+    this.replyOptionsKeywordsValue = normalizeReplyOptionKeywords(
+      config.replyOptionsKeywords,
+      this.replyOptionsCountValue,
+    )
     this.harnessSections = harnessSections
     this.defaultHarnessIdentity = requiredHarnessIdentity(harnessSections)
     this.identityOverride = normalizeHarnessIdentityOverride(config.harnessIdentity)
@@ -78,6 +92,8 @@ export class RpFeatureManager extends Service {
         validate: value => {
           migrateLegacyFeatureSelection(value.enabledFeatures)
           assertSkillSelection(value.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
+          const replyOptionsCount = normalizeReplyOptionsCount(value.replyOptionsCount)
+          normalizeReplyOptionKeywords(value.replyOptionsKeywords, replyOptionsCount)
           normalizeHarnessIdentityOverride(value.harnessIdentity)
         },
         onChange: () => { this.refresh() },
@@ -108,6 +124,8 @@ export class RpFeatureManager extends Service {
     return Object.freeze({
       enabledFeatures: Object.freeze([...this.enabled]),
       enabledSkills: Object.freeze([...this.enabledSkills]),
+      replyOptionsCount: this.replyOptionsCountValue,
+      replyOptionsKeywords: Object.freeze([...this.replyOptionsKeywordsValue]),
       harnessIdentity: this.identity,
       compatible: this.environment.compatible,
       dshVersion: this.environment.dsh.version,
@@ -125,6 +143,16 @@ export class RpFeatureManager extends Service {
 
   hasAssetProvider() {
     return hasEnabledAssetProvider(this.enabled)
+  }
+
+  /** Return the exact number of reply options requested from the main model. */
+  replyOptionsCount() {
+    return this.replyOptionsCountValue
+  }
+
+  /** Return one normalized, optional direction keyword for each requested option. */
+  replyOptionsKeywords() {
+    return [...this.replyOptionsKeywordsValue]
   }
 
   /** Return the live identity shadowed into every Roleplay Agent scope. */
@@ -169,6 +197,8 @@ export class RpFeatureManager extends Service {
       problems: this.environment.problems,
       enabledFeatures: [...this.enabled],
       enabledSkills: [...this.enabledSkills],
+      replyOptionsCount: this.replyOptionsCountValue,
+      replyOptionsKeywords: [...this.replyOptionsKeywordsValue],
       settings: this.settingsStatus(),
       core: this.environment.core,
       features: FEATURE_CATALOG.map(item => ({
@@ -229,6 +259,19 @@ export class RpFeatureManager extends Service {
     return this.status()
   }
 
+  /** Persist reply count and its index-aligned direction keywords atomically. */
+  async setReplyOptionsSettings(payload) {
+    const { count, keywords, expectedRevision } = parseReplyOptionsSettingsWrite(payload)
+    const settings = this.requireWritableSettings()
+    await settings.update(ROLEPLAY_SETTINGS_NAMESPACE, {
+      replyOptionsCount: count,
+      replyOptionsKeywords: keywords,
+    }, expectedRevision)
+    this.refresh()
+    await this.settled()
+    return this.status()
+  }
+
   /** Remove one Roleplay-owned override so it inherits its composed default. */
   async unsetSetting(payload) {
     const { field, expectedRevision } = parseSettingReset(payload)
@@ -261,16 +304,25 @@ export class RpFeatureManager extends Service {
     const source = this.source()
     const next = migrateLegacyFeatureSelection(source.enabledFeatures)
     const nextSkills = normalizeSkillSelection(source.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
+    const nextReplyOptionsCount = normalizeReplyOptionsCount(source.replyOptionsCount)
+    const nextReplyOptionsKeywords = normalizeReplyOptionKeywords(
+      source.replyOptionsKeywords,
+      nextReplyOptionsCount,
+    )
     const nextOverride = normalizeHarnessIdentityOverride(source.harnessIdentity)
     const nextIdentity = nextOverride ?? this.defaultHarnessIdentity
     const selectionChanged = !sameSelection(next, this.enabled) || !sameSelection(nextSkills, this.enabledSkills)
+    const replyOptionsCountChanged = nextReplyOptionsCount !== this.replyOptionsCountValue
+    const replyOptionsKeywordsChanged = !sameSelection(nextReplyOptionsKeywords, this.replyOptionsKeywordsValue)
     const identityChanged = nextIdentity !== this.identity || nextOverride !== this.identityOverride
     this.enabled = next
     this.enabledSkills = nextSkills
+    this.replyOptionsCountValue = nextReplyOptionsCount
+    this.replyOptionsKeywordsValue = nextReplyOptionsKeywords
     this.identityOverride = nextOverride
     this.identity = nextIdentity
     if (selectionChanged) this.scheduleReconcile()
-    if (!selectionChanged && !identityChanged) return
+    if (!selectionChanged && !identityChanged && !replyOptionsCountChanged && !replyOptionsKeywordsChanged) return
     const snapshot = this.snapshot()
     const listeners = [...this.listeners]
     this.listenerTail = this.listenerTail.then(async () => {
@@ -372,6 +424,8 @@ async function resolveHarnessPromptSections(ctx) {
 }
 
 export async function apply(ctx, config) {
+  const replyOptionsCount = normalizeReplyOptionsCount(config.replyOptionsCount)
+  normalizeReplyOptionKeywords(config.replyOptionsKeywords, replyOptionsCount)
   normalizeHarnessIdentityOverride(config.harnessIdentity)
   const manager = new RpFeatureManager(ctx, config, await resolveHarnessPromptSections(ctx))
   // Keep the provider fiber pending until the persisted selection has loaded
@@ -387,11 +441,12 @@ function registerBrowserApi(ctx, manager) {
       await manager.settled()
       if (endpoint === 'status') return transportSuccess(success(manager.status()))
       if (endpoint === 'prompts') return transportSuccess(success(await manager.promptPreview()))
+      if (endpoint === 'settings/reply-options') return transportSuccess(success(await manager.setReplyOptionsSettings(payload)))
       if (endpoint === 'settings/set') return transportSuccess(success(await manager.setSetting(payload)))
       if (endpoint === 'settings/unset') return transportSuccess(success(await manager.unsetSetting(payload)))
       return transportSuccess(failure('INVALID_REQUEST', 'Unknown Roleplay feature endpoint.'))
     } catch {
-      if (endpoint === 'settings/set' || endpoint === 'settings/unset') {
+      if (endpoint === 'settings/reply-options' || endpoint === 'settings/set' || endpoint === 'settings/unset') {
         return transportSuccess(failure('ROLEPLAY_SETTINGS_UPDATE_FAILED', 'Roleplay 设置没有保存，请稍后重试。'))
       }
       return endpoint === 'prompts'
@@ -513,6 +568,16 @@ function parseSettingWrite(payload) {
     return { field, value: value ?? '', expectedRevision }
   }
   throw new TypeError(`rp-feature-manager: unknown Roleplay setting ${String(field)}`)
+}
+
+function parseReplyOptionsSettingsWrite(payload) {
+  if (!isPlainObject(payload)) throw new TypeError('rp-feature-manager: reply option settings payload must be an object')
+  const count = normalizeReplyOptionsCount(payload.count)
+  return {
+    count,
+    keywords: assertReplyOptionKeywords(payload.keywords, count),
+    expectedRevision: parseExpectedRevision(payload.expectedRevision),
+  }
 }
 
 function parseSettingReset(payload) {

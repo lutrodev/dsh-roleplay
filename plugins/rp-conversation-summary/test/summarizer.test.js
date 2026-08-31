@@ -27,14 +27,15 @@ test('pressure input snapshots only completed logical RP dialogue', () => {
     { seq: 1, type: 'user/message', data: user, surfaceOp: 'append' },
     { seq: 2, type: 'step/start', data: { turn: 1, step: 1 } },
     { seq: 3, type: 'assistant/message', data: { turn: 1, step: 1, message: assistant }, surfaceOp: 'append' },
-    { seq: 4, type: 'step/end', data: { turn: 1, step: 1 } },
-    { seq: 5, type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
+    { seq: 4, type: 'tool/result', data: { meta: commitMeta('run-1', 1, 3, assistant.id) }, surfaceOp: 'append' },
+    { seq: 5, type: 'step/end', data: { turn: 1, step: 1 } },
+    { seq: 6, type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
   ]
-  const input = pressureSummaryInput({ events, surface: { nodes: [1, 3] } })
+  const input = pressureSummaryInput({ events, surface: { nodes: [1, 3, 4] } })
   assert.equal(input.newMessageCount, 2)
   assert.deepEqual(input.messages.map(message => [message.role, message.content[0].text]), [
     ['user', '打开潮门。'],
-    ['assistant', '潮门缓缓开启。'],
+    ['assistant', '写作回复：潮门缓缓开启。'],
   ])
 })
 
@@ -60,17 +61,27 @@ test('later pressure input merges the active checkpoint summary with only newer 
     { seq: 3, type: 'user/message', data: recentUser, surfaceOp: 'append' },
     { seq: 4, type: 'step/start', data: { turn: 2, step: 1 } },
     { seq: 5, type: 'assistant/message', data: { turn: 2, step: 1, message: recentAssistant }, surfaceOp: 'append' },
-    { seq: 6, type: 'step/end', data: { turn: 2, step: 1 } },
-    { seq: 7, type: 'turn/end', data: { turn: 2, reason: { kind: 'completed' } } },
+    { seq: 6, type: 'tool/result', data: { meta: commitMeta('run-2', 2, 5, recentAssistant.id) }, surfaceOp: 'append' },
+    { seq: 7, type: 'step/end', data: { turn: 2, step: 1 } },
+    { seq: 8, type: 'turn/end', data: { turn: 2, reason: { kind: 'completed' } } },
   ]
-  const input = pressureSummaryInput({ events, surface: { nodes: [1, 3, 5] } })
+  const input = pressureSummaryInput({ events, surface: { nodes: [1, 3, 5, 6] } })
   assert.equal(input.newMessageCount, 2)
   assert.deepEqual(input.messages.map(message => [message.role, message.content[0].text]), [
     ['user', '<已有会话总结>\n旧总结仍有效。\n</已有会话总结>'],
     ['user', '继续进入潮门。'],
-    ['assistant', '两人踏入潮门。'],
+    ['assistant', '写作回复：两人踏入潮门。'],
   ])
   assert.equal(input.messages.some(message => message.content[0].text.includes('<compacted-summary>')), false)
+})
+
+test('manual input labels an ordinary assistant response as non-writing', () => {
+  const assistant = {
+    role: 'assistant', id: 'assistant-discussion', source: { kind: 'model', provider: 'mock', model: 'mock' },
+    content: [{ type: 'text', text: '可以先讨论反派的动机。' }],
+  }
+  const messages = nativeSummaryInput({ messages: [assistant] }, { events: [], surface: { nodes: [] } })
+  assert.equal(messages[0].content[0].text, '非写作回复：可以先讨论反派的动机。')
 })
 
 test('manual and overflow input merges only checkpoints inside the selected native region', () => {
@@ -156,6 +167,13 @@ function checkpointMessage(compactionId) {
     content: [{ type: 'text', text: `checkpoint:${compactionId}` }],
     source: { kind: 'plugin', plugin: 'compact', compactionId },
   })
+}
+
+function commitMeta(runId, turn, seq, messageId) {
+  return {
+    kind: 'rp-agent/turn-commit', version: 2, runId, turn,
+    assistant: { seq, messageId },
+  }
 }
 
 async function* textResponse(text) {

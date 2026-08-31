@@ -1,0 +1,5 @@
+- insert:
+    - id: rp-reply-options
+      name: dsh-roleplay-rp-reply-options
+      config:
+        registerRuntime: false

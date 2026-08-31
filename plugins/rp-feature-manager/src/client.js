@@ -19,12 +19,14 @@ import {
   planFeatureToggle,
   planSkillToggle,
   promptPreview,
+  setReplyOptionsSettings,
   setRoleplaySetting,
   skillToggleAnnouncement,
   toggleAnnouncement,
   unsetRoleplaySetting,
 } from './client-state.js'
 import { QuickReplyManager, createQuickReplyStore } from './quick-reply-settings.js'
+import { ReplyOptionsSettingsDialog } from './reply-options-settings.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
 export const inject = ['slots', 'locale', 'rpRemote', 'settingsScope']
@@ -64,7 +66,10 @@ const zh = {
   applies: '资料入口会立即调整；Roleplay 运行能力从下一次新建或重新打开对话开始生效。',
   saveError: '启用状态没有保存，请稍后重试。',
   quickRepliesConfigure: '设置快捷回复',
-  quickRepliesEnableFirst: '启用后设置',
+  quickRepliesEnableFirst: '启用快捷回复后设置',
+  replyOptionsConfigure: '设置回复选项',
+  replyOptionsEnableFirst: '启用回复选项后设置',
+  replyOptionsSettingsSaved: '回复条数和方向关键词已保存；新建或重新打开对话后生效。',
   skillsTitle: 'Roleplay Skills',
   skillsDescription: '逐项选择 Roleplay 插件向 Agent 提供的工作指南。停用 Skill 不会停用插件，也不会删除资料。',
   skillsScope: '这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。',
@@ -177,7 +182,9 @@ const en = {
   roleplayVersion: 'Roleplay', dshVersion: 'DSH', versionDetails: 'View core components',
   applies: 'Material entries update immediately. Runtime changes apply to newly created or reopened conversations.',
   saveError: 'The enabled state was not saved. Try again.',
-  quickRepliesConfigure: 'Configure quick replies', quickRepliesEnableFirst: 'Enable to configure',
+  quickRepliesConfigure: 'Configure quick replies', quickRepliesEnableFirst: 'Enable Quick replies to configure',
+  replyOptionsConfigure: 'Configure reply options', replyOptionsEnableFirst: 'Enable Reply options to configure',
+  replyOptionsSettingsSaved: 'The reply count and direction keywords are saved and apply to newly created or reopened conversations.',
   skillsTitle: 'Roleplay Skills',
   skillsDescription: 'Select the guides Roleplay plugins expose to agents. Disabling a Skill does not disable its plugin or delete data.',
   skillsScope: 'This page only manages Skills contributed by Roleplay plugins. Project and user Skills are unaffected.',
@@ -258,6 +265,7 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
   const [promptStatus, setPromptStatus] = useState({ phase: 'idle' })
   const [promptRequest, setPromptRequest] = useState(0)
   const [quickReplyManagerOpen, setQuickReplyManagerOpen] = useState(false)
+  const [replyOptionsSettingsOpen, setReplyOptionsSettingsOpen] = useState(false)
   const quickReplyStore = useMemo(() => createQuickReplyStore(connection), [connection])
 
   useEffect(() => {
@@ -291,11 +299,11 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
   const selectedSkills = useMemo(() => new Set(enabledSkills), [enabledSkills])
   const compatible = status.phase === 'ready' && status.value.compatible === true
   const settingsRevision = status.phase === 'ready' ? status.value.settings?.revision : null
-  const canWrite = status.phase === 'ready'
+  const settingsWritable = status.phase === 'ready'
     && status.value.settings?.writable === true
     && Number.isSafeInteger(settingsRevision)
     && compatible
-    && pending === null
+  const canWrite = settingsWritable && pending === null
 
   const toggleFeature = async feature => {
     if (!canWrite) return
@@ -372,6 +380,30 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
     }
   }
 
+  const updateReplyOptions = async ({ count, keywords }) => {
+    if (!canWrite) return false
+    setPending('reply-options-settings')
+    setNotice('')
+    try {
+      const nextStatus = await setReplyOptionsSettings(
+        connection,
+        count,
+        keywords,
+        settingsRevision,
+      )
+      if (nextStatus.replyOptionsCount !== count || !sameSelection(nextStatus.replyOptionsKeywords, keywords)) {
+        throw new Error('Roleplay reply option settings were not applied')
+      }
+      setStatus({ phase: 'ready', value: nextStatus })
+      setNotice(t('replyOptionsSettingsSaved'))
+      return true
+    } catch {
+      return false
+    } finally {
+      setPending(null)
+    }
+  }
+
   if (status.phase === 'loading') {
     return h('div', { className: css.state, role: 'status' }, t('loading'))
   }
@@ -421,6 +453,7 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
               onToggle: feature => { void toggleFeature(feature) },
               onConfigure: feature => {
                 if (feature.id === 'quick-replies') setQuickReplyManagerOpen(true)
+                if (feature.id === 'reply-options') setReplyOptionsSettingsOpen(true)
               },
               t,
             })
@@ -449,6 +482,17 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
         store: quickReplyStore,
         onClose: () => setQuickReplyManagerOpen(false),
       }),
+      replyOptionsSettingsOpen
+        ? h(ReplyOptionsSettingsDialog, {
+            open: true,
+            count: status.value.replyOptionsCount,
+            keywords: status.value.replyOptionsKeywords,
+            writable: settingsWritable,
+            saving: pending === 'reply-options-settings',
+            onSave: updateReplyOptions,
+            onClose: () => setReplyOptionsSettingsOpen(false),
+          })
+        : null,
       h('div', { className: css.liveNotice, 'aria-live': 'polite' }, notice))))
 }
 
@@ -470,7 +514,9 @@ function FeaturesPanel({ status, enabled, pending, canWrite, reduced, onToggle, 
         status: status.features.find(item => item.id === feature.id),
         reduced,
         onToggle: () => onToggle(feature),
-        onConfigure: feature.id === 'quick-replies' ? () => onConfigure(feature) : undefined,
+        onConfigure: feature.id === 'quick-replies' || feature.id === 'reply-options'
+          ? () => onConfigure(feature)
+          : undefined,
         t,
       }))))))
 }
@@ -826,8 +872,10 @@ function CoreSummary({ status, t }) {
 function FeatureRow({ feature, checked, pending, disabled, status, reduced, onToggle, onConfigure, t }) {
   const requires = dependencyLabels(feature)
   const recommends = dependencyLabels(feature, 'recommends')
-  const configureReady = checked && status?.active === true && !pending
-  const configureLabel = t(configureReady ? 'quickRepliesConfigure' : 'quickRepliesEnableFirst')
+  const configureReady = checked && status?.active === true && !pending && !disabled
+  const configureLabel = feature.id === 'reply-options'
+    ? t(configureReady ? 'replyOptionsConfigure' : 'replyOptionsEnableFirst')
+    : t(configureReady ? 'quickRepliesConfigure' : 'quickRepliesEnableFirst')
   return h(m.li, { className: css.feature, layout: !reduced },
     h('div', { className: css.featureCopy },
       h('div', { className: css.featureTitle },

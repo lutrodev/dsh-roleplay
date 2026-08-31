@@ -8,7 +8,7 @@ import { CORE_PACKAGES, DEFAULT_ENABLED_FEATURES, FEATURE_CATALOG, ROLEPLAY_SKIL
 const pluginDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const pluginsDirectory = resolve(pluginDirectory, '..')
 const packagesDirectory = resolve(pluginsDirectory, '..', 'packages')
-const V0_1_5_NEW_ENTRY_IDS = ['rp-quick-replies', 'rp-state-display', 'rp-compact-access-mode']
+const PARKED_BROWSER_ENTRY_IDS = ['rp-quick-replies', 'rp-reply-options', 'rp-state-display', 'rp-compact-access-mode']
 
 function patchEntry(patch, id) {
   const marker = `    - id: ${id}\n`
@@ -35,12 +35,19 @@ test('feature manager is the suite bundle and carries every managed Roleplay pac
   assert.match(stateDisplayEntry, /disabled: true/)
   assert.equal(DEFAULT_ENABLED_FEATURES.includes('state-display'), true)
   assert.match(patch.match(/enabledFeatures:([\s\S]*?)enabledSkills:/)?.[1] ?? '', /- state-display/)
-  for (const entryId of V0_1_5_NEW_ENTRY_IDS) {
+  const replyOptionsEntry = patchEntry(patch, 'rp-reply-options')
+  assert.match(replyOptionsEntry, /name: dsh-roleplay-rp-reply-options/)
+  assert.match(replyOptionsEntry, /registerRuntime: false/)
+  assert.equal(DEFAULT_ENABLED_FEATURES.includes('reply-options'), true)
+  assert.match(patch.match(/enabledFeatures:([\s\S]*?)enabledSkills:/)?.[1] ?? '', /- reply-options/)
+  assert.match(patchEntry(patch, 'rp-feature-manager'), /replyOptionsCount: 3/)
+  assert.match(patchEntry(patch, 'rp-feature-manager'), /replyOptionsKeywords:\s+- ''\s+- ''\s+- ''/)
+  for (const entryId of PARKED_BROWSER_ENTRY_IDS) {
     assert.match(patchEntry(patch, entryId), /disabled: true/, `${entryId} must start parked`)
   }
   for (const entryId of FEATURE_CATALOG
     .flatMap(feature => feature.hostEntryIds)
-    .filter(entryId => !V0_1_5_NEW_ENTRY_IDS.includes(entryId))) {
+    .filter(entryId => !PARKED_BROWSER_ENTRY_IDS.includes(entryId))) {
     assert.doesNotMatch(patchEntry(patch, entryId), /disabled:/, `${entryId} must keep its existing activation path`)
   }
 
@@ -108,6 +115,7 @@ test('settings UI presents activation instead of package acquisition', async () 
   assert.match(client, /customPrompt: '自定义子代理'/)
   assert.match(client, /可见性预览/)
   assert.match(client, /writerVisibility: '始终不可见[^']*Writer。'/)
+  assert.match(client, /replyOptionsConfigure: '设置回复选项'/)
   assert.doesNotMatch(client, /安装|卸载|下载/)
 })
 

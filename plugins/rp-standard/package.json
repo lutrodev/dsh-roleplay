@@ -37,6 +37,7 @@
     "@deepseek-ai/dsh-command-compact": "^0.1.2-alpha.2",
     "dsh-roleplay-rp-conversation-summary": "workspace:^",
     "dsh-roleplay-rp-core": "workspace:^",
+    "dsh-roleplay-rp-reply-options": "workspace:^",
     "dsh-roleplay-rp-subagent-manager": "workspace:^",
     "dsh-roleplay-rp-session": "workspace:^",
     "dsh-roleplay-rp-character-card": "workspace:^",

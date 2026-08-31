@@ -34,6 +34,15 @@ test('the reply variable card is known, requires State, and is on by default', (
   assert.deepEqual(toggleSideEffects(['state', 'state-display'], 'state', false), ['state-display'])
 })
 
+test('main-model reply options are independent, on for fresh installs, and off for saved old selections', () => {
+  assert.equal(FEATURE_IDS.includes('reply-options'), true)
+  assert.equal(DEFAULT_ENABLED_FEATURES.includes('reply-options'), true)
+  assert.deepEqual(normalizeFeatureSelection(['reply-options']), ['reply-options'])
+  assert.deepEqual(toggleFeature([], 'reply-options', true), ['reply-options'])
+  const previousDefaults = FEATURE_IDS.filter(id => id !== 'reply-options')
+  assert.deepEqual(migrateLegacyFeatureSelection(previousDefaults), previousDefaults)
+})
+
 test('selection validation rejects unknown, duplicate, and incomplete input', () => {
   assert.throws(() => assertFeatureSelection(['unknown']), /unknown feature/)
   assert.throws(() => assertFeatureSelection(['persona', 'persona']), /duplicates/)
@@ -51,8 +60,8 @@ test('the pre-optional-State MVU selection migrates without accepting other inco
 })
 
 test('the previous full feature set adopts compact access mode without changing the saved display choice', () => {
-  const previousDefaults = FEATURE_IDS.filter(id => id !== 'state-display' && id !== 'compact-access-mode')
-  const migratedDefaults = FEATURE_IDS.filter(id => id !== 'state-display')
+  const previousDefaults = FEATURE_IDS.filter(id => id !== 'state-display' && id !== 'compact-access-mode' && id !== 'reply-options')
+  const migratedDefaults = FEATURE_IDS.filter(id => id !== 'state-display' && id !== 'reply-options')
   assert.deepEqual(migrateLegacyFeatureSelection(previousDefaults), migratedDefaults)
   assert.deepEqual(migrateLegacyFeatureSelection(migratedDefaults), migratedDefaults)
   assert.deepEqual(migrateLegacyFeatureSelection(['dialogue-highlight']), ['dialogue-highlight'])
