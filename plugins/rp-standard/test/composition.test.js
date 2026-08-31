@@ -395,6 +395,27 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     }, { surfaceOp: 'append', sourceEventSeqs: [commitCall.seq] })
     assert.equal(ctx.rpState.get(agent).namespaces[namespace].value.hp, 6)
 
+    const stateBeforeModeRoundTrip = ctx.rpState.get(agent)
+    const profileBeforeModeRoundTrip = ctx.rpSessions.get(agent)
+    const chatProfile = await ctx.rpSessions.setExecutionMode(agent, {
+      expectedRevision: profileBeforeModeRoundTrip.revision,
+      executionMode: 'chat',
+    })
+    assert.equal(chatProfile.runtime.executionMode, 'chat')
+    assert.deepEqual(chatProfile.resources, profileBeforeModeRoundTrip.resources)
+    assert.deepEqual(chatProfile.contextBuild, profileBeforeModeRoundTrip.contextBuild)
+    assert.deepEqual(ctx.rpState.get(agent), stateBeforeModeRoundTrip)
+    assert.deepEqual(agentTools.registered?.parameters, CHAT_WRITER_PARAMETERS)
+    const agentProfileAfterRoundTrip = await ctx.rpSessions.setExecutionMode(agent, {
+      expectedRevision: chatProfile.revision,
+      executionMode: 'agent',
+    })
+    assert.equal(agentProfileAfterRoundTrip.runtime.executionMode, 'agent')
+    assert.deepEqual(agentProfileAfterRoundTrip.resources, profileBeforeModeRoundTrip.resources)
+    assert.deepEqual(agentProfileAfterRoundTrip.contextBuild, profileBeforeModeRoundTrip.contextBuild)
+    assert.deepEqual(ctx.rpState.get(agent), stateBeforeModeRoundTrip)
+    assert.equal(agentTools.registered, undefined)
+
     const stateRefreshedLore = await ctx.rpLoreBooks.assembleLore({
       agent, runId: 'state-revision-check',
       messages: [{ role: 'user', content: [{ type: 'text', text: 'I look for help.' }] }],
@@ -426,9 +447,9 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     const stateFragment = nextRun.fragments.find(fragment => fragment.id === 'rp.state')
     assert.match(stateFragment?.text ?? '', /"hp": 6/)
     assert.doesNotMatch(stateFragment.text, /current health|expectedRevision|state\.update|schema|rules|diagnostics|initialValue/)
-    assert.match(stateFragment.parentText, /"description": "current health"/)
-    assert.match(stateFragment.parentText, /"expectedRevision": 2/)
-    assert.match(stateFragment.parentText, /"kind": "state\.update"/)
+    assert.match(stateFragment.parentText, /"description":"current health"/)
+    assert.match(stateFragment.parentText, /"expectedRevision":2/)
+    assert.match(stateFragment.parentText, /"effectKind":"state\.update"/)
     assert.doesNotMatch(stateFragment.parentText, /initialValue|ValueWithDescription|state\.patch|payload\.namespace|writable/)
     assert.equal(Object.hasOwn(stateFragment, 'directorText'), false)
     assert.ok(nextRun.fragments.some(fragment => fragment.id.startsWith('rp.preset:') && fragment.text.includes('把港口谜团推进到午夜钟声。')))

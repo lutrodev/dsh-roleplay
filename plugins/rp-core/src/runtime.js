@@ -37,6 +37,7 @@ import {
   COMMIT_TOOL_DESCRIPTION,
   DEFAULT_WRITER_PERSONA,
   filterUnavailableToolPromptSections,
+  renderCommitContextReplacement,
   renderRoleplayRequest,
   renderTaskSubagentPrompt,
   renderWriterPrompt,
@@ -652,6 +653,7 @@ export class RpRuntime extends Service {
     const contextEpoch = run.refreshEpoch + 1
     run.refreshEpoch = contextEpoch
     const gateKind = typeof options.kind === 'string' ? options.kind : 'asset-mutation'
+    const previousCommitContextText = run.commitContextText
     try {
       const profile = this.sessionProfile(agent)
       const sourceMessages = agent.session?.deriveMessages?.() ?? []
@@ -667,6 +669,7 @@ export class RpRuntime extends Service {
       const build = compileContextBuild({ layout, candidates: ingredients.candidates, unavailable: ingredients.unavailable })
       assignIngredients(run, { profile, input, messages, ingredients, catalog, contextEpoch })
       this.acceptBuild(run, build, 'session')
+      const commitContextChanged = run.commitContextText !== previousCommitContextText
       if (run.writerArtifact !== undefined) {
         run.writerArtifact = undefined
         run.writerCallId = undefined
@@ -682,6 +685,9 @@ export class RpRuntime extends Service {
         usedCharacters: [...run.contextText].length,
         sourceCount: run.fragments.length,
         excludedSourceCount: run.excludedFragments.length,
+        ...(commitContextChanged
+          ? { commitContextReplacement: renderCommitContextReplacement(run.commitContextText, contextEpoch) }
+          : {}),
         ...(run.executionMode === 'agent' ? { contextText: run.contextText } : {}),
       }))
     } catch (error) {
@@ -743,6 +749,7 @@ export class RpRuntime extends Service {
       contextBuild: null,
       contextBuilds: [],
       contextText: '',
+      commitContextText: '',
       catalog: [],
       contextEpoch: 0,
       refreshEpoch: 0,
@@ -1064,6 +1071,7 @@ export class RpRuntime extends Service {
     run.fragments = build.fragments
     run.excludedFragments = build.excluded
     run.contextText = build.contextText
+    run.commitContextText = renderParentCommitContext(build.fragments)
     run.contextBuild = { version: 1, owner, slots: build.slots }
     run.contextBuilds.push(run.contextBuild)
   }
@@ -1090,16 +1098,12 @@ export class RpRuntime extends Service {
   writerReadyMessage(run) {
     const preparedAt = Date.now()
     const availableSubagents = run.executionMode === 'agent' ? taskSubagentCatalog(run.taskSubagents) : []
-    const parentCommitFragments = run.fragments.filter(fragment => fragment.parentDelivery === 'commit')
-    const commitContext = parentCommitFragments.length === 0
-      ? ''
-      : parentCommitFragments.map(fragment => `<item source="${escapeAttribute(fragment.id)}">\n${fragment.parentText ?? fragment.text}\n</item>`).join('\n')
     const text = renderRoleplayRequest({
       executionMode: run.executionMode,
       assetBindings: rpCurrentAssetBindingManifest(run.profile),
       specialists: availableSubagents,
       roleplayContext: run.contextText,
-      commitContext,
+      commitContext: run.commitContextText,
     })
     return createUserMessage({
       content: [{ type: 'text', text }],
@@ -2024,6 +2028,14 @@ function validateReferences(value, run) {
     }
     return { source: reference.source, id: reference.id, revision: reference.revision }
   })
+}
+
+/** Serialize all commit-delivery source views once for a frozen context build. */
+function renderParentCommitContext(fragments) {
+  const selected = fragments.filter(fragment => fragment.parentDelivery === 'commit')
+  return selected.length === 0
+    ? ''
+    : selected.map(fragment => `<item source="${escapeAttribute(fragment.id)}">\n${fragment.parentText ?? fragment.text}\n</item>`).join('\n')
 }
 
 function contextMetadata(fragment) {

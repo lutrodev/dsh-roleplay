@@ -19,7 +19,6 @@ import {
   applyStateChanges,
   stateUpdateArgumentCorrections,
   stateUpdateEffectSchema,
-  stateUpdateOperationProtocol,
 } from './update.js'
 import {
   applyStateCommandEvent,
@@ -45,6 +44,23 @@ export const inject = ['commands', 'rpRuntime', 'tools']
 export const Config = Schema.object({ maxNamespacesInContext: Schema.number().default(32) })
 export const STATE_CONTEXT_SOURCE_ID = 'rp.state'
 export const STATE_ACTIVITY_PROJECTION_KEY = 'rp/state/activity'
+export const RP_STATE_COMMIT_CONTEXT_VERSION = 1
+
+const STATE_COMMIT_CONSTRAINTS = Object.freeze([
+  'Submit only paths whose values changed.',
+  'set and append use value; increment uses by; remove uses neither value nor by.',
+  'append adds exactly one new array item, never the complete current array.',
+  'Submit at most one state.update effect per namespace.',
+  'Every change requires a non-empty factual reason.',
+  'Paths in one effect must not duplicate, overlap, or contain one another.',
+  'All changes in one commit are atomic.',
+])
+
+const STATE_UPDATE_MODE_GUIDANCE = Object.freeze({
+  'rules-required': 'Every change requires the matching ruleId.',
+  'schema-only': 'ruleId is optional; operations and the resulting value must satisfy the schema.',
+  disabled: 'Do not submit state.update for this namespace.',
+})
 
 /** Session-owned event-sourced roleplay State service. */
 export class RpState extends Service {
@@ -275,39 +291,38 @@ export class RpState extends Service {
       })),
     }, null, 2)
     const parentText = JSON.stringify({
-      protocolVersion: RP_STATE_PROTOCOL_VERSION,
-      updateProtocol: {
-        kind: 'state.update',
-        effect: { kind: 'state.update', namespace: '<exact namespace>', expectedRevision: '<exact namespace revision>', payload: { changes: '<non-empty ordered array>' } },
-        operations: stateUpdateOperationProtocol(),
-        modes: {
-          'rules-required': 'Every change must include the matching ruleId.',
-          'schema-only': 'ruleId is optional; every operation and the final value must still pass validation.',
-          disabled: 'Do not submit State changes for this namespace.',
-        },
-        constraints: [
-          'submit only paths that changed',
-          'increment uses by and never value; set and append use value and never by; remove uses neither field',
-          'when adding to an array, append only the new item; never copy or set the complete current array',
-          'one effect per namespace',
-          'non-empty reason per change',
-          'no duplicate or ancestor/descendant paths',
-          'all changes commit atomically',
-        ],
-        atomic: true,
+      version: RP_STATE_COMMIT_CONTEXT_VERSION,
+      stateProtocolVersion: RP_STATE_PROTOCOL_VERSION,
+      contract: {
+        effectKind: 'state.update',
+        updateModes: STATE_UPDATE_MODE_GUIDANCE,
+        constraints: STATE_COMMIT_CONSTRAINTS,
+        namespaces: entries.map(([namespace, snapshot]) => ({
+          namespace,
+          updateMode: snapshot.definition.updateMode,
+          title: snapshot.definition.title,
+          ...(snapshot.definition.description === undefined ? {} : { description: snapshot.definition.description }),
+          ...(snapshot.definition.updateMode === 'disabled'
+            ? {}
+            : { schema: snapshot.definition.schema, rules: snapshot.definition.rules }),
+        })),
       },
-      namespaces: entries.map(([namespace, snapshot]) => ({
-        namespace,
-        expectedRevision: snapshot.revision,
-        updateMode: snapshot.definition.updateMode,
-        title: snapshot.definition.title,
-        ...(snapshot.definition.description === undefined ? {} : { description: snapshot.definition.description }),
-        value: snapshot.value,
-        schema: snapshot.definition.schema,
-        rules: snapshot.definition.rules,
-        diagnostics: snapshot.diagnostics,
-      })),
-    }, null, 2)
+      snapshot: {
+        stateRevision: state.revision,
+        namespaces: entries.flatMap(([namespace, namespaceSnapshot]) => {
+          const diagnostics = commitContextDiagnostics(namespaceSnapshot.diagnostics)
+          if (namespaceSnapshot.definition.updateMode === 'disabled') {
+            return diagnostics === undefined ? [] : [{ namespace, diagnostics }]
+          }
+          return [{
+            namespace,
+            expectedRevision: namespaceSnapshot.revision,
+            value: namespaceSnapshot.value,
+            ...(diagnostics === undefined ? {} : { diagnostics }),
+          }]
+        }),
+      },
+    })
     return {
       revision: state.revision,
       text,
@@ -315,6 +330,15 @@ export class RpState extends Service {
       diagnostics: { namespaces: entries.map(([namespace]) => namespace) },
     }
   }
+}
+
+/** Keep only diagnostics that can change a model-authored State update. */
+function commitContextDiagnostics(diagnostics) {
+  const setup = diagnostics.setup.filter(item => item.severity !== 'info')
+  const lastCommit = diagnostics.lastCommit.filter(item => item.severity !== 'info')
+  return setup.length === 0 && lastCommit.length === 0
+    ? undefined
+    : { ...(setup.length === 0 ? {} : { setup }), ...(lastCommit.length === 0 ? {} : { lastCommit }) }
 }
 
 export function apply(ctx, config) {

@@ -189,6 +189,8 @@ test('Writer receives narrative context while both parent modes receive separate
   assert.match(agentReady, /<commit_context read_only="true">/)
   assert.match(agentReady, /state revision 3 and update rules/)
   assert.doesNotMatch(agentRun.contextText, /state revision 3 and update rules/)
+  assert.equal(agentRun.commitContextText, chatRun.commitContextText)
+  assert.match(chatRun.commitContextText, /^<item source="rp.state">/)
 
   runtime.registerContextSource({ id: 'orphan-parent-text', prepare: () => ({ text: 'visible', parentText: 'hidden' }) })
   await assert.rejects(
@@ -436,13 +438,18 @@ test('chat refresh keeps full material hidden from the parent and returns a comp
   ctx.provide('rpSessions', { get: () => profile })
   const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   let facts = { revision: 1, text: '旧资料。' }
+  let state = { revision: 1, text: 'Writer 变量值为 10。', parentText: 'state revision 1' }
   runtime.registerContextSource({ id: 'facts', label: '资料', defaultSlot: { id: 'facts', label: '资料' }, prepare: () => facts })
+  runtime.registerContextSource({
+    id: 'state', label: '变量', parentDelivery: 'commit', defaultSlot: { id: 'state', label: '变量' }, prepare: () => state,
+  })
   const input = currentInput()
   const agent = { session: { events: [], deriveMessages: () => [input], append() {} } }
   const run = await runtime.prepareRun(agent, 1, [input])
   seedWriter(run, '旧资料下的草稿。')
   run.writerCallId = 'old-writer'
   facts = { revision: 2, text: '新资料已经生效。' }
+  state = { revision: 2, text: 'Writer 变量值为 9。', parentText: 'state revision 2' }
 
   const refreshed = await runtime.refreshRunContext(agent)
 
@@ -453,10 +460,26 @@ test('chat refresh keeps full material hidden from the parent and returns a comp
   assert.equal(refreshed.sourceCount > 0, true)
   assert.equal('contextText' in refreshed, false)
   assert.equal('contexts' in refreshed, false)
+  assert.match(refreshed.commitContextReplacement, /^<commit_context_replacement context_epoch="1"/)
+  assert.match(refreshed.commitContextReplacement, /state revision 2/)
+  assert.doesNotMatch(refreshed.commitContextReplacement, /state revision 1|Writer 变量值|新资料/)
+  assert.equal(run.commitContextText, '<item source="state">\nstate revision 2\n</item>')
   assert.equal(runtime.inspectRun(agent).fragments.find(item => item.id === 'facts').revision, 2)
   assert.equal(runtime.inspectRun(agent).contextEpoch, 1)
   assert.equal(run.writerArtifact, undefined)
   assert.equal(run.writerCallId, undefined)
+
+  facts = { revision: 3, text: '只有 Writer 资料再次变化。' }
+  const unchangedCommitContext = await runtime.refreshRunContext(agent)
+  assert.equal(unchangedCommitContext.contextEpoch, 2)
+  assert.equal(Object.hasOwn(unchangedCommitContext, 'commitContextReplacement'), false)
+
+  state = undefined
+  facts = { revision: 4, text: '提交来源已经移除。' }
+  const clearedCommitContext = await runtime.refreshRunContext(agent)
+  assert.equal(clearedCommitContext.contextEpoch, 3)
+  assert.match(clearedCommitContext.commitContextReplacement, /<commit_content>\n\n<\/commit_content>/)
+  assert.equal(run.commitContextText, '')
   await ctx.fiber.dispose()
 })
 

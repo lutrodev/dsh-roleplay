@@ -23,6 +23,7 @@ test('read and mutation tools cover all five asset types without sharing actions
     assert.equal(created.asset.id, `${serviceName}-created`)
     assert.deepEqual(created.binding, { requested: false, applied: false })
     assert.equal(created.runContext.refreshed, true)
+    assert.equal(created.runContext.commitContextReplacement, `<commit_context_replacement context_epoch="${harness.refreshes}" />`)
     assert.equal(created.ok, true)
     assert.equal(created.phases.assetWrite.durable, true)
     const updated = await harness.tool.execute({ action: 'update', kind, id: 'asset-id', expectedRevision: 3, value: { name: 'updated' } }, harness.exec)
@@ -267,7 +268,12 @@ function createHarness(options = {}) {
       async refreshRunContext() {
         refreshes += 1
         if (options.refreshError) throw options.refreshError
-        return { refreshed: true, contextEpoch: refreshes, contextText: 'refreshed context' }
+        return {
+          refreshed: true,
+          contextEpoch: refreshes,
+          contextText: 'refreshed context',
+          commitContextReplacement: `<commit_context_replacement context_epoch="${refreshes}" />`,
+        }
       },
       recordAssetMutationOutcome(_agent, outcome) { outcomes.push(outcome) },
     },

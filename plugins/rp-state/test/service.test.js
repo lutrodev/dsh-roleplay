@@ -66,16 +66,21 @@ test('registers State v2 context, semantic effect, diagnostics, and Chat-readabl
   assert.equal(Object.hasOwn(visible, 'updateProtocol'), false)
 
   const commitVisible = JSON.parse(prepared.parentText)
-  assert.equal(commitVisible.protocolVersion, 2)
-  assert.equal(commitVisible.namespaces[0].namespace, 'story')
-  assert.equal(commitVisible.namespaces[0].expectedRevision, 1)
-  assert.deepEqual(commitVisible.namespaces[0].value, { hp: 10 })
-  assert.equal(Object.hasOwn(commitVisible.namespaces[0], 'initialValue'), false)
-  assert.equal(commitVisible.updateProtocol.kind, 'state.update')
-  assert.deepEqual(commitVisible.updateProtocol.operations.increment.required, ['op', 'path', 'by', 'reason'])
-  assert.deepEqual(commitVisible.updateProtocol.operations.increment.forbidden, ['value'])
-  assert.match(commitVisible.updateProtocol.constraints.join('\n'), /increment uses by and never value/)
-  assert.match(commitVisible.updateProtocol.modes['rules-required'], /ruleId/)
+  assert.equal(commitVisible.version, 1)
+  assert.equal(commitVisible.stateProtocolVersion, 2)
+  assert.equal(commitVisible.contract.effectKind, 'state.update')
+  assert.equal(commitVisible.contract.namespaces[0].namespace, 'story')
+  assert.equal(commitVisible.contract.namespaces[0].updateMode, 'rules-required')
+  assert.deepEqual(commitVisible.contract.namespaces[0].rules, rules)
+  assert.equal(commitVisible.snapshot.stateRevision, 1)
+  assert.equal(commitVisible.snapshot.namespaces[0].namespace, 'story')
+  assert.equal(commitVisible.snapshot.namespaces[0].expectedRevision, 1)
+  assert.deepEqual(commitVisible.snapshot.namespaces[0].value, { hp: 10 })
+  assert.equal(Object.hasOwn(commitVisible.snapshot.namespaces[0], 'initialValue'), false)
+  assert.equal(Object.hasOwn(commitVisible.snapshot.namespaces[0], 'diagnostics'), false)
+  assert.match(commitVisible.contract.constraints.join('\n'), /increment uses by/)
+  assert.match(commitVisible.contract.updateModes['rules-required'], /ruleId/)
+  assert.equal(/\n\s+"/.test(prepared.parentText), false)
   assert.ok([...prepared.text].length < [...prepared.parentText].length)
   assert.deepEqual(harness.effectType.diagnoseArguments({
     kind: 'state.update', namespace: 'story', expectedRevision: 1,
@@ -89,6 +94,30 @@ test('registers State v2 context, semantic effect, diagnostics, and Chat-readabl
     kind: 'state.update', namespace: 'story', payload: { changes: [{ path: '/hp', ruleId: 'hp-turn' }] },
   }] }, { agent }), [])
   assert.deepEqual(state.read(agent, { action: 'get', namespace: 'story' }).initialValue, { hp: 10 })
+  await harness.ctx.fiber.dispose()
+})
+
+test('commit context omits unwritable State payloads and non-actionable diagnostics', async () => {
+  const harness = createHarness()
+  const agent = seededAgent({ hp: 10 }, definition('disabled'), {
+    setup: [
+      { code: 'STATE_NOTE', severity: 'info', message: '仅供界面展示。' },
+      { code: 'STATE_DISABLED', severity: 'error', message: '此命名空间不能安全更新。' },
+    ],
+    lastCommit: [],
+  })
+  new RpState(harness.ctx, { maxNamespacesInContext: 32 })
+  await new Promise(resolve => setImmediate(resolve))
+
+  const commitVisible = JSON.parse(harness.contextSource.prepare({ agent }).parentText)
+  assert.deepEqual(commitVisible.contract.namespaces, [{
+    namespace: 'story', updateMode: 'disabled', title: '故事状态',
+  }])
+  assert.deepEqual(commitVisible.snapshot.namespaces, [{
+    namespace: 'story',
+    diagnostics: { setup: [{ code: 'STATE_DISABLED', severity: 'error', message: '此命名空间不能安全更新。' }] },
+  }])
+  assert.doesNotMatch(JSON.stringify(commitVisible), /仅供界面展示|"schema"|"rules"|"value"|expectedRevision/)
   await harness.ctx.fiber.dispose()
 })
 
@@ -180,6 +209,7 @@ test('rp_state_read works in either mode while rp_state requires Agent mode and 
   }, { agent, callId: 'tool-create' })
   assert.equal(result.ok, true)
   assert.equal(result.phases.contextRefresh.status, 'succeeded')
+  assert.equal(result.runContext.commitContextReplacement, '<commit_context_replacement context_epoch="1" />')
   assert.equal(harness.refreshes.length, 1)
   assert.equal(harness.refreshes[0].kind, 'state-configuration')
   harness.failRefresh = true
@@ -234,7 +264,10 @@ function createHarness(options = {}) {
     async refreshRunContext(_agent, request) {
       harness.refreshes.push(request)
       if (harness.failRefresh) throw new Error('refresh failed')
-      return { contextEpoch: harness.refreshes.length }
+      return {
+        contextEpoch: harness.refreshes.length,
+        commitContextReplacement: `<commit_context_replacement context_epoch="${harness.refreshes.length}" />`,
+      }
     },
   }
   ctx.provide('rpRuntime', runtime)
@@ -255,10 +288,10 @@ function definition(updateMode = 'schema-only', rules = []) {
   }
 }
 
-function seededAgent(initialValue, stateDefinition = definition()) {
+function seededAgent(initialValue, stateDefinition = definition(), diagnostics = { setup: [], lastCommit: [] }) {
   const profile = {
     revision: 1,
-    stateBootstrap: { version: 2, namespaces: [{ namespace: 'story', initialValue, definition: stateDefinition, diagnostics: { setup: [], lastCommit: [] } }] },
+    stateBootstrap: { version: 2, namespaces: [{ namespace: 'story', initialValue, definition: stateDefinition, diagnostics }] },
   }
   return agentWithEvents([
     { seq: 0, type: 'command/run', data: { commandId: 'profile', name: RP_SESSION_APPLY_COMMAND, args: encodeSessionCommand(0, profile) } },

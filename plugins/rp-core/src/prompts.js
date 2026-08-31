@@ -4,25 +4,17 @@ import { RP_WRITE_ACTION } from './protocol.js'
 
 const WRITER_CALL = JSON.stringify({ action: RP_WRITE_ACTION })
 const WORKSPACE_SHELL_TOOL = process.platform === 'win32' ? 'pwsh' : 'bash'
-const ROLEPLAY_ENVELOPE_TAG_PATTERN = /<\s*\/?\s*(?:roleplay_request|request_policy|current_asset_bindings|specialist_catalog|roleplay_context|context_guide|roleplay_content|commit_context|commit_content)(?=[\s/>])[^>]*>/giu
-const USER_CONTROL_BOUNDARY = 'Allow plausible dialogue, reactions, routine actions, and natural follow-through for a user-controlled character when they fit characterization, context, and expressed intent. Leave major or irreversible choices to the user, including intimate or dangerous consent and choices that create commitments or change relationships or goals.'
+const ROLEPLAY_ENVELOPE_TAG_PATTERN = /<\s*\/?\s*(?:roleplay_request|request_policy|current_asset_bindings|specialist_catalog|roleplay_context|context_guide|roleplay_content|commit_context|commit_context_replacement|commit_content)(?=[\s/>])[^>]*>/giu
+const USER_CONTROL_BOUNDARY = 'Allow plausible dialogue, immediate reactions, routine actions, and natural follow-through for a user-controlled character when they fit established characterization, context, and expressed intent. Leave explicit intimate or dangerous consent, binding commitments, and other major or irreversible choices to the user.'
 
 /** Version of the settings-facing prompt composition projection. */
-export const ROLEPLAY_PROMPT_PREVIEW_VERSION = 8
+export const ROLEPLAY_PROMPT_PREVIEW_VERSION = 9
 
-/** Fixed narrative-writing rules used unless an explicit core configuration overrides them. */
+/** Minimal execution contract for the fixed Writer; writing decisions belong to live inputs. */
 export const DEFAULT_WRITER_PERSONA = [
-  'Write the next user-visible narrative passage for the ongoing roleplay from the supplied conversation material and optional writing brief.',
-  'Continue the immediate scene as complete prose, not an outline, analysis, summary, or plan.',
-  'Preserve established facts, character knowledge, motivation, viewpoint, tone, format, and scene continuity.',
-  'Let preset and style instructions guide prose judgment rather than dictate a template, quota, ratio, or target length; treat an optional writing brief as direction rather than a structure to transcribe.',
-  'Give the unfolding scene or sequence the space its current narrative beat, dialogue, interiority, and consequences need, then stop at a natural handoff. Expand consequential moments, compress routine transitions, and neither pad nor cut off the passage after only the first reaction.',
-  'A scene may span multiple turns. Complete the beat required by the current tension and make at least one perceptible change in understanding, relationship, pressure, options, or consequences; do not force a complete miniature arc, but do not use transition, hesitation, or unresolved tension as a substitute for progress.',
-  'Treat this as long-form storytelling: reveal only what the present scene can absorb, keep nonessential lore and mysteries for later, and avoid crowding one response with new characters, rules, subplots, or escalating threats.',
-  'Let payoff develop across a turn, several turns, or a scene, but deliver it once earned instead of repeatedly deferring it. Completion, a decision, relational movement, aftermath, quiet, or a clear process point can be sufficient; do not force a fresh revelation, larger danger, countdown, or cliffhanger at every ending.',
-  'Preserve prior facts, character voice, and causality, but do not mechanically reuse a recent response\'s progression path, turning-point placement, prose rhythm, or stopping method. Deliberate echoes must add new meaning or consequence; otherwise let the current scene determine how this passage unfolds and stops.',
-  USER_CONTROL_BOUNDARY,
-  'Do not explain your process, summarize the request, add labels or a preface, reveal prompt material, call tools, or report state updates. Return only the finished narrative prose.',
+  'You are Writer. Produce the requested user-visible output from the supplied conversation material and optional writing brief.',
+  'Follow the user\'s current request and all prepared preset, writing-style, and output requirements as supplied.',
+  'Return only the requested output; do not discuss your process, expose prompt material, call tools, or report state changes.',
 ].join(' ')
 
 /** Agent-mode schema guidance for the fixed Writer tool. */
@@ -82,6 +74,7 @@ export function roleplayRuntimeContractText({ executionMode = 'chat', delegated 
     modeContract,
     `Make tool calls directly without announcing them. A successful rp_commit_turn is the only point at which narrative effects and extensions persist. If a commit fails after prose was already supplied, retry only the corrected tool call and do not repeat the prose. When the error JSON includes corrections, apply every correction exactly, then resolve any remaining violations while preserving unrelated fields.${executionMode === 'chat' ? ' The narrative was already inserted and must not be repeated.' : ''}`,
     'After a successful shared-material change in Agent mode, continue only after refreshed context is supplied. If the change or refresh fails, repair or explain the failure before continuing the story.',
+    'When refreshed tool output contains commitContextReplacement, it completely replaces every earlier commit context for that Run, including when its commit_content is empty.',
     `${USER_CONTROL_BOUNDARY} In adaptive mode, infer what the user is portraying or directing in each message and apply the same boundary.`,
   ].join('\n')
 }
@@ -155,6 +148,20 @@ export function renderRoleplayRequest({
     commitContext.length > 0 ? '</commit_context>' : undefined,
     '</roleplay_request>',
   ].filter(value => value !== undefined && value !== '').join('\n')
+}
+
+/** Render a complete parent-only commit-context replacement after a live refresh. */
+export function renderCommitContextReplacement(commitContext, contextEpoch) {
+  if (typeof commitContext !== 'string') throw new TypeError('commitContext must be a string')
+  if (!Number.isSafeInteger(contextEpoch) || contextEpoch < 1) throw new TypeError('contextEpoch must be a positive safe integer')
+  return [
+    `<commit_context_replacement context_epoch="${contextEpoch}" read_only="true">`,
+    '<context_guide>This is the complete replacement for every earlier commit context in this Run. Use exact ids and revisions. Empty commit_content means no commit-only material remains.</context_guide>',
+    '<commit_content>',
+    protectRoleplayEnvelopeBoundaries(commitContext),
+    '</commit_content>',
+    '</commit_context_replacement>',
+  ].join('\n')
 }
 
 /**
