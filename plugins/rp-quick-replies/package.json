@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-quick-replies",
-  "version": "0.1.7",
+  "version": "0.1.7-alpha",
   "description": "Customizable quick replies for the Roleplay composer",
   "license": "MIT",
   "private": true,
@@ -51,7 +51,7 @@
     "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
     "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
     "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
-    "dsh-roleplay-rp-remote": "^0.1.7"
+    "dsh-roleplay-rp-remote": "^0.1.7-alpha"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.2",

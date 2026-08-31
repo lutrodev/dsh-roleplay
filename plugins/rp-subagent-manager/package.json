@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-subagent-manager",
-  "version": "0.1.7",
+  "version": "0.1.7-alpha",
   "description": "Global fixed Writer and isolated task-subagent catalog for Roleplay",
   "license": "MIT",
   "private": true,
@@ -52,7 +52,7 @@
     "dsh-roleplay-rp-core": "^0.1.0",
     "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
     "@deepseek-ai/dsh-api-remotes": "^0.1.2-alpha.2",
-    "dsh-roleplay-rp-remote": "^0.1.7"
+    "dsh-roleplay-rp-remote": "^0.1.7-alpha"
   },
   "peerDependenciesMeta": {
     "dsh-roleplay-rp-core": {

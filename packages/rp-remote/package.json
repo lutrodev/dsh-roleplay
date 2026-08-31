@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-remote",
-  "version": "0.1.7",
+  "version": "0.1.7-alpha",
   "description": "Typed Remote transport shared by the dsh-roleplay host and browser plugins",
   "license": "MIT",
   "private": true,

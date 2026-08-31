@@ -1,6 +1,6 @@
 /** Product-facing Roleplay feature catalog and release compatibility contract. */
 
-export const ROLEPLAY_SUITE_VERSION = '0.1.7'
+export const ROLEPLAY_SUITE_VERSION = '0.1.7-alpha'
 export const SUPPORTED_DSH_RANGE = '0.1.2-alpha.2'
 export const SETTINGS_NAMESPACE = 'roleplay-features'
 

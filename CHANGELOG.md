@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## 0.1.7-alpha - 2026-08-31
+
 - Chat 父代理现在会在首步从同一份 Context Build 获得当前角色卡与用户人设，用于识别主角并生成回复选项；不额外发起模型步骤，也不向 Chat 展开世界书、预设、文风或其他完整 Writer Slot。
 - Writer 对话历史与会话总结输入会把成功提交的故事正文标为“写作回复”，把讨论、解释、资料和配置等其他助手内容标为“非写作回复”；保留全部可见原文，同时避免模型无差别把非写作回复当作已经发生的剧情。
 - 新增可开关的主模型回复选项：成功提交 Roleplay 剧情回复时随同一次 `rp_commit_turn` 生成第三人称的主角后续对白和／或行为，不以导演视角续写；会话变量下方以带数字编号的可点击选项呈现，编号不进入实际消息，选项可直接发送并随消息回滚；功能卡齿轮可将每次条数设为 1–5（默认 3），并按编号填写可选的方向关键词，条数与关键词原子保存且不增加模型调用；新安装默认开启，已有配置升级后保持关闭。
@@ -12,21 +14,18 @@
 - 快捷回复新增逐项“中间／末尾”光标位置设置，并改用原生会话输入事件在真实富文本草稿的当前光标或选区插入内容。
 - 修复 Cordis 4.0.2 通过浏览器 Remote 调用服务时重绑定上下文，导致 Roleplay 功能开关和“编辑统一身份”被误判为不可写并全部禁用。
 - 修复升级后遗留的 `writer-history` 功能 ID 阻断 Roleplay Settings 注册，导致所有功能开关和统一身份编辑一起禁用；启动时会移除并持久化这个已下线 ID。
-- 保持 Roleplay 套件版本 0.1.7 并对齐 DSH `0.1.2-alpha.2`：Prompt 顺序与 Settings 注册改用服务 API，开发依赖同步到 Cordis 4.0.2、Loader 1.0.3、Include 1.0.7、Group 1.0.2 与 Schemastery 3.18.2，并重新生成 Typert Remote 产物。
+- 保持 Roleplay 套件版本 0.1.7-alpha 并对齐 DSH `0.1.2-alpha.2`：Prompt 顺序与 Settings 注册改用服务 API，开发依赖同步到 Cordis 4.0.2、Loader 1.0.3、Include 1.0.7、Group 1.0.2 与 Schemastery 3.18.2，并重新生成 Typert Remote 产物。
 - 加强 Harness 兼容门禁：除 package manifest 外，同时校验公开 lockfile 中的直接与传递 DSH 解析版本，并通过 pnpm 的 lockfile-only peer 检查阻止不一致依赖图。
 - 主角控制边界集中到 Core：允许合理对白和行动，只把重大或不可逆选择留给用户，包括亲密或危险情境中的同意、形成承诺或改变关系与目标；默认预设同时允许安静过渡和自然收束。
 - 内置“示例预设”改为与默认文风一致的托管初始资料：新建预设直接进入空白编辑器，不再选择空白或示例起点；提示文本未编辑的旧示例会保留资产、栏位 ID 与分组标签设置并升级内容。
 - 创作预设的每个栏位可设置是否默认使用 `<section>`／`<item>` 分组标签；会话首次使用时继承该值，并可在“回复资料”中保存自己的调整。
 - Writer 模型设置改为全局默认值；每个 Roleplay 会话动态继承该默认值，也可只为当前会话覆盖 Writer 的模型与推理强度，并随时恢复继承。任务子代理继续使用各自的全局目录配置。
-
-## 0.1.7 - 2026-08-28
-
 - 适配 DSH `0.1.2-alpha.1`：切换拆分后的 Session、Workspace、Conversation 与 Renderer 客户端 provider，跟进 `ToolCallId`、第一方 Prompt 顺序和 Harness 身份覆盖接口。
 - Roleplay 会话识别改为读取 Session Summary 的 `projectionValues.agentPreset`，消息操作与会话变量改用独立 Chat 投影，修复升级后会话工具、头像、对白高亮及编辑／删除／重新生成全部隐藏的问题。
 - 新增共享 `rp-remote` package，把十组 Roleplay 浏览器管理接口迁移到 Typert 生成的类型化 Remote；Host 继续拥有领域校验和生命周期，浏览器插件不再直接调用旧的字符串 RPC。
 - Writer 和任务子代理新增模型推理强度选择、目录 v4 迁移、路由冻结与运行 metadata；固定模型只使用该模型实际声明的推理档位，跟随父代理时继承父路由。
 - 本轮用户图片附件会以原生 durable image block 透传给新鲜 Writer 与任务子代理；仅图片输入也可建立当前输入上下文，不增加旁路存储。
-- 本地集成启动器会在 Harness commit 或 lockfile 变化后同步并重建上游 checkout，并以本地 source link 安装尚未发布的 alpha packages。公开 npm 发布仍需等待上游 `0.1.2-alpha.1` packages 发布并刷新 lockfile。
+- 本地集成启动器会在 Harness commit 或 lockfile 变化后同步并重建上游 checkout，并以本地 source link 安装尚未发布的 alpha packages。
 
 ## 0.1.6 - 2026-08-27
 

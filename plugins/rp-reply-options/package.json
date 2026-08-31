@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-reply-options",
-  "version": "0.1.7",
+  "version": "0.1.7-alpha",
   "description": "Main-model reply directions below successful Roleplay responses",
   "license": "MIT",
   "private": true,
@@ -48,7 +48,7 @@
     "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
     "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
     "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
-    "dsh-roleplay-rp-core": "^0.1.7"
+    "dsh-roleplay-rp-core": "^0.1.7-alpha"
   },
   "peerDependenciesMeta": {
     "dsh-roleplay-rp-core": {

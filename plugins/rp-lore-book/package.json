@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-lore-book",
-  "version": "0.1.7",
+  "version": "0.1.7-alpha",
   "description": "Lorebook library and context activation for Roleplay",
   "license": "MIT",
   "private": true,
@@ -55,7 +55,7 @@
     "dsh-roleplay-rp-library": "^0.1.0",
     "dsh-roleplay-rp-session": "^0.1.0",
     "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
-    "dsh-roleplay-rp-remote": "^0.1.7"
+    "dsh-roleplay-rp-remote": "^0.1.7-alpha"
   },
   "peerDependenciesMeta": {
     "dsh-roleplay-rp-core": {

@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-character-card",
-  "version": "0.1.7",
+  "version": "0.1.7-alpha",
   "description": "Community character-card library and importer for Roleplay",
   "license": "MIT",
   "private": true,
@@ -53,7 +53,7 @@
     "dsh-roleplay-rp-core": "^0.1.0",
     "dsh-roleplay-rp-library": "^0.1.0",
     "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
-    "dsh-roleplay-rp-remote": "^0.1.7"
+    "dsh-roleplay-rp-remote": "^0.1.7-alpha"
   },
   "peerDependenciesMeta": {
     "dsh-roleplay-rp-core": {
