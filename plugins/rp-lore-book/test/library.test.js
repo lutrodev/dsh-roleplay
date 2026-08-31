@@ -52,6 +52,33 @@ test('lists imported world books by import time with the newest first', async ()
   }
 })
 
+test('reuses lorebook summaries and invalidates them across service instances', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-lore-list-cache-'))
+  const firstContext = new Context()
+  const secondContext = new Context()
+  const first = new RpLoreBooks(firstContext, { libraryDir: root, maxInputBytes: 4096, maxTokens: 128, maxEntries: 16, maxRecursiveDepth: 2 })
+  const second = new RpLoreBooks(secondContext, { libraryDir: root, maxInputBytes: 4096, maxTokens: 128, maxEntries: 16, maxRecursiveDepth: 2 })
+  try {
+    const created = await first.import({ name: '缓存前的世界', entries: [] })
+    const originalGet = first.get.bind(first)
+    let reads = 0
+    first.get = async id => { reads += 1; return originalGet(id) }
+
+    assert.equal((await first.list({ limit: 100 })).items[0].name, '缓存前的世界')
+    const firstReadCount = reads
+    await first.list({ query: '世界', limit: 100 })
+    assert.equal(reads, firstReadCount)
+
+    await second.update(created.id, { name: '另一实例已更新' }, 1)
+    assert.equal((await first.list({ limit: 100 })).items[0].name, '另一实例已更新')
+    assert.ok(reads > firstReadCount)
+  } finally {
+    await firstContext.fiber.dispose()
+    await secondContext.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('uses each imported book scan depth and preserves it across native edits', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-lore-scan-depth-'))
   const ctx = new Context()

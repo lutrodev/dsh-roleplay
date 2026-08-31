@@ -244,6 +244,26 @@ test('lists imported character cards by import time with the newest first', asyn
   }
 })
 
+test('invalidates shared character list summaries when another service instance writes the library', async () => {
+  const libraryDir = await mkdtemp(join(tmpdir(), 'dsh-roleplay-card-list-cache-'))
+  const firstContext = new Context()
+  const secondContext = new Context()
+  const first = new RpCharacterCards(firstContext, { libraryDir, maxInputBytes: 4096, maxTextCharacters: 4096 })
+  const second = new RpCharacterCards(secondContext, { libraryDir, maxInputBytes: 4096, maxTextCharacters: 4096 })
+  try {
+    const created = (await first.create({ name: '缓存前的角色' })).created
+    assert.equal((await first.list({ limit: 100 })).items[0].name, '缓存前的角色')
+
+    await second.update(created.id, { name: '另一实例已更新' }, 1)
+
+    assert.equal((await first.list({ limit: 100 })).items[0].name, '另一实例已更新')
+  } finally {
+    await firstContext.fiber.dispose()
+    await secondContext.fiber.dispose()
+    await rm(libraryDir, { recursive: true, force: true })
+  }
+})
+
 test('browser export downloads the latest saved native card as a re-importable V3 PNG', async () => {
   const libraryDir = await mkdtemp(join(tmpdir(), 'dsh-roleplay-native-card-export-'))
   const ctx = new Context()

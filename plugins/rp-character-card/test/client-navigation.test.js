@@ -24,6 +24,14 @@ test('角色卡入口使用独立的资料卡图标', async () => {
   assert.doesNotMatch(client, /IconAgentPresetOutline16/)
 })
 
+test('角色卡头像只在接近可视区时读取并复用请求', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  assert.match(client, /useInView\(avatarRef, \{ margin: '200px 0px', once: true \}\)/)
+  assert.match(client, /cachedAvatar\(connection, item\.id\)/)
+  assert.match(client, /const AVATAR_CACHE_LIMIT = 16/)
+  assert.match(client, /while \(cache\.size > AVATAR_CACHE_LIMIT\)/)
+})
+
 test('角色卡导入由覆盖按钮区域的原生文件输入直接打开', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
   const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')

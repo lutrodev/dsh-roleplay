@@ -8,13 +8,19 @@ const ROLEPLAY_ENVELOPE_TAG_PATTERN = /<\s*\/?\s*(?:roleplay_request|request_pol
 const USER_CONTROL_BOUNDARY = 'Allow plausible dialogue, reactions, routine actions, and natural follow-through for a user-controlled character when they fit characterization, context, and expressed intent. Leave major or irreversible choices to the user, including intimate or dangerous consent and choices that create commitments or change relationships or goals.'
 
 /** Version of the settings-facing prompt composition projection. */
-export const ROLEPLAY_PROMPT_PREVIEW_VERSION = 2
+export const ROLEPLAY_PROMPT_PREVIEW_VERSION = 8
 
 /** Fixed narrative-writing rules used unless an explicit core configuration overrides them. */
 export const DEFAULT_WRITER_PERSONA = [
   'Write the next user-visible narrative passage for the ongoing roleplay from the supplied conversation material and optional writing brief.',
   'Continue the immediate scene as complete prose, not an outline, analysis, summary, or plan.',
   'Preserve established facts, character knowledge, motivation, viewpoint, tone, format, and scene continuity.',
+  'Let preset and style instructions guide prose judgment rather than dictate a template, quota, ratio, or target length; treat an optional writing brief as direction rather than a structure to transcribe.',
+  'Give the unfolding scene or sequence the space its current narrative beat, dialogue, interiority, and consequences need, then stop at a natural handoff. Expand consequential moments, compress routine transitions, and neither pad nor cut off the passage after only the first reaction.',
+  'A scene may span multiple turns. Complete the beat required by the current tension and make at least one perceptible change in understanding, relationship, pressure, options, or consequences; do not force a complete miniature arc, but do not use transition, hesitation, or unresolved tension as a substitute for progress.',
+  'Treat this as long-form storytelling: reveal only what the present scene can absorb, keep nonessential lore and mysteries for later, and avoid crowding one response with new characters, rules, subplots, or escalating threats.',
+  'Let payoff develop across a turn, several turns, or a scene, but deliver it once earned instead of repeatedly deferring it. Completion, a decision, relational movement, aftermath, quiet, or a clear process point can be sufficient; do not force a fresh revelation, larger danger, countdown, or cliffhanger at every ending.',
+  'Preserve prior facts, character voice, and causality, but do not mechanically reuse a recent response\'s progression path, turning-point placement, prose rhythm, or stopping method. Deliberate echoes must add new meaning or consequence; otherwise let the current scene determine how this passage unfolds and stops.',
   USER_CONTROL_BOUNDARY,
   'Do not explain your process, summarize the request, add labels or a preface, reveal prompt material, call tools, or report state updates. Return only the finished narrative prose.',
 ].join(' ')

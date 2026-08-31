@@ -713,6 +713,17 @@ test('会话设置与会话 Wiki 不承担资料创建、导入或编辑', async
   assert.match(client, /关联世界书 · \$\{item\.lorebookEntries\} 条设定/)
 })
 
+test('会话资料选择复用列表与详情请求，头像仅预取可见区', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  assert.match(client, /const listRequests = useRef\(new Map\(\)\)/)
+  assert.match(client, /cachedListRequest\(listRequests\.current, connection/)
+  assert.match(client, /cachedDetailRequest\(detailRequests\.current, connection/)
+  assert.match(client, /useInView\(avatarRef, \{ margin: '200px 0px', once: true \}\)/)
+  assert.match(client, /const RESOURCE_REQUEST_CACHE_LIMIT = 32/)
+  assert.match(client, /while \(cache\.size > RESOURCE_REQUEST_CACHE_LIMIT\)/)
+  assert.match(client, /const CHARACTER_AVATAR_CACHE_LIMIT = 16/)
+})
+
 test('资料导航、会话 Wiki 与 Prompt 入口清晰分工且不泄漏内部错误', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
   const sessionWiki = await readFile(new URL('../src/session-wiki.js', import.meta.url), 'utf8')
@@ -730,9 +741,9 @@ test('资料导航、会话 Wiki 与 Prompt 入口清晰分工且不泄漏内部
   assert.match(styles, /\.sessionResourceFields \{ display: grid; grid-template-columns: repeat\(auto-fit, minmax\(180px, 1fr\)\)/)
   assert.match(styles, /\.sessionResourcePicker:focus-visible/)
   assert.match(styles, /\.libraryGrid\[data-selection-only="true"\] \{ min-height: 220px; flex: 1 1 320px;/)
-  assert.match(client, /rpc\(connection, 'personas\/list'/)
-  assert.match(client, /rpc\(connection, 'presets\/list'/)
-  assert.match(client, /rpc\(connection, 'writing-styles\/list'/)
+  assert.match(client, /cachedListRequest\(listRequests\.current, connection, 'personas\/list'/)
+  assert.match(client, /cachedListRequest\(listRequests\.current, connection, 'presets\/list'/)
+  assert.match(client, /cachedListRequest\(listRequests\.current, connection, 'writing-styles\/list'/)
   assert.match(client, /const defaultsApplied = useRef\(false\)/)
   assert.match(client, /setSelectedPersona\(personas\.defaultId \?\? null\)/)
   assert.match(client, /setSelectedPreset\(presets\.defaultId \?\? null\)/)

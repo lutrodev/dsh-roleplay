@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Button, IconChevronLeftOutline14, IconEditOutline16, IconEllipsisOutline16, IconPlusOutline16, IconTrashOutline16, IconUserOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import { domAnimation, LazyMotion, m, MotionConfig } from 'motion/react'
+import { domAnimation, LazyMotion, m, MotionConfig, useInView } from 'motion/react'
 import { descriptionLabelInsertion, domainValue } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
 
@@ -9,6 +9,8 @@ const h = React.createElement
 const MODAL_SCROLL_LOCK = Symbol.for('dsh-roleplay.asset-modal-scroll-lock')
 const QUICK_DESCRIPTION_LABELS = ['性别', '外貌', '年龄', '身份', '说话方式', '背景故事', '爱好']
 const DESCRIPTION_LIMIT = 4000
+const AVATAR_CACHE_LIMIT = 16
+const avatarRequests = new WeakMap()
 
 export function apply(ctx) {
   ctx.effect(ensureStyles)
@@ -281,14 +283,16 @@ function State({ text }) { return h('div', { className: css.state }, text) }
 function initialOf(name) { return name?.trim()?.[0]?.toLocaleUpperCase() ?? '我' }
 function compareItems(left, right) { return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }) || left.id.localeCompare(right.id) }
 function PersonaAvatar({ connection, persona, className }) {
+  const avatarRef = useRef(null)
+  const nearViewport = useInView(avatarRef, { margin: '200px 0px', once: true })
   const [source, setSource] = useState(null)
   useEffect(() => {
-    if (!persona?.hasAvatar) { setSource(null); return }
+    if (!persona?.hasAvatar || !nearViewport) { setSource(null); return }
     let live = true
-    void rpc(connection, 'avatar', { id: persona.id }).then(value => { if (live) setSource(`data:${value.mimeType};base64,${value.base64}`) }).catch(() => { if (live) setSource(null) })
+    void cachedAvatar(connection, persona.id, persona.revision).then(value => { if (live) setSource(value) }).catch(() => { if (live) setSource(null) })
     return () => { live = false }
-  }, [connection, persona?.hasAvatar, persona?.id])
-  return h('span', { className, 'aria-hidden': true }, source === null ? initialOf(persona?.name) : h('img', { src: source, alt: '' }))
+  }, [connection, nearViewport, persona?.hasAvatar, persona?.id, persona?.revision])
+  return h('span', { ref: avatarRef, className, 'aria-hidden': true }, source === null ? initialOf(persona?.name) : h('img', { src: source, alt: '' }))
 }
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -337,3 +341,18 @@ function useModalScrollLock(open) {
   }, [open])
 }
 async function rpc(connection, endpoint, payload) { return domainValue(await connection.call('/rp-personas', endpoint, payload)) }
+function cachedAvatar(connection, id, revision) {
+  let cache = avatarRequests.get(connection)
+  if (cache === undefined) {
+    cache = new Map()
+    avatarRequests.set(connection, cache)
+  }
+  const key = `${id}:${revision ?? ''}`
+  let request = cache.get(key)
+  if (request !== undefined) return request
+  request = rpc(connection, 'avatar', { id }).then(value => `data:${value.mimeType};base64,${value.base64}`)
+  cache.set(key, request)
+  while (cache.size > AVATAR_CACHE_LIMIT) cache.delete(cache.keys().next().value)
+  void request.catch(() => { if (cache.get(key) === request) cache.delete(key) })
+  return request
+}

@@ -62,6 +62,13 @@ test('人设操作错误和状态使用用户语言', async () => {
   assert.match(client, /expectedRevision: detail\.revision/)
 })
 
+test('人设头像按可见性加载并按修订复用', async () => {
+  const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
+  assert.match(client, /useInView\(avatarRef, \{ margin: '200px 0px', once: true \}\)/)
+  assert.match(client, /cachedAvatar\(connection, persona\.id, persona\.revision\)/)
+  assert.match(client, /const key = `\$\{id\}:\$\{revision \?\? ''\}`/)
+})
+
 test('人设插件向会话编排注册同一个创建与编辑表单', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
   assert.match(client, /export const inject = \['slots', 'rpRemote', 'rpAssetEditors'\]/)

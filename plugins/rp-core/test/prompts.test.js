@@ -4,6 +4,7 @@ import {
   buildRoleplayPromptPreview,
   DEFAULT_WRITER_PERSONA,
   filterUnavailableToolPromptSections,
+  ROLEPLAY_PROMPT_PREVIEW_VERSION,
   renderRoleplayRequest,
   renderTaskSubagentPrompt,
   renderWriterPrompt,
@@ -56,6 +57,30 @@ test('Writer and custom task messages use one deterministic envelope', () => {
     '<task_input>\n{\n  "task": "Check facts.",\n  "input": {\n    "draft": "Text"\n  }\n}\n</task_input>',
   )
   assert.match(DEFAULT_WRITER_PERSONA, /ongoing roleplay/)
+  assert.match(DEFAULT_WRITER_PERSONA, /guide prose judgment rather than dictate a template/)
+  assert.match(DEFAULT_WRITER_PERSONA, /quota, ratio, or target length/)
+  assert.match(DEFAULT_WRITER_PERSONA, /direction rather than a structure to transcribe/)
+  assert.match(DEFAULT_WRITER_PERSONA, /unfolding scene or sequence/)
+  assert.match(DEFAULT_WRITER_PERSONA, /current narrative beat, dialogue, interiority, and consequences need/)
+  assert.match(DEFAULT_WRITER_PERSONA, /natural handoff/)
+  assert.match(DEFAULT_WRITER_PERSONA, /Expand consequential moments, compress routine transitions/)
+  assert.match(DEFAULT_WRITER_PERSONA, /neither pad nor cut off the passage after only the first reaction/)
+  assert.match(DEFAULT_WRITER_PERSONA, /A scene may span multiple turns/)
+  assert.match(DEFAULT_WRITER_PERSONA, /Complete the beat required by the current tension/)
+  assert.match(DEFAULT_WRITER_PERSONA, /make at least one perceptible change in understanding, relationship, pressure, options, or consequences/)
+  assert.match(DEFAULT_WRITER_PERSONA, /do not force a complete miniature arc/)
+  assert.match(DEFAULT_WRITER_PERSONA, /do not use transition, hesitation, or unresolved tension as a substitute for progress/)
+  assert.match(DEFAULT_WRITER_PERSONA, /Treat this as long-form storytelling/)
+  assert.match(DEFAULT_WRITER_PERSONA, /reveal only what the present scene can absorb/)
+  assert.match(DEFAULT_WRITER_PERSONA, /keep nonessential lore and mysteries for later/)
+  assert.match(DEFAULT_WRITER_PERSONA, /avoid crowding one response with new characters, rules, subplots, or escalating threats/)
+  assert.match(DEFAULT_WRITER_PERSONA, /Let payoff develop across a turn, several turns, or a scene/)
+  assert.match(DEFAULT_WRITER_PERSONA, /deliver it once earned instead of repeatedly deferring it/)
+  assert.match(DEFAULT_WRITER_PERSONA, /Completion, a decision, relational movement, aftermath, quiet, or a clear process point can be sufficient/)
+  assert.match(DEFAULT_WRITER_PERSONA, /do not force a fresh revelation, larger danger, countdown, or cliffhanger at every ending/)
+  assert.match(DEFAULT_WRITER_PERSONA, /do not mechanically reuse a recent response's progression path, turning-point placement, prose rhythm, or stopping method/)
+  assert.match(DEFAULT_WRITER_PERSONA, /Deliberate echoes must add new meaning or consequence/)
+  assert.match(DEFAULT_WRITER_PERSONA, /let the current scene determine how this passage unfolds and stops/)
   assert.match(DEFAULT_WRITER_PERSONA, /Allow plausible dialogue, reactions, routine actions, and natural follow-through/)
   assert.match(DEFAULT_WRITER_PERSONA, /Leave major or irreversible choices to the user/)
   assert.match(DEFAULT_WRITER_PERSONA, /intimate or dangerous consent/)
@@ -147,6 +172,8 @@ test('settings preview is projected from the same runtime prompt functions', () 
   const chat = preview.profiles.find(profile => profile.kind === 'parent-chat')
   const agent = preview.profiles.find(profile => profile.kind === 'parent-agent')
   const writer = preview.profiles.find(profile => profile.kind === 'writer')
+  assert.equal(ROLEPLAY_PROMPT_PREVIEW_VERSION, 8)
+  assert.equal(preview.version, ROLEPLAY_PROMPT_PREVIEW_VERSION)
   assert.deepEqual(chat.layers.find(layer => layer.id === 'harness-identity'), {
     id: 'harness-identity', role: 'system', source: 'dsh-system-prompt', contentKind: 'exact', order: -1000,
     text: harnessIdentity, sectionName: 'harness:identity',

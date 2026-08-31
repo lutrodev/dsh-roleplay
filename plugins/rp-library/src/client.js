@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, LazyMotion, MotionConfig, Reorder, domMax, m, useReducedMotion } from 'motion/react'
+import { AnimatePresence, LazyMotion, MotionConfig, Reorder, domMax, m, useInView, useReducedMotion } from 'motion/react'
 import {
   Button,
   IconAgentPresetOutline16,
@@ -32,6 +32,9 @@ const EMPTY_CAPABILITIES = Object.freeze({ characters: false, lorebooks: false, 
 const EMPTY_RESOURCE_SELECTION = '__rp-empty-resource-selection__'
 const FINISH_RESOURCE_SELECTION = '__rp-finish-resource-selection__'
 const STATE_ACTIVITY_PROJECTION_KEY = 'rp/state/activity'
+const RESOURCE_REQUEST_CACHE_LIMIT = 32
+const CHARACTER_AVATAR_CACHE_LIMIT = 16
+const characterAvatarRequests = new WeakMap()
 export function apply(ctx) {
   ctx.effect(ensureStyles)
   ctx.uiConversation.events.register(roleplayRunMarkerDefinition)
@@ -395,6 +398,8 @@ function LibraryModal({ open, onClose, connection, sessionId, session, profile, 
   const [reloadKey, setReloadKey] = useState(0)
   const [pendingRevision, setPendingRevision] = useState(null)
   const defaultsApplied = useRef(false)
+  const listRequests = useRef(new Map())
+  const detailRequests = useRef(new Map())
   const dialogRef = useWorkbenchModal(open)
 
   useEffect(() => {
@@ -446,19 +451,26 @@ function LibraryModal({ open, onClose, connection, sessionId, session, profile, 
     onClose()
   }, [onClose, open, pendingRevision, profile?.revision])
   useEffect(() => {
+    if (!open) return
+    listRequests.current.clear()
+    detailRequests.current.clear()
+  }, [connection, open, reloadKey])
+  useEffect(() => {
     if (!open || !guided || capabilities === null) return
+    let live = true
     const timer = setTimeout(() => { void loadLists() }, 180)
-    return () => clearTimeout(timer)
+    return () => { live = false; clearTimeout(timer) }
     async function loadLists() {
       setLoading(true); setLoadError(null)
       try {
         const [characters, lorebooks, personas, presets, writingStyles] = await Promise.all([
-          capabilities.characters ? rpc(connection, 'characters/list', { query: tab === 'characters' ? query : '', limit: 100 }) : Promise.resolve({ items: [] }),
-          capabilities.lorebooks ? rpc(connection, 'lorebooks/list', { query: tab === 'lorebooks' ? query : '', limit: 100 }) : Promise.resolve({ items: [] }),
-          capabilities.personas ? rpc(connection, 'personas/list', { limit: 100 }) : Promise.resolve({ items: [] }),
-          capabilities.presets ? rpc(connection, 'presets/list', { limit: 100 }) : Promise.resolve({ items: [] }),
-          capabilities.writingStyles ? rpc(connection, 'writing-styles/list', { limit: 100 }) : Promise.resolve({ items: [] }),
+          capabilities.characters ? cachedListRequest(listRequests.current, connection, 'characters/list', { query: tab === 'characters' ? query : '', limit: 100 }) : Promise.resolve({ items: [] }),
+          capabilities.lorebooks ? cachedListRequest(listRequests.current, connection, 'lorebooks/list', { query: tab === 'lorebooks' ? query : '', limit: 100 }) : Promise.resolve({ items: [] }),
+          capabilities.personas ? cachedListRequest(listRequests.current, connection, 'personas/list', { limit: 100 }) : Promise.resolve({ items: [] }),
+          capabilities.presets ? cachedListRequest(listRequests.current, connection, 'presets/list', { limit: 100 }) : Promise.resolve({ items: [] }),
+          capabilities.writingStyles ? cachedListRequest(listRequests.current, connection, 'writing-styles/list', { limit: 100 }) : Promise.resolve({ items: [] }),
         ])
+        if (!live) return
         setLists({ characters: characters.items, lorebooks: lorebooks.items, personas: personas.items, presets: presets.items, writingStyles: writingStyles.items, defaultPersonaId: personas.defaultId ?? null, defaultPresetId: presets.defaultId ?? null, defaultWritingStyleId: writingStyles.defaultId ?? null })
         if ((creating || setup || recovery) && !defaultsApplied.current) {
           setSelectedPersona(personas.defaultId ?? null)
@@ -468,7 +480,7 @@ function LibraryModal({ open, onClose, connection, sessionId, session, profile, 
         }
         setStylesAvailable(capabilities.writingStyles)
         if (Number.isSafeInteger(writingStyles.maxStylesPerSession)) setMaxWritingStyles(writingStyles.maxStylesPerSession)
-      } catch (reason) { setLoadError(reason) } finally { setLoading(false) }
+      } catch (reason) { if (live) setLoadError(reason) } finally { if (live) setLoading(false) }
     }
   }, [capabilities, connection, creating, guided, open, query, recovery, reloadKey, setup, tab])
 
@@ -482,7 +494,7 @@ function LibraryModal({ open, onClose, connection, sessionId, session, profile, 
     if (!open || !guided || !activeId || capabilities?.[tab] !== true) { setDetail(null); setDetailState('idle'); return }
     let live = true
     setDetailState('loading')
-    rpc(connection, tab === 'characters' ? 'characters/get' : 'lorebooks/get', { id: activeId })
+    cachedDetailRequest(detailRequests.current, connection, tab === 'characters' ? 'characters/get' : 'lorebooks/get', activeId)
       .then(value => { if (live) { setDetail(value); setDetailState('ready') } })
       .catch(reason => { if (live) { setDetail(reason); setDetailState('error') } })
     return () => { live = false }
@@ -492,7 +504,7 @@ function LibraryModal({ open, onClose, connection, sessionId, session, profile, 
     if (!open || !includesOpening || selectedCard === null || capabilities?.characters !== true) { setCardPreview(null); return }
     let live = true
     setActionError(null)
-    rpc(connection, 'characters/get', { id: selectedCard })
+    cachedDetailRequest(detailRequests.current, connection, 'characters/get', selectedCard)
       .then(value => { if (live) setCardPreview(value) })
       .catch(reason => { if (live) { setCardPreview(null); setActionError({ reason, intent: 'preview' }) } })
     return () => { live = false }
@@ -1464,14 +1476,17 @@ function AssetList({ tab, items, loading, error, onRetry, selectedCard, selected
 }
 
 function Avatar({ item, connection, sourceDisabled = false }) {
+  const avatarRef = useRef(null)
+  const nearViewport = useInView(avatarRef, { margin: '200px 0px', once: true })
   const [source, setSource] = useState(null)
   useEffect(() => {
-    if (!item.hasAvatar || sourceDisabled) return
+    setSource(null)
+    if (!item.hasAvatar || sourceDisabled || !nearViewport) return
     let live = true
-    rpc(connection, 'characters/avatar', { id: item.id }).then(value => { if (live) setSource(`data:${value.mimeType};base64,${value.base64}`) }).catch(() => {})
+    cachedCharacterAvatar(connection, item.id).then(value => { if (live) setSource(value) }).catch(() => {})
     return () => { live = false }
-  }, [connection, item.hasAvatar, item.id, sourceDisabled])
-  return source ? h('img', { className: css.avatar, src: source, alt: '' }) : h('span', { className: css.avatarFallback }, (item.name?.trim()?.[0] ?? '卡').toLocaleUpperCase())
+  }, [connection, item.hasAvatar, item.id, nearViewport, sourceDisabled])
+  return source ? h('img', { ref: avatarRef, className: css.avatar, src: source, alt: '' }) : h('span', { ref: avatarRef, className: css.avatarFallback }, (item.name?.trim()?.[0] ?? '卡').toLocaleUpperCase())
 }
 
 function AssetDetail({ tab, detail, state, onBack }) {
@@ -1567,6 +1582,41 @@ async function rpc(connection, endpoint, payload) {
   const operation = endpoint.includes('/') && route !== '/rp-assets' ? endpoint.slice(endpoint.indexOf('/') + 1) : endpoint
   return domainValue(await connection.call(route, operation, payload))
 }
+
+function cachedListRequest(cache, connection, endpoint, payload) {
+  return cachedRequest(cache, `${endpoint}:${JSON.stringify(payload)}`, () => rpc(connection, endpoint, payload))
+}
+
+function cachedDetailRequest(cache, connection, endpoint, id) {
+  return cachedRequest(cache, `${endpoint}:${id}`, () => rpc(connection, endpoint, { id }))
+}
+
+function cachedRequest(cache, key, load) {
+  let request = cache.get(key)
+  if (request !== undefined) return request
+  request = Promise.resolve().then(load)
+  cache.set(key, request)
+  while (cache.size > RESOURCE_REQUEST_CACHE_LIMIT) cache.delete(cache.keys().next().value)
+  void request.catch(() => { if (cache.get(key) === request) cache.delete(key) })
+  return request
+}
+
+function cachedCharacterAvatar(connection, id) {
+  let cache = characterAvatarRequests.get(connection)
+  if (cache === undefined) {
+    cache = new Map()
+    characterAvatarRequests.set(connection, cache)
+  }
+  let request = cache.get(id)
+  if (request !== undefined) return request
+  request = rpc(connection, 'characters/avatar', { id })
+    .then(value => `data:${value.mimeType};base64,${value.base64}`)
+  cache.set(id, request)
+  while (cache.size > CHARACTER_AVATAR_CACHE_LIMIT) cache.delete(cache.keys().next().value)
+  void request.catch(() => { if (cache.get(id) === request) cache.delete(id) })
+  return request
+}
+
 async function waitForListedSession(sessions, sessionId) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     if (sessions.list.getSnapshot().byId[sessionId] !== undefined) return

@@ -7,6 +7,163 @@ import { Context } from '@deepseek-ai/cordis'
 import { apply, DEFAULT_WRITING_STYLE, dispatchBrowser, RpWritingStyles } from '../src/index.js'
 
 const configFor = libraryDir => ({ libraryDir, maxTextCharacters: 30000, maxStylesPerSession: 3, exposeBrowser: false })
+const CHARACTER_DESCRIPTION_GUIDANCE = '重要人物初次出现或成为场景焦点，或其样貌、神态、衣着、伤痕与装束影响识别、关系、行动或气氛时，从当前视角选取最有辨识度的细节，使形象清晰可感、便于代入与想象；尊重既有人设与用户留白，已有特征只在变化或产生新意义时重提，不作从头到脚的清单。'
+const PREVIOUS_LONG_FORM_STYLE_INFORMATION = '设定、背景和前情只在影响当下判断、选择或后果时进入正文，借观察、比较、回忆、冲突或误解自然显露。给足理解当前场景所需的信息，不一次讲完世界，也不重复已经明确的内容。'
+const PREVIOUS_LONG_FORM_STYLE_ENDING = `## 篇幅与收束
+
+篇幅由完整呈现当前场景及其必要叙事节拍所需决定，不设字数、段数或对白比例。该展开的决定、发现、失误、关系转折与余波充分展开，该压缩的常规移动、重复动作和已知信息利落带过；不为显得丰富而填充，也不在第一层反应后截断。让结尾落在后果、新压力或自然静止点，不用作者总结或通用钩子代替收束。`
+const PREVIOUS_ENDING_IMITATION_STYLE_ENDING = `## 篇幅与收束
+
+篇幅由完整呈现当前场景及其必要叙事节拍所需决定，不设字数、段数或对白比例。该展开的决定、发现、失误、关系转折与余波充分展开，该压缩的常规移动、重复动作和已知信息利落带过；不为显得丰富而填充，也不在第一层反应后截断。
+
+结尾选择与当前场景最相称的落点：可以是完成、决定、关系变化、后果、余波、暂时平静，或已有问题的自然延伸。不要惯性追加新秘密、新人物、更大危机、倒计时或“最后一行反转”，并避免连续重复同类收束；不用作者总结或通用钩子代替结尾。`
+const PREVIOUS_VERBOSE_ENDING_STYLE_GUIDANCE = '承接前文的事实、人物声音和因果，不照抄最近结尾的表达骨架。若近期已用窗外、天色或风雨等景物切出，或以角色提问、沉默、欲言又止、离场动作、突发声响、单句揭示收尾，除非刻意照应能产生新的含义或后果，不再复用相同的观察对象、动作、句法和段落节奏；由本场景自身变化决定落点，不为求异机械轮换，也不用作者总结或通用钩子代替结尾。'
+const PREVIOUS_SINGLE_TURN_STYLE_SCENE = '把场景写成正在发生的事件，而不是剧情梗概。常见的内在因果是：外界变化—主角感知与判断—选择、行动或对白—他人回应、后果或新信息；它可以省略、交错或拉长，只用于保持因果清楚，不要机械逐项书写。叙述定位变化并承载细节，对白让人物带着各自目的相互作用，内心把感知转为判断与选择；三者按场景需要自然交替，共同推进同一节拍。'
+const PREVIOUS_SINGLE_TURN_STYLE_ENDING = `## 篇幅与收束
+
+篇幅由完整呈现当前场景及其必要叙事节拍所需决定，不设字数、段数或对白比例。该展开的决定、发现、失误、关系转折与余波充分展开，该压缩的常规移动、重复动作和已知信息利落带过；不为显得丰富而填充，也不在第一层反应后截断。
+
+结尾选择与当前场景最相称的落点：可以是完成、决定、关系变化、后果、余波、暂时平静，或已有问题的自然延伸。不要惯性追加新秘密、新人物、更大危机、倒计时或“最后一行反转”，并避免连续重复同类收束。
+
+承接前文的事实、人物声音和因果，但不要机械复用近期结尾的景物切换、角色提问、动作、句法或段落节奏；除非刻意照应能产生新的含义或后果，结尾应由当前场景自然形成，不用作者总结或通用钩子代替。`
+const PREVIOUS_DIALOGUE_PARAGRAPH_OPENING = '对白使用双引号，按说话人、动作变化或叙述焦点自然分段。'
+const CURRENT_DIALOGUE_PARAGRAPH_OPENING = '对白使用双引号，按说话人、动作变化或叙述焦点自然分段，保持发言归属清楚。'
+const CURRENT_SHORT_DIALOGUE_GUIDANCE = '连续短对话可以独立成段，但不要长期维持等长、等距的单句往返。'
+const PREVIOUS_PROTAGONIST_THOUGHT_GUIDANCE = '主角内心默认融入自由间接引语，让叙述自然带上其判断、偏见和欲望；需要锋利、私密或富有角色声音的瞬间，才短暂使用直接念头。内心应解释证据、暴露误判或影响下一步，不复述刚发生的事，也不替读者总结。'
+
+function previousProtagonistThoughtWritingStyle() {
+  const style = structuredClone(DEFAULT_WRITING_STYLE)
+  const marker = '\n\n## 情绪与修辞'
+  const content = style.content.replace(marker, `\n\n${PREVIOUS_PROTAGONIST_THOUGHT_GUIDANCE}${marker}`)
+  assert.notEqual(content, style.content)
+  style.content = content
+  return style
+}
+
+function previousDialogueParagraphWritingStyle() {
+  const style = previousProtagonistThoughtWritingStyle()
+  const opening = style.content.replace(CURRENT_DIALOGUE_PARAGRAPH_OPENING, PREVIOUS_DIALOGUE_PARAGRAPH_OPENING)
+  assert.notEqual(opening, style.content)
+  const content = opening.replace(CURRENT_SHORT_DIALOGUE_GUIDANCE, '')
+  assert.notEqual(content, opening)
+  style.content = content
+  return style
+}
+
+function previousSingleTurnArcWritingStyle() {
+  const style = previousDialogueParagraphWritingStyle()
+  const currentScene = '把场景写成正在发生的事件，而不是剧情梗概。让感知、判断、对白、行动与回应保持清楚的因果关联；根据当前张力决定从何处展开、停留或略过，不预设固定链条，也不要求每轮闭合。叙述定位变化并承载细节，对白让人物带着各自目的相互作用，内心把感知转为判断与选择；三者按场景需要自然交织，共同推进当前节拍。'
+  const scene = style.content.replace(currentScene, PREVIOUS_SINGLE_TURN_STYLE_SCENE)
+  assert.notEqual(scene, style.content)
+  const content = scene.replace(/## 篇幅与收束[\s\S]*$/, PREVIOUS_SINGLE_TURN_STYLE_ENDING)
+  assert.notEqual(content, scene)
+  style.content = content
+  return style
+}
+
+function previousVerboseEndingWritingStyle() {
+  const style = previousSingleTurnArcWritingStyle()
+  const content = style.content.replace(
+    '承接前文的事实、人物声音和因果，但不要机械复用近期结尾的景物切换、角色提问、动作、句法或段落节奏；除非刻意照应能产生新的含义或后果，结尾应由当前场景自然形成，不用作者总结或通用钩子代替。',
+    PREVIOUS_VERBOSE_ENDING_STYLE_GUIDANCE,
+  )
+  assert.notEqual(content, style.content)
+  style.content = content
+  return style
+}
+
+function previousEndingImitationWritingStyle() {
+  const style = previousSingleTurnArcWritingStyle()
+  const content = style.content.replace(/## 篇幅与收束[\s\S]*$/, PREVIOUS_ENDING_IMITATION_STYLE_ENDING)
+  assert.notEqual(content, style.content)
+  style.content = content
+  return style
+}
+
+function previousLongFormWritingStyle() {
+  const style = previousSingleTurnArcWritingStyle()
+  const content = style.content
+    .replace(
+      /设定、背景和前情只在影响[\s\S]*?\n\n动作写清/,
+      `${PREVIOUS_LONG_FORM_STYLE_INFORMATION}\n\n动作写清`,
+    )
+    .replace(/## 篇幅与收束[\s\S]*$/, PREVIOUS_LONG_FORM_STYLE_ENDING)
+  assert.notEqual(content, style.content)
+  style.content = content
+  return style
+}
+
+function previousIntegratedWritingStyle() {
+  return {
+    name: '通用叙事',
+    description: '主角锚定、因果紧密，叙述、对白与内心自然交织的通用文风。',
+    content: `没有其他明确要求时，采用贴近主角的第三人称限知叙事；用户明确指定人称、视角或文体时随之调整。叙述距离可以随节奏拉近或稍远，所知范围仍以主角为锚；对白是人物发言，不会自动切换视角。预设若允许“配角心声”，只按该规则作短暂例外。对白使用双引号，按说话人、动作转折或认知变化自然分段。
+
+## 推进与组织
+
+把场景写成正在发生的事件，而非剧情梗概。常用的内在链条是：外界变化—主角感知与判断—选择、行动或对白—他人回应、后果或新信息。它只用于维持因果，可以省略、交错或拉长，不要机械逐项书写。叙述定位变化并承载细节，对白推动立场与关系，内心连接感知和选择；三者按场景需要交替，共同推动同一节拍。
+
+## 对白与内心
+
+对白服务人物当下目标，可以试探、遮掩、交换、拒绝、拖延、误解或言不由衷；人物声音来自用词、句式、回避方式和知识边界。只在动作、观察或念头改变一句话的分量、潜台词或下一步时穿插叙述，不给每句话配套表情和解释。
+
+主角内心默认融入自由间接引语，让叙述自然带上其判断、偏见和欲望；需要锋利、私密或富有角色声音的瞬间，才短暂使用直接念头。内心应解释证据、暴露误判或影响下一步，不复述刚发生的事，也不替读者总结。
+
+## 描写与详略
+
+${CHARACTER_DESCRIPTION_GUIDANCE}
+
+设定、背景和前情只在影响当下判断、选择或后果时进入正文，借观察、比较、回忆、冲突或误解分散交代。给足理解场景所需的信息，不一次讲完世界。常规移动、重复动作和已知信息压缩；决定、发现、失误、关系转折与不可逆结果展开。动作写清主体、方向、距离和可见结果，多人同场用站位、视线与物件维持空间连续。
+
+## 语言与节奏
+
+语言准确、自然、易读。短句用于加速或落锤，长句承载观察、推理与余韵；句段长短随压力变化，不维持单一节拍。优先使用具体动词和符合当前角色注意力的细节，让一个细节或一句对白同时承担氛围、人物、信息或推进中的多种作用。
+
+情绪可以经感知、念头、沉默、动作或身体反应呈现，选最有力的方式，不逐项罗列。比喻简短、具体并符合人物经验。成稿既不是聊天记录，也不是密集说明墙；不预设明快、甜美、幽默或沉重，让基调服从人物与场景。
+
+## 篇幅与收束
+
+篇幅服从一个完整、有意义的叙事节拍，不设字数、段数或对白比例。该展开的转折与余波充分展开，该压缩的过渡利落带过；不为显得丰富而填充，也不在第一层反应后截断。让本轮给出可感的回答、发现、得失、决定、关系变化、亲近、恐惧或代价，再落到后果、新压力或自然静止点，不用作者总结或通用钩子代替收束。`,
+  }
+}
+
+function previousPreAppearanceWritingStyle() {
+  const style = previousIntegratedWritingStyle()
+  const content = style.content.replace(`## 描写与详略\n\n${CHARACTER_DESCRIPTION_GUIDANCE}\n\n`, '## 信息与详略\n\n')
+  assert.notEqual(content, style.content)
+  style.content = content
+  return style
+}
+
+function previousDefaultWritingStyle() {
+  return {
+    name: '通用叙事',
+    description: '清晰、具体、有节奏的近距离叙事，兼顾对白、动作与氛围。',
+    content: `没有其他明确要求时，采用贴近主角感受的第三人称限知叙事；用户明确指定人称、视角或文体时随之调整。对白使用双引号，按说话人、动作变化或叙述焦点自然分段。
+
+## 语言与节奏
+
+使用准确、自然、易读的语言。句子长短随动作速度、观察深度和情绪压力变化：关键瞬间可以放慢，过渡与常规动作应利落带过。避免整段维持同一节拍、连续堆叠碎句、用逗号串起过多动作，或把每个动作拆成等重的步骤。
+
+## 叙述焦点
+
+每段围绕一个清晰的叙述焦点组织。优先写会改变读者理解或场面感受的细节，人物外貌、衣着、环境和物件只选当前有作用的部分。日常过程适度压缩，在发现、触碰、失言、迟疑或局势转折等关键瞬间展开；不要平均用力或逐项清点。
+
+## 动作与空间
+
+动作写清主体、顺序、方向、距离与可见结果。多人同场时，用站位、视线、遮挡和物件关系维持空间感，避免人物突然换位或动作互相冲突。感官描写选择场景最突出的少数线索，让声音、温度、触感、气味或光线参与当下动作；不要轮流罗列五感。
+
+## 对白与段落
+
+对白可以短促、含混、被打断或答非所问，让语气和用词承担潜台词。叙述只在动作改变对白含义、场面关系或节奏时穿插，不必给每句话配表情、语气标签和内心解释。避免反复使用“说完”“闻言”“不由得”、省略号和相同肢体反应维持节拍。
+
+## 情绪与修辞
+
+情绪先落在可观察的选择、身体反应、注意力变化或物件使用上，再决定是否直说；一种有分量的迹象通常胜过连续罗列心跳、呼吸、目光和指尖。比喻保持简短、具体并贴合人物经验，同一段落不要混用多个意象。避免套话式情绪标签、模板化网络表达、抽象概念堆叠、对称口号和解释句子自身意义的文字。
+
+成稿应具体、流畅、层次清楚。不要预设明快、甜美、幽默、抒情或沉重等固定基调；让措辞、密度和节奏服从当前人物、场景与题材。`,
+  }
+}
 
 test('seeds one default general style and preserves it across service instances', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-default-'))
@@ -20,14 +177,66 @@ test('seeds one default general style and preserves it across service instances'
     assert.equal(seeded.description, DEFAULT_WRITING_STYLE.description)
     assert.equal(seeded.isDefault, true)
     assert.match(seeded.content, /第三人称限知叙事/)
+    assert.match(seeded.content, /所知范围仍以主角为锚/)
+    assert.match(seeded.content, /对白是人物发言，不会自动切换视角/)
+    assert.match(seeded.content, /“配角心声”/)
     assert.match(seeded.content, /对白使用双引号/)
+    assert.match(seeded.content, /保持发言归属清楚/)
+    assert.match(seeded.content, /感知、判断、对白、行动与回应保持清楚的因果关联/)
+    assert.match(seeded.content, /根据当前张力决定从何处展开、停留或略过/)
+    assert.match(seeded.content, /不预设固定链条，也不要求每轮闭合/)
+    assert.match(seeded.content, /叙述定位变化并承载细节，对白让人物带着各自目的相互作用，内心把感知转为判断与选择/)
+    assert.match(seeded.content, /三者按场景需要自然交织/)
+    assert.match(seeded.content, /每段围绕一个清晰的叙述焦点组织/)
+    assert.match(seeded.content, /一个细节同时承担人物、氛围、信息或推进中的多种作用/)
+    assert.match(seeded.content, /日常过程适度压缩/)
     assert.match(seeded.content, /句子长短随动作速度、观察深度和情绪压力变化/)
+    assert.match(seeded.content, /连续堆叠碎句、用逗号串起过多动作/)
+    assert.match(seeded.content, /把每个动作拆成等重的步骤/)
+    assert.doesNotMatch(seeded.content, /主角内心默认融入|自由间接引语|直接念头/)
+    assert.match(seeded.content, /## 描写、动作与空间/)
+    assert.match(seeded.content, /重要人物初次出现或成为场景焦点/)
+    assert.match(seeded.content, /样貌、神态、衣着、伤痕与装束/)
+    assert.match(seeded.content, /从当前视角选取最有辨识度的细节/)
+    assert.match(seeded.content, /融入观察、动作与互动/)
+    assert.match(seeded.content, /形象清晰可感、便于代入与想象/)
+    assert.match(seeded.content, /尊重既有人设与用户留白/)
+    assert.match(seeded.content, /不作从头到脚的清单/)
+    assert.match(seeded.content, /设定、背景和前情只在影响当下判断、选择或后果时进入正文/)
+    assert.match(seeded.content, /观察、比较、回忆、冲突或误解逐步显露/)
+    assert.match(seeded.content, /把其余内容留到人物真正接触或因果需要时再展开/)
+    assert.match(seeded.content, /避免在同一处密集引入彼此无关的新设定、人物关系、谜团和支线/)
     assert.match(seeded.content, /动作写清主体、顺序、方向、距离与可见结果/)
+    assert.match(seeded.content, /站位、视线、遮挡和物件关系维持空间感/)
+    assert.match(seeded.content, /声音、温度、触感、气味或光线参与当下动作，不轮流罗列五感/)
+    assert.match(seeded.content, /对白既要符合人物声音，也要服务其当下目标/)
+    assert.match(seeded.content, /短促、含混、被打断、答非所问/)
+    assert.match(seeded.content, /连续短对话可以独立成段/)
+    assert.match(seeded.content, /不要长期维持等长、等距的单句往返/)
+    assert.match(seeded.content, /场面关系、节奏或下一步时穿插叙述/)
     assert.match(seeded.content, /不必给每句话配表情、语气标签和内心解释/)
-    assert.match(seeded.content, /一种有分量的迹象通常胜过/)
+    assert.match(seeded.content, /“说完”“闻言”“不由得”/)
+    assert.match(seeded.content, /情绪可以落在选择、感知、念头、沉默、身体反应、注意力变化或物件使用上/)
+    assert.match(seeded.content, /不逐项罗列心跳、呼吸、目光和指尖/)
+    assert.match(seeded.content, /同一段落不要混用多个意象/)
+    assert.match(seeded.content, /模板化网络表达、抽象概念堆叠、对称口号/)
     assert.match(seeded.content, /不要预设明快、甜美、幽默、抒情或沉重等固定基调/)
+    assert.match(seeded.content, /篇幅由完整呈现本轮必要叙事节拍所需决定/)
+    assert.match(seeded.content, /不设字数、段数或对白比例/)
+    assert.match(seeded.content, /不在第一层反应后截断/)
+    assert.match(seeded.content, /决定、发现、失误、关系转折与余波充分展开/)
+    assert.match(seeded.content, /不为一次写完整个场景而过度推进/)
+    assert.match(seeded.content, /一个场景可以跨越多轮/)
+    assert.match(seeded.content, /尚未闭合但态势清楚、已有可读进展的过程节点/)
+    assert.match(seeded.content, /不随意切断正在形成意义的动作、对白或情绪/)
+    assert.match(seeded.content, /不用停顿和留白掩盖缺少推进/)
+    assert.match(seeded.content, /不要惯性追加新秘密、新人物、更大危机、倒计时或“最后一行反转”/)
+    assert.match(seeded.content, /不机械复用近期回复的观察落点、句法、段落节奏或收束形式/)
+    assert.match(seeded.content, /有意照应须产生新的含义或后果/)
+    assert.match(seeded.content, /不用作者总结或通用钩子代替结尾/)
+    assert.doesNotMatch(seeded.content, /外界变化—主角感知与判断—/)
+    assert.doesNotMatch(seeded.content, /\d+\s*字|固定.{0,4}段|对白.{0,4}%/)
     assert.doesNotMatch(`${seeded.description}\n${seeded.content}`, /轻小说|Light Novel/i)
-    assert.doesNotMatch(seeded.content, /结尾应停在|世界信息只在|角色拥有自己的动机|真实后果/)
     assert.equal(same.id, seeded.id)
     const listed = await first.list()
     assert.equal(listed.total, 1)
@@ -36,6 +245,170 @@ test('seeds one default general style and preserves it across service instances'
   } finally {
     await firstCtx.fiber.dispose()
     await secondCtx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('migrates the previous protagonist-thought general style', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-protagonist-thought-migrate-'))
+  const ctx = new Context()
+  const styles = new RpWritingStyles(ctx, configFor(root))
+  try {
+    const legacy = await styles.create(previousProtagonistThoughtWritingStyle())
+    await writeFile(join(root, '.preferences.json'), `${JSON.stringify({ version: 1, defaultWritingStyleId: legacy.id, initialized: true }, null, 2)}\n`)
+
+    const migrated = await styles.ensureDefault()
+    assert.equal(migrated.id, legacy.id)
+    assert.equal(migrated.revision, 2)
+    assert.equal(migrated.content, DEFAULT_WRITING_STYLE.content)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('migrates the previous dialogue-paragraphing general style', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-dialogue-paragraphing-migrate-'))
+  const ctx = new Context()
+  const styles = new RpWritingStyles(ctx, configFor(root))
+  try {
+    const legacy = await styles.create(previousDialogueParagraphWritingStyle())
+    await writeFile(join(root, '.preferences.json'), `${JSON.stringify({ version: 1, defaultWritingStyleId: legacy.id, initialized: true }, null, 2)}\n`)
+
+    const migrated = await styles.ensureDefault()
+    assert.equal(migrated.id, legacy.id)
+    assert.equal(migrated.revision, 2)
+    assert.equal(migrated.content, DEFAULT_WRITING_STYLE.content)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('migrates the immediately previous single-turn arc style', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-multi-turn-balance-migrate-'))
+  const ctx = new Context()
+  const styles = new RpWritingStyles(ctx, configFor(root))
+  try {
+    const legacy = await styles.create(previousSingleTurnArcWritingStyle())
+    await writeFile(join(root, '.preferences.json'), `${JSON.stringify({ version: 1, defaultWritingStyleId: legacy.id, initialized: true }, null, 2)}\n`)
+
+    const migrated = await styles.ensureDefault()
+    assert.equal(migrated.id, legacy.id)
+    assert.equal(migrated.revision, 2)
+    assert.equal(migrated.content, DEFAULT_WRITING_STYLE.content)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('migrates the previous verbose ending rule', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-ending-rule-trim-migrate-'))
+  const ctx = new Context()
+  const styles = new RpWritingStyles(ctx, configFor(root))
+  try {
+    const legacy = await styles.create(previousVerboseEndingWritingStyle())
+    await writeFile(join(root, '.preferences.json'), `${JSON.stringify({ version: 1, defaultWritingStyleId: legacy.id, initialized: true }, null, 2)}\n`)
+
+    const migrated = await styles.ensureDefault()
+    assert.equal(migrated.id, legacy.id)
+    assert.equal(migrated.revision, 2)
+    assert.equal(migrated.content, DEFAULT_WRITING_STYLE.content)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('migrates the previous ending-variation general style', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-ending-imitation-migrate-'))
+  const ctx = new Context()
+  const styles = new RpWritingStyles(ctx, configFor(root))
+  try {
+    const legacy = await styles.create(previousEndingImitationWritingStyle())
+    await writeFile(join(root, '.preferences.json'), `${JSON.stringify({ version: 1, defaultWritingStyleId: legacy.id, initialized: true }, null, 2)}\n`)
+
+    const migrated = await styles.ensureDefault()
+    assert.equal(migrated.id, legacy.id)
+    assert.equal(migrated.revision, 2)
+    assert.equal(migrated.content, DEFAULT_WRITING_STYLE.content)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('migrates the previous long-form general style', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-long-form-migrate-'))
+  const ctx = new Context()
+  const styles = new RpWritingStyles(ctx, configFor(root))
+  try {
+    const legacy = await styles.create(previousLongFormWritingStyle())
+    await writeFile(join(root, '.preferences.json'), `${JSON.stringify({ version: 1, defaultWritingStyleId: legacy.id, initialized: true }, null, 2)}\n`)
+
+    const migrated = await styles.ensureDefault()
+    assert.equal(migrated.id, legacy.id)
+    assert.equal(migrated.revision, 2)
+    assert.equal(migrated.content, DEFAULT_WRITING_STYLE.content)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('migrates the previous integrated managed general style', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-latest-migrate-'))
+  const ctx = new Context()
+  const styles = new RpWritingStyles(ctx, configFor(root))
+  try {
+    const legacy = await styles.create(previousIntegratedWritingStyle())
+    await writeFile(join(root, '.preferences.json'), `${JSON.stringify({ version: 1, defaultWritingStyleId: legacy.id, initialized: true }, null, 2)}\n`)
+
+    const migrated = await styles.ensureDefault()
+    assert.equal(migrated.id, legacy.id)
+    assert.equal(migrated.revision, 2)
+    assert.equal(migrated.content, DEFAULT_WRITING_STYLE.content)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('migrates the managed general style from before the appearance guidance', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-current-migrate-'))
+  const ctx = new Context()
+  const styles = new RpWritingStyles(ctx, configFor(root))
+  try {
+    const legacy = await styles.create(previousPreAppearanceWritingStyle())
+    await writeFile(join(root, '.preferences.json'), `${JSON.stringify({ version: 1, defaultWritingStyleId: legacy.id, initialized: true }, null, 2)}\n`)
+
+    const migrated = await styles.ensureDefault()
+    assert.equal(migrated.id, legacy.id)
+    assert.equal(migrated.revision, 2)
+    assert.equal(migrated.description, DEFAULT_WRITING_STYLE.description)
+    assert.equal(migrated.content, DEFAULT_WRITING_STYLE.content)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('migrates the baseline managed general style', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-writing-style-baseline-migrate-'))
+  const ctx = new Context()
+  const styles = new RpWritingStyles(ctx, configFor(root))
+  try {
+    const legacy = await styles.create(previousDefaultWritingStyle())
+    await writeFile(join(root, '.preferences.json'), `${JSON.stringify({ version: 1, defaultWritingStyleId: legacy.id, initialized: true }, null, 2)}\n`)
+
+    const migrated = await styles.ensureDefault()
+    assert.equal(migrated.id, legacy.id)
+    assert.equal(migrated.revision, 2)
+    assert.equal(migrated.description, DEFAULT_WRITING_STYLE.description)
+    assert.equal(migrated.content, DEFAULT_WRITING_STYLE.content)
+  } finally {
+    await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })
   }
 })

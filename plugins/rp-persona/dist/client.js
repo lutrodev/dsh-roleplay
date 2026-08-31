@@ -6369,6 +6369,66 @@ get: (_target, key) => {
 			...gestureAnimations
 		};
 		//#endregion
+		//#region ../../node_modules/.pnpm/framer-motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/framer-motion/dist/es/render/dom/viewport/index.mjs
+		const thresholds = {
+			some: 0,
+			all: 1
+		};
+		function inView(elementOrSelector, onStart, { root, margin: rootMargin, amount = "some" } = {}) {
+			const elements = resolveElements(elementOrSelector);
+			const activeIntersections = /* @__PURE__ */ new WeakMap();
+			const onIntersectionChange = (entries) => {
+				entries.forEach((entry) => {
+					const onEnd = activeIntersections.get(entry.target);
+					/**
+					* If there's no change to the intersection, we don't need to
+					* do anything here.
+					*/
+					if (entry.isIntersecting === Boolean(onEnd)) return;
+					if (entry.isIntersecting) {
+						const newOnEnd = onStart(entry.target, entry);
+						if (typeof newOnEnd === "function") activeIntersections.set(entry.target, newOnEnd);
+						else observer.unobserve(entry.target);
+					} else if (typeof onEnd === "function") {
+						onEnd(entry);
+						activeIntersections.delete(entry.target);
+					}
+				});
+			};
+			const observer = new IntersectionObserver(onIntersectionChange, {
+				root,
+				rootMargin,
+				threshold: typeof amount === "number" ? amount : thresholds[amount]
+			});
+			elements.forEach((element) => observer.observe(element));
+			return () => observer.disconnect();
+		}
+		//#endregion
+		//#region ../../node_modules/.pnpm/framer-motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/framer-motion/dist/es/utils/use-in-view.mjs
+		function useInView(ref, { root, margin, amount, once = false, initial = false } = {}) {
+			const [isInView, setInView] = (0, react.useState)(initial);
+			(0, react.useEffect)(() => {
+				if (!ref.current || once && isInView) return;
+				const onEnter = () => {
+					setInView(true);
+					return once ? void 0 : () => setInView(false);
+				};
+				const options = {
+					root: root && root.current || void 0,
+					margin,
+					amount
+				};
+				return inView(ref.current, onEnter, options);
+			}, [
+				root,
+				ref,
+				margin,
+				once,
+				amount
+			]);
+			return isInView;
+		}
+		//#endregion
 		//#region ../../node_modules/.pnpm/motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/motion/dist/es/react.mjs
 		const m = m$1;
 		//#endregion
@@ -6467,6 +6527,8 @@ get: (_target, key) => {
 			"爱好"
 		];
 		const DESCRIPTION_LIMIT = 4e3;
+		const AVATAR_CACHE_LIMIT = 16;
+		const avatarRequests = /* @__PURE__ */ new WeakMap();
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
 			ctx.effect(() => ctx.rpAssetEditors.register("persona", PersonaSessionEditor), "rp-persona: canonical session editor");
@@ -7024,15 +7086,20 @@ get: (_target, key) => {
 			return left.name.localeCompare(right.name, void 0, { sensitivity: "base" }) || left.id.localeCompare(right.id);
 		}
 		function PersonaAvatar({ connection, persona, className }) {
+			const avatarRef = (0, react.useRef)(null);
+			const nearViewport = useInView(avatarRef, {
+				margin: "200px 0px",
+				once: true
+			});
 			const [source, setSource] = (0, react.useState)(null);
 			(0, react.useEffect)(() => {
-				if (!persona?.hasAvatar) {
+				if (!persona?.hasAvatar || !nearViewport) {
 					setSource(null);
 					return;
 				}
 				let live = true;
-				rpc(connection, "avatar", { id: persona.id }).then((value) => {
-					if (live) setSource(`data:${value.mimeType};base64,${value.base64}`);
+				cachedAvatar(connection, persona.id, persona.revision).then((value) => {
+					if (live) setSource(value);
 				}).catch(() => {
 					if (live) setSource(null);
 				});
@@ -7041,10 +7108,13 @@ get: (_target, key) => {
 				};
 			}, [
 				connection,
+				nearViewport,
 				persona?.hasAvatar,
-				persona?.id
+				persona?.id,
+				persona?.revision
 			]);
 			return h("span", {
+				ref: avatarRef,
 				className,
 				"aria-hidden": true
 			}, source === null ? initialOf(persona?.name) : h("img", {
@@ -7109,6 +7179,23 @@ get: (_target, key) => {
 		}
 		async function rpc(connection, endpoint, payload) {
 			return domainValue(await connection.call("/rp-personas", endpoint, payload));
+		}
+		function cachedAvatar(connection, id, revision) {
+			let cache = avatarRequests.get(connection);
+			if (cache === void 0) {
+				cache = /* @__PURE__ */ new Map();
+				avatarRequests.set(connection, cache);
+			}
+			const key = `${id}:${revision ?? ""}`;
+			let request = cache.get(key);
+			if (request !== void 0) return request;
+			request = rpc(connection, "avatar", { id }).then((value) => `data:${value.mimeType};base64,${value.base64}`);
+			cache.set(key, request);
+			while (cache.size > AVATAR_CACHE_LIMIT) cache.delete(cache.keys().next().value);
+			request.catch(() => {
+				if (cache.get(key) === request) cache.delete(key);
+			});
+			return request;
 		}
 		//#endregion
 		exports.apply = apply;

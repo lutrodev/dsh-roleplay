@@ -9994,6 +9994,66 @@ get: (_target, key) => {
 			return shouldReduceMotion;
 		}
 		//#endregion
+		//#region ../../node_modules/.pnpm/framer-motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/framer-motion/dist/es/render/dom/viewport/index.mjs
+		const thresholds = {
+			some: 0,
+			all: 1
+		};
+		function inView(elementOrSelector, onStart, { root, margin: rootMargin, amount = "some" } = {}) {
+			const elements = resolveElements(elementOrSelector);
+			const activeIntersections = /* @__PURE__ */ new WeakMap();
+			const onIntersectionChange = (entries) => {
+				entries.forEach((entry) => {
+					const onEnd = activeIntersections.get(entry.target);
+					/**
+					* If there's no change to the intersection, we don't need to
+					* do anything here.
+					*/
+					if (entry.isIntersecting === Boolean(onEnd)) return;
+					if (entry.isIntersecting) {
+						const newOnEnd = onStart(entry.target, entry);
+						if (typeof newOnEnd === "function") activeIntersections.set(entry.target, newOnEnd);
+						else observer.unobserve(entry.target);
+					} else if (typeof onEnd === "function") {
+						onEnd(entry);
+						activeIntersections.delete(entry.target);
+					}
+				});
+			};
+			const observer = new IntersectionObserver(onIntersectionChange, {
+				root,
+				rootMargin,
+				threshold: typeof amount === "number" ? amount : thresholds[amount]
+			});
+			elements.forEach((element) => observer.observe(element));
+			return () => observer.disconnect();
+		}
+		//#endregion
+		//#region ../../node_modules/.pnpm/framer-motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/framer-motion/dist/es/utils/use-in-view.mjs
+		function useInView(ref, { root, margin, amount, once = false, initial = false } = {}) {
+			const [isInView, setInView] = (0, react.useState)(initial);
+			(0, react.useEffect)(() => {
+				if (!ref.current || once && isInView) return;
+				const onEnter = () => {
+					setInView(true);
+					return once ? void 0 : () => setInView(false);
+				};
+				const options = {
+					root: root && root.current || void 0,
+					margin,
+					amount
+				};
+				return inView(ref.current, onEnter, options);
+			}, [
+				root,
+				ref,
+				margin,
+				once,
+				amount
+			]);
+			return isInView;
+		}
+		//#endregion
 		//#region ../../node_modules/.pnpm/framer-motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/framer-motion/dist/es/context/ReorderContext.mjs
 		const ReorderContext = (0, react.createContext)(null);
 		//#endregion
@@ -10486,6 +10546,8 @@ get: (_target, key) => {
 		const h = react.default.createElement;
 		const MODAL_SCROLL_LOCK = Symbol.for("dsh-roleplay.asset-modal-scroll-lock");
 		const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
+		const AVATAR_CACHE_LIMIT = 16;
+		const avatarRequests = /* @__PURE__ */ new WeakMap();
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
 			ctx.effect(() => ctx.rpAssetEditors.register("character", CharacterSessionEditor), "rp-character-card: canonical session editor");
@@ -10719,13 +10781,18 @@ get: (_target, key) => {
 			}), h("span", { className: css.rowText }, h("strong", null, item.name), h("small", null, item.status === "corrupt" ? "内容无法读取" : `${characterFormatLabel(item.format)} · ${linkedLorebookLabel(item.lorebookEntries)}`)))));
 		}
 		function Avatar({ item, connection }) {
+			const avatarRef = (0, react.useRef)(null);
+			const nearViewport = useInView(avatarRef, {
+				margin: "200px 0px",
+				once: true
+			});
 			const [source, setSource] = (0, react.useState)(null);
 			(0, react.useEffect)(() => {
 				setSource(null);
-				if (!item.hasAvatar) return;
+				if (!item.hasAvatar || !nearViewport) return;
 				let live = true;
-				rpc(connection, "avatar", { id: item.id }).then((value) => {
-					if (live) setSource(`data:${value.mimeType};base64,${value.base64}`);
+				cachedAvatar(connection, item.id).then((value) => {
+					if (live) setSource(value);
 				}).catch(() => {});
 				return () => {
 					live = false;
@@ -10733,13 +10800,16 @@ get: (_target, key) => {
 			}, [
 				connection,
 				item.hasAvatar,
-				item.id
+				item.id,
+				nearViewport
 			]);
 			return source ? h("img", {
+				ref: avatarRef,
 				className: css.avatar,
 				src: source,
 				alt: `${item.name}头像`
 			}) : h("span", {
+				ref: avatarRef,
 				className: `${css.avatar} ${css.avatarFallback}`,
 				"aria-label": `${item.name}无头像`
 			}, (item.name?.trim()?.[0] ?? "卡").toLocaleUpperCase());
@@ -11215,6 +11285,22 @@ get: (_target, key) => {
 		}
 		async function assetRpc(connection, endpoint, payload) {
 			return domainValue(await connection.call("/rp-assets", endpoint, payload));
+		}
+		function cachedAvatar(connection, id) {
+			let cache = avatarRequests.get(connection);
+			if (cache === void 0) {
+				cache = /* @__PURE__ */ new Map();
+				avatarRequests.set(connection, cache);
+			}
+			let request = cache.get(id);
+			if (request !== void 0) return request;
+			request = rpc(connection, "avatar", { id }).then((value) => `data:${value.mimeType};base64,${value.base64}`);
+			cache.set(id, request);
+			while (cache.size > AVATAR_CACHE_LIMIT) cache.delete(cache.keys().next().value);
+			request.catch(() => {
+				if (cache.get(id) === request) cache.delete(id);
+			});
+			return request;
 		}
 		function bytesToBase64(bytes) {
 			let binary = "";

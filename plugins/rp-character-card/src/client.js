@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { AnimatePresence, Reorder, m } from 'motion/react'
+import React, { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, Reorder, m, useInView } from 'motion/react'
 import { IconChevronLeftOutline14, IconSearchOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { domainValue, normalizedMime, relatedLorebookNames } from './client-state.js'
 import { css, ensureStyles } from './client-styles.generated.js'
@@ -9,6 +9,8 @@ export const inject = ['slots', 'rpRemote', 'rpAssetEditors']
 const h = React.createElement
 const MODAL_SCROLL_LOCK = Symbol.for('dsh-roleplay.asset-modal-scroll-lock')
 const MAX_IMPORT_BYTES = 20 * 1024 * 1024
+const AVATAR_CACHE_LIMIT = 16
+const avatarRequests = new WeakMap()
 
 export function apply(ctx) {
   ctx.effect(ensureStyles)
@@ -132,17 +134,19 @@ function CharacterList({ items, status, onSelect, connection }) {
 }
 
 function Avatar({ item, connection }) {
+  const avatarRef = useRef(null)
+  const nearViewport = useInView(avatarRef, { margin: '200px 0px', once: true })
   const [source, setSource] = useState(null)
   useEffect(() => {
     setSource(null)
-    if (!item.hasAvatar) return
+    if (!item.hasAvatar || !nearViewport) return
     let live = true
-    void rpc(connection, 'avatar', { id: item.id }).then(value => { if (live) setSource(`data:${value.mimeType};base64,${value.base64}`) }).catch(() => {})
+    void cachedAvatar(connection, item.id).then(value => { if (live) setSource(value) }).catch(() => {})
     return () => { live = false }
-  }, [connection, item.hasAvatar, item.id])
+  }, [connection, item.hasAvatar, item.id, nearViewport])
   return source
-    ? h('img', { className: css.avatar, src: source, alt: `${item.name}头像` })
-    : h('span', { className: `${css.avatar} ${css.avatarFallback}`, 'aria-label': `${item.name}无头像` }, (item.name?.trim()?.[0] ?? '卡').toLocaleUpperCase())
+    ? h('img', { ref: avatarRef, className: css.avatar, src: source, alt: `${item.name}头像` })
+    : h('span', { ref: avatarRef, className: `${css.avatar} ${css.avatarFallback}`, 'aria-label': `${item.name}无头像` }, (item.name?.trim()?.[0] ?? '卡').toLocaleUpperCase())
 }
 
 function CharacterDetail({ detail, connection, onChanged, onDeleted }) {
@@ -387,6 +391,20 @@ function useModalScrollLock(open) {
 }
 async function rpc(connection, endpoint, payload) { return domainValue(await connection.call('/rp-character-cards', endpoint, payload)) }
 async function assetRpc(connection, endpoint, payload) { return domainValue(await connection.call('/rp-assets', endpoint, payload)) }
+function cachedAvatar(connection, id) {
+  let cache = avatarRequests.get(connection)
+  if (cache === undefined) {
+    cache = new Map()
+    avatarRequests.set(connection, cache)
+  }
+  let request = cache.get(id)
+  if (request !== undefined) return request
+  request = rpc(connection, 'avatar', { id }).then(value => `data:${value.mimeType};base64,${value.base64}`)
+  cache.set(id, request)
+  while (cache.size > AVATAR_CACHE_LIMIT) cache.delete(cache.keys().next().value)
+  void request.catch(() => { if (cache.get(id) === request) cache.delete(id) })
+  return request
+}
 function bytesToBase64(bytes) { let binary = ''; for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000)); return btoa(binary) }
 function downloadExport(value) {
   if (value?.mimeType !== 'image/png' || typeof value.fileName !== 'string' || !value.fileName.toLocaleLowerCase().endsWith('.png')

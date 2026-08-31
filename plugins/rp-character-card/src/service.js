@@ -20,6 +20,7 @@ export class RpCharacterCards extends Service {
     this.maxTextCharacters = config.maxTextCharacters
     this.transforms = new Map()
     this.embeddedLoreManager = undefined
+    ctx.effect(() => () => invalidateLibraryListing(this.libraryDir), 'rp-character-card: release derived library listing')
     // The browser library is also mounted at the root where no RP runtime exists.
     // Register lazily so a preset group that provides rpRuntime later still gets
     // the card source deterministically instead of depending on plugin timing.
@@ -239,20 +240,22 @@ export class RpCharacterCards extends Service {
   /** Paginated, deterministic browser-library listing. */
   async list({ query = '', cursor, limit = 50 } = {}) {
     const page = pageOptions(query, cursor, limit)
-    await mkdir(this.libraryDir, { recursive: true })
-    const rows = []
-    for (const entry of await readdir(this.libraryDir, { withFileTypes: true })) {
-      if (!entry.isDirectory() || !/^[0-9a-f-]{36}$/.test(entry.name)) continue
-      try {
-        const [manifest, character] = await Promise.all([
-          readJson(resolve(this.libraryDir, entry.name, 'manifest.json')),
-          readJson(resolve(this.libraryDir, entry.name, 'character.json')),
-        ])
-        rows.push(cardSummary(manifest, character))
-      } catch (error) {
-        rows.push({ id: entry.name, name: '损坏的角色卡', status: 'corrupt', error: error instanceof Error ? error.message : String(error), tags: [], hasAvatar: false, lorebookEntries: 0, quarantinedPrompts: 0 })
-      }
-    }
+    const rows = await cachedLibraryListing(this.libraryDir, async () => {
+      await mkdir(this.libraryDir, { recursive: true })
+      const entries = (await readdir(this.libraryDir, { withFileTypes: true }))
+        .filter(entry => entry.isDirectory() && /^[0-9a-f-]{36}$/.test(entry.name))
+      return mapWithConcurrency(entries, LISTING_READ_CONCURRENCY, async entry => {
+        try {
+          const [manifest, character] = await Promise.all([
+            readJson(resolve(this.libraryDir, entry.name, 'manifest.json')),
+            readJson(resolve(this.libraryDir, entry.name, 'character.json')),
+          ])
+          return cardSummary(manifest, character)
+        } catch (error) {
+          return { id: entry.name, name: '损坏的角色卡', status: 'corrupt', error: error instanceof Error ? error.message : String(error), tags: [], hasAvatar: false, lorebookEntries: 0, quarantinedPrompts: 0 }
+        }
+      })
+    })
     const filtered = rows.filter(row => row.name.toLocaleLowerCase().includes(page.query)).sort(compareAssets)
     const items = filtered.slice(page.offset, page.offset + page.limit)
     return { items, nextCursor: page.offset + items.length < filtered.length ? String(page.offset + items.length) : null, total: filtered.length }
@@ -485,6 +488,39 @@ function exportFileName(name) {
 }
 
 const libraryMutations = new Map()
+const libraryListings = new Map()
+const LISTING_READ_CONCURRENCY = 8
+
+async function cachedLibraryListing(libraryDir, load) {
+  const cached = libraryListings.get(libraryDir)
+  if (cached !== undefined) return cached
+  const pending = Promise.resolve().then(load)
+  libraryListings.set(libraryDir, pending)
+  try {
+    return await pending
+  } catch (error) {
+    if (libraryListings.get(libraryDir) === pending) libraryListings.delete(libraryDir)
+    throw error
+  }
+}
+
+function invalidateLibraryListing(libraryDir) {
+  libraryListings.delete(libraryDir)
+}
+
+async function mapWithConcurrency(items, limit, map) {
+  const results = new Array(items.length)
+  let nextIndex = 0
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex
+      nextIndex += 1
+      results[index] = await map(items[index])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()))
+  return results
+}
 
 async function withLibraryMutation(libraryDir, operation) {
   const previous = libraryMutations.get(libraryDir) ?? Promise.resolve()
@@ -492,9 +528,11 @@ async function withLibraryMutation(libraryDir, operation) {
   const current = new Promise(resolve => { release = resolve })
   libraryMutations.set(libraryDir, current)
   await previous
+  invalidateLibraryListing(libraryDir)
   try {
     return await operation()
   } finally {
+    invalidateLibraryListing(libraryDir)
     release()
     if (libraryMutations.get(libraryDir) === current) libraryMutations.delete(libraryDir)
   }

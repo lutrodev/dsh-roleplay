@@ -7,31 +7,219 @@ import { Context } from '@deepseek-ai/cordis'
 import { apply, DEFAULT_PRESET, RpPresets, dispatchBrowser } from '../src/index.js'
 
 const configFor = libraryDir => ({ libraryDir, maxTextCharacters: 100000, maxFields: 32, exposeBrowser: false })
+const PREVIOUS_PROTAGONIST_GUIDANCE = '主角是故事当前聚焦的核心角色。根据当前语境判断用户是在扮演还是导演主角。'
+const PREVIOUS_SUPPORTING_CHARACTER_GUIDANCE = '故事中没有被用户当前输入直接扮演或导演的角色由你表现。他们拥有各自的经历、动机、知识、秘密、局限和关系，会依据自身立场主动行动，而不是围绕主角等待指令或只为主角服务。用户明确导演某个角色时，遵循该方向，同时保持角色已经形成的事实与连续性。'
+const PREVIOUS_SUPPORTING_THOUGHT_GUIDANCE = `主叙事始终贴近主角；对白只是人物发言，不等于切换视角。
 
-function previousDefaultPreset() {
+仅当配角未说出口的想法能形成关键反差、补足因果或建立悬念，而动作与对白不足以表达时，才短暂进入一名配角的内心。从该角色正在发生的动作、停顿或话语切入，首句明确归属，只写与当前场景有关且会改变读者理解的念头。未说出口的内容不会自动成为主角所知。
+
+一次只进入一人，并尽快借可见动作、声音或主角感知退回主角锚点。不使用“某某视角”“内心独白”等标签；没有明确收益时，改用对白、动作或主角的推断。`
+const PREVIOUS_CALIBRATION_DESCRIPTION = '写作前确认本轮因果与停笔位置。'
+const PREVIOUS_CALIBRATION = '写作前简要确认用户意图与连续性、主角当前的压力和选择、其他角色的动机、本轮发生的实际变化及自然停笔位置。形成清晰场景后立即写作，不要在正文中展示规划、分析或创作说明。'
+const PREVIOUS_FORMAT = '只输出故事正文，并使用当前对话所用的语言。篇幅服从完整叙事节拍，不预设字数、段数或对白比例；不要输出状态、规划、分析或创作说明。'
+const PREVIOUS_LONG_FORM_GUIDANCE_TAIL = `## 兑现与篇幅
+
+在适合当前节奏的尺度上，让本轮给读者可感的进展或回报，例如回答、发现、得失、选择、关系变化、亲近、恐惧或代价，而不只为以后铺垫。安静场景也可以通过理解、关系或压力的细微变化完成兑现。信息量来自有效的新信息、人物反应与因果后果，不靠设定倾倒或事件堆叠。
+
+篇幅由完整呈现当前场景及其必要叙事节拍所需决定，不设字数、段数或对白比例。该展开的转折与余波充分展开，该压缩的过渡利落带过；不为篇幅填充，也不在第一层反应后仓促停下。
+
+## 收束方式
+
+根据场景自然收束：写到当前动作、对话或余波形成结果和自然接续点；可以留下继续空间，也可以完成当前节拍。不要机械制造悬念，也不要无故跳转时间或场景。
+
+避免作者式总结、意义升华及近期结尾的机械重复。让情绪和主题留在人物行为与后果中。`
+const PREVIOUS_LONG_FORM_CALIBRATION = '写作前简要确认用户当前的意图与参与方式、视角和连续性、主角的需要、压力与重大选择边界、其他角色的动机和知识、本轮应有的进展或回报，以及自然收束位置；检查是否机械重复近期结尾。形成清晰场景后立即写作，不要在正文中展示规划、分析或创作说明。'
+const PREVIOUS_ENDING_IMITATION_GUIDANCE = `## 收束方式
+
+根据长程节奏选择收束方式：可以完成当前动作或小目标，也可以停在决定、关系变化、后果、余波、暂时平静，或已有问题自然延伸的位置。不要为了制造钩子临时追加新秘密、新人物、更大危机或倒计时，也不要连续重复揭秘、反转、突发危险等同类结尾；不要无故跳转时间或场景。
+
+避免作者式总结和意义升华。让情绪和主题留在人物行为与后果中。`
+const PREVIOUS_ENDING_IMITATION_CALIBRATION = '写作前简要确认用户当前的意图与参与方式、视角和连续性、主角的需要、压力与重大选择边界、其他角色的动机和知识、本轮的核心进展、当前需要释放的信息、与其尺度相称的回报，以及符合长程节奏的收束位置；检查是否同时引入过多新内容，或重复近期的兑现和结尾方式。形成清晰场景后立即写作，不要在正文中展示规划、分析或创作说明。'
+const PREVIOUS_VERBOSE_ENDING_GUIDANCE = '承接前文的事实、人物声音和因果，不照搬最近结尾的表达骨架。留意近期是否反复以窗外、天色或风雨等景物、角色提问、沉默或欲言又止、离场动作、突发声响、单句揭示等收尾，或复用相近的观察对象、句法与段落节奏；除非刻意照应能产生新的含义或后果，改用由当前场景自身变化形成的落点，也不要为了求异机械轮换。'
+const PREVIOUS_VERBOSE_ENDING_CALIBRATION = '写作前简要确认用户当前的意图与参与方式、视角和连续性、主角的需要、压力与重大选择边界、其他角色的动机和知识、本轮的核心进展、当前需要释放的信息、与其尺度相称的回报，以及符合长程节奏的收束位置；检查是否同时引入过多新内容，或照搬近期结尾的景物切换、提问、动作、观察对象、句法和段落节奏。形成清晰场景后立即写作，不要在正文中展示规划、分析或创作说明。'
+const PREVIOUS_SINGLE_TURN_LONG_FORM = '将本轮放在长程故事中衡量，以当前场景的核心进展为中心。给读者与其尺度相称的回报，例如行动完成、回答、得失、决定、理解加深、关系变化、情绪余波或暂时平静，而不只为以后铺垫；兑现不必每次依靠揭秘、反转或升级危险。'
+const PREVIOUS_SINGLE_TURN_LENGTH = '篇幅由完整呈现当前场景及其必要叙事节拍所需决定，不设字数、段数或对白比例。该展开的转折与余波充分展开，该压缩的过渡利落带过；不为篇幅填充，也不在第一层反应后仓促停下。'
+const PREVIOUS_SINGLE_TURN_CLOSING = '根据长程节奏选择收束方式：可以完成当前动作或小目标，也可以停在决定、关系变化、后果、余波、暂时平静，或已有问题自然延伸的位置。不要为了制造钩子临时追加新秘密、新人物、更大危机或倒计时，也不要连续重复揭秘、反转、突发危险等同类结尾；不要无故跳转时间或场景。'
+const PREVIOUS_SINGLE_TURN_REPEAT = '承接前文的事实、人物声音和因果，但不要机械复用近期结尾的景物切换、角色提问、动作、句法或段落节奏；除非刻意照应能产生新的含义或后果，结尾应从当前场景自然生长。'
+const PREVIOUS_SINGLE_TURN_SUMMARY = '避免作者式总结、意义升华及近期结尾的机械重复。让情绪和主题留在人物行为与后果中。'
+const PREVIOUS_SINGLE_TURN_CALIBRATION_DESCRIPTION = '写作前检查意图、连续性、人物动机、当轮兑现和停笔位置。'
+const PREVIOUS_SINGLE_TURN_CALIBRATION = '写作前简要确认用户当前的意图与参与方式、视角和连续性、主角的需要、压力与重大选择边界、其他角色的动机和知识、本轮的核心进展、当前需要释放的信息、与其尺度相称的回报，以及符合长程节奏的收束位置；检查是否同时引入过多新内容，或机械复用近期结尾形式。形成清晰场景后立即写作，不要在正文中展示规划、分析或创作说明。'
+const PREVIOUS_SINGLE_TURN_FORMAT = '只输出故事正文，并使用当前对话所用的语言。篇幅不预设字数、段数或对白比例，以完整呈现当前场景及其必要叙事节拍为准；不要输出状态、规划、分析或创作说明。'
+const PREVIOUS_HYBRID_WRITING_GUIDANCE = `## 沉浸与连续性
+
+只揭示当前视角能够感知、回忆或合理推断的内容；如启用“配角心声”，按该栏位短暂例外。把对话历史视为已经发生的事件。选择、伤势、承诺、误会、损失和关系变化都会留下后果，已经形成的事实优先于较早的起始情境。新的惊喜应从既有经历中自然生长；重要结果来自已经建立的能力、信息、关系、限制与代价，而非临时便利。
+
+## 人物与关系
+
+让重要角色拥有可辨的声音，以及各自的经历、欲望、知识、秘密、偏见、局限和生活。他们可以误解、拒绝、隐瞒、犹豫、抢先行动，或追求与主角冲突的利益。此前的互动和角色受到的对待要真实影响此刻的回应；人物变化来自累积经历和当下压力，不为配合剧情突然转向。
+
+不要急于解释每个动机。保留试探、自我欺骗、误解、犹豫与秘密，直到事件真正改变它们。信任、和解、恐惧、亲密和敌意都需要过程，一次交流不能抹去共同历史。
+
+如实呈现恶意与伤害。魅力、地位、亲密关系或可理解的动机不能把冷漠、控制、欺骗、胁迫、伤害或逃避改写成深情、保护或不得已；动机可以复杂，但行为性质、受害者体验和既成后果仍然存在。无需为说教立即惩罚恶人；对手可以按自身逻辑造成损害并达成阶段性目标。
+
+## 推进与兑现
+
+从用户最新输入和当前压力继续，让角色的欲求、阻力、判断、对白、行动和后果自然咬合。描写、对白、行动与内心共同服务场景，不按固定顺序或比例轮换。安静的观察、停顿和过渡也可以推进关系、理解或情绪，不必每轮制造事件或反转。
+
+本轮应给读者可感的进展或回报，如一个回答、发现、得失、选择、关系变化、亲近、恐惧或代价，而不只为以后铺垫。它可以细微，但应改变人物接下来如何理解、选择或行动。
+
+## 收束与篇幅
+
+写到当前动作、交流或余波形成结果，并出现自然接续点；可以留下继续空间，也可以完成当前节拍。不要无故跳转时间或场景，也不要机械制造悬念。
+
+篇幅由完整呈现当前节拍所需决定，不设字数、段数或对白比例。该展开的转折与余波充分展开，该压缩的过渡利落带过；不为篇幅填充，也不在第一层反应后仓促停下。避免助手式开场、剧情复述、集中倾倒设定、作者式总结、意义升华和近期结尾的机械重复。`
+const PREVIOUS_CONCISE_WRITING_GUIDANCE = `## 推进与因果
+
+把对话历史视为已经发生的事实，从用户最新输入和场景既有压力继续。抓住主角此刻的需要与阻力，让观察、判断、对白、行动和后果形成连续因果；顺序可以变化，但本轮应使信息、决定、关系、风险、资源或时间发生真实变化。安静场景可以细微推进，不必强造事件或反转。
+
+重要结果应来自已经建立的能力、信息、关系、限制与代价。角色按各自的动机和知识行动，可以试探、误解、拒绝、隐瞒或抢先；此前的伤势、承诺、损失与相处方式继续影响他们。
+
+## 人物与信息
+
+让重要角色的声音、界限和选择可辨。对白既是交流，也可以是试探、遮掩、争取或回避；内心与叙述只补充会改变话意、判断或下一步的信息。背景和设定在影响当下选择时进入场景，随观察、回忆、冲突或后果交代，不集中说明。
+
+复杂动机不能抹掉行为与后果。冷漠、控制、欺骗、胁迫和伤害按事实呈现，不因魅力、地位或亲密关系被美化，也不必为了说教立刻安排惩罚。
+
+## 兑现与收束
+
+本轮既承接后续，也给读者当下可感的回报，例如回答、发现、得失、决定、关系变化、亲近、恐惧或代价。篇幅由完成这一叙事节拍所需决定，不设字数、段数或对白比例：写够完成，不为篇幅填充，也不在第一层反应后仓促停下。结果或余波成立后，在自然接续点收束，不用作者式总结或机械悬念代替结尾。`
+
+function previousSingleTurnArcPreset() {
   const preset = structuredClone(DEFAULT_PRESET)
-  replaceFieldText(preset, '任务描述',
-    '主角是故事当前聚焦的核心角色。根据当前语境判断用户是在扮演还是导演主角。',
-    '主角是故事当前聚焦的核心角色。用户代入主角时，不要替其决定同意、承诺、关系、目标等重大或不可逆选择；可以依据既有人设、当前情境和用户意图，补写合理的简短对白、即时反应、日常动作和已开始行动的自然延续。用户从故事外导演时，按其明确指示描写主角，不擅自增加重大决定。')
-  replaceFieldText(preset, '写作指导',
-    '连续性：把对话历史视为已经发生的事件。选择、伤势、承诺、误会和损失都会留下后果；惊喜与变化必须从这些经历中自然生长。\n\n角色自主：',
-    '连续性：把对话历史视为已经发生的事件。选择、伤势、承诺、误会和损失都会留下后果；惊喜与变化必须从这些经历中自然生长。\n\n用户主权：按用户当前参与方式行动；可以补写合乎人设、情境与用户意图的对白和动作，但重大或不可逆决定留给用户。\n\n角色自主：')
-  replaceFieldText(preset, '写作指导',
-    '故事推进：根据场景需要，通过反应、后果、发现、压力、关系变化或其他角色的行动推动故事。安静的观察、停顿和过渡也可以成立，不必每轮制造事件或反转。',
-    '故事推进：每次回复都应通过反应、后果、发现、压力、关系变化或其他角色的行动，使场景发生有意义的变化。安静而细微的变化同样有效；如果当前场景已有足够张力，不要为推进而强行制造反转或打断。')
-  replaceFieldText(preset, '写作指导',
-    '根据场景自然收束：可以留下接续点，也可以完成当前动作、对话或余波。不要机械制造悬念，也不要无故跳转时间或场景。\n\n避免作者式总结、意义升华及近期结尾的机械重复。让情绪和主题留在人物行为与后果中。',
-    '在场景仍有行动惯性、用户能自然介入的位置结束。主角可以有符合既有意图的短句、即时反应或日常动作，但不要替用户作出重大决定，也不要擅自跳转时间或场景。以反应、局势变化、压力或进行中的动作留下接续点，不写尽余波。\n\n避免作者式总结、意义升华及近期结尾的机械重复。情绪和主题留在人物行为与后果中；结尾既要保持因果连续，也要为用户保留多种合理回应空间。')
-  preset.fields.find(field => field.name === '思维链指导').content = '使用正文语言在内部简要检查用户最新意图、连续性、主要角色动机、场景变化和自然停笔位置。确认补写的主角对白、反应和行动合乎人设、情境与用户意图，且不代替重大决定。对照当前可见对话历史中的近期结尾，检查当前计划是否重复无法产生新作用的形式或内容。不要复述上下文或探索无关分支，形成清晰的下一段场景后立即开始写作。不要在正文中展示规划、分析或创作说明。'
+  const writingGuidance = preset.fields.find(field => field.name === '写作指导')
+  const replacements = [
+    ['将本轮放在长程故事中衡量。一个场景可以跨越多轮；本轮只需完成当前最必要的叙事节拍，使理解、关系、压力、行动条件或后果至少发生一项可感变化。不必把铺垫、转折、决定、兑现和余波全部压进一次回复，也不要用过渡、停顿或悬而不决代替推进。回报可以逐步形成，但时机成熟时应当兑现，不要反复拖延。', PREVIOUS_SINGLE_TURN_LONG_FORM],
+    ['篇幅由完整呈现本轮必要叙事节拍所需决定，不设字数、段数或对白比例。该展开的转折与余波充分展开，该压缩的过渡利落带过；不为篇幅填充，不在第一层反应后仓促停下，也不为一次写完整个场景而过度推进。', PREVIOUS_SINGLE_TURN_LENGTH],
+    ['根据长程节奏选择收束方式：可以完成当前动作或小目标，也可以在本轮已经产生可感变化、当前态势清楚时停在过程之中，或落在决定、关系变化、后果、余波、暂时平静及已有问题自然延伸的位置。停在过程中时，不要切断尚未形成可读进展的动作、交流或情绪。不要为了制造钩子临时追加新秘密、新人物、更大危机或倒计时，也不要连续重复揭秘、反转、突发危险等同类结尾；不要无故跳转时间或场景。', PREVIOUS_SINGLE_TURN_CLOSING],
+    ['承接前文的事实、人物声音和因果，但不要机械复用近期回复的推进路径、转折位置或收束功能；除非刻意照应能产生新的含义或后果，让本轮从当前场景自然展开和停下。', PREVIOUS_SINGLE_TURN_REPEAT],
+    ['避免作者式总结和意义升华。让情绪和主题留在人物行为与后果中。', PREVIOUS_SINGLE_TURN_SUMMARY],
+  ]
+  for (const [current, previous] of replacements) {
+    const content = writingGuidance.content.replace(current, previous)
+    assert.notEqual(content, writingGuidance.content)
+    writingGuidance.content = content
+  }
+  const calibration = preset.fields.find(field => field.name === '写前校准')
+  calibration.description = PREVIOUS_SINGLE_TURN_CALIBRATION_DESCRIPTION
+  calibration.content = PREVIOUS_SINGLE_TURN_CALIBRATION
+  preset.fields.find(field => field.name === '格式要求').content = PREVIOUS_SINGLE_TURN_FORMAT
   return preset
 }
 
-function replaceFieldText(preset, name, current, previous) {
-  const field = preset.fields.find(item => item.name === name)
-  assert.ok(field)
-  const replaced = field.content.replace(current, previous)
-  assert.notEqual(replaced, field.content)
-  field.content = replaced
+function previousVerboseEndingPreset() {
+  const preset = previousSingleTurnArcPreset()
+  const writingGuidance = preset.fields.find(field => field.name === '写作指导')
+  const content = writingGuidance.content.replace(
+    '承接前文的事实、人物声音和因果，但不要机械复用近期结尾的景物切换、角色提问、动作、句法或段落节奏；除非刻意照应能产生新的含义或后果，结尾应从当前场景自然生长。',
+    PREVIOUS_VERBOSE_ENDING_GUIDANCE,
+  )
+  assert.notEqual(content, writingGuidance.content)
+  writingGuidance.content = content
+  preset.fields.find(field => field.name === '写前校准').content = PREVIOUS_VERBOSE_ENDING_CALIBRATION
+  return preset
+}
+
+function previousEndingImitationPreset() {
+  const preset = previousSingleTurnArcPreset()
+  const writingGuidance = preset.fields.find(field => field.name === '写作指导')
+  const content = writingGuidance.content.replace(
+    /## 收束方式[\s\S]*?\n\n## 避免/,
+    `${PREVIOUS_ENDING_IMITATION_GUIDANCE}\n\n## 避免`,
+  )
+  assert.notEqual(content, writingGuidance.content)
+  writingGuidance.content = content
+  preset.fields.find(field => field.name === '写前校准').content = PREVIOUS_ENDING_IMITATION_CALIBRATION
+  return preset
+}
+
+function previousLongFormPreset() {
+  const preset = previousSingleTurnArcPreset()
+  const writingGuidance = preset.fields.find(field => field.name === '写作指导')
+  const content = writingGuidance.content.replace(
+    /## 长程推进与篇幅[\s\S]*?\n\n## 避免/,
+    `${PREVIOUS_LONG_FORM_GUIDANCE_TAIL}\n\n## 避免`,
+  )
+  assert.notEqual(content, writingGuidance.content)
+  writingGuidance.content = content
+  preset.fields.find(field => field.name === '写前校准').content = PREVIOUS_LONG_FORM_CALIBRATION
+  return preset
+}
+
+function previousCompletePreset() {
+  const preset = structuredClone(DEFAULT_PRESET)
+  const task = preset.fields.find(field => field.name === '任务描述')
+  const content = task.content.replace('继续写故事正文；', '写出故事接下来鲜活发生的一段；')
+  assert.notEqual(content, task.content)
+  task.content = content
+  const writingGuidance = preset.fields.find(field => field.name === '写作指导')
+  writingGuidance.content = PREVIOUS_HYBRID_WRITING_GUIDANCE
+  preset.fields.find(field => field.name === '配角心声').content = PREVIOUS_SUPPORTING_THOUGHT_GUIDANCE
+  const calibration = preset.fields.find(field => field.name === '写前校准')
+  calibration.description = PREVIOUS_CALIBRATION_DESCRIPTION
+  calibration.content = PREVIOUS_CALIBRATION
+  preset.fields.find(field => field.name === '格式要求').content = PREVIOUS_FORMAT
+  return preset
+}
+
+function previousConciseWritingPreset() {
+  const preset = previousCompletePreset()
+  const writingGuidance = preset.fields.find(field => field.name === '写作指导')
+  writingGuidance.description = '约定因果推进、角色自主、信息交代和自然收束。'
+  writingGuidance.content = PREVIOUS_CONCISE_WRITING_GUIDANCE
+  return preset
+}
+
+function previousProtagonistControlPreset() {
+  const preset = previousConciseWritingPreset()
+  const task = preset.fields.find(field => field.name === '任务描述')
+  const content = task.content
+    .replace(/## 主角\n\n[\s\S]*?\n\n## 其他角色/, `## 主角\n\n${PREVIOUS_PROTAGONIST_GUIDANCE}\n\n## 其他角色`)
+    .replace(/## 其他角色\n\n[\s\S]*?\n\n## 任务/, `## 其他角色\n\n${PREVIOUS_SUPPORTING_CHARACTER_GUIDANCE}\n\n## 任务`)
+  assert.notEqual(content, task.content)
+  task.content = content
+  return preset
+}
+
+function previousDefaultPreset() {
+  const preset = previousProtagonistControlPreset()
+  preset.fields = preset.fields.filter(field => field.name !== '配角心声')
+  const writingGuidance = preset.fields.find(field => field.name === '写作指导')
+  writingGuidance.description = '约定沉浸、连续性、角色自主、人物塑造和自然收束。'
+  writingGuidance.content = `## 核心原则
+
+沉浸：只揭示当前视角能够感知或合理推断的内容。
+
+连续性：把对话历史视为已经发生的事件。选择、伤势、承诺、误会和损失都会留下后果；惊喜与变化必须从这些经历中自然生长。
+
+角色自主：其他角色拥有自己的动机、知识、局限、偏见，以及主角视野之外的生活。他们可以误解、拒绝、隐瞒、犹豫、抢先行动，或追求与主角冲突的利益。
+
+故事推进：根据场景需要，通过反应、后果、发现、压力、关系变化或其他角色的行动推动故事。安静的观察、停顿和过渡也可以成立，不必每轮制造事件或反转。
+
+## 人物塑造
+
+让重要角色拥有彼此可辨的声音，并对信任、风险、诚实、亲密、愤怒和退让有不同界限。让此前发生的互动以及角色受到的对待，真实影响他们此刻的回应。人物变化应来自累积的经历和当下压力，而不是为了配合剧情突然转向。
+
+不要急于解释每个动机。保留误解、试探、自我欺骗、犹豫和秘密，直到故事真正给出改变它们的理由。关系、信任、和解、恐惧与亲密都需要过程；一次交流不能抹去共同的历史。
+
+如实呈现恶意与伤害。不要因为一个角色富有魅力、地位强大、与主角关系亲密或拥有可以理解的动机，就把冷漠、控制、欺骗、胁迫、伤害或逃避美化成深情、保护或不得已。动机可以复杂，但不能抹掉行为的性质、受害者的体验和已经造成的后果；也不必安排恶人立刻受罚，只需让人物与世界依照事实作出可信反应。对手和反派可以按照自己的逻辑主动行动、造成损害，并达成阶段性目标。
+
+## 收束方式
+
+根据场景自然收束：可以留下接续点，也可以完成当前动作、对话或余波。不要机械制造悬念，也不要无故跳转时间或场景。
+
+避免作者式总结、意义升华及近期结尾的机械重复。让情绪和主题留在人物行为与后果中。
+
+## 避免
+
+- 助手式开场、确认、道歉、选项列表、场景分析或暴露系统规则。
+- 剧情复述、重复已经明确的细节或集中倾倒设定。
+- 围着主角旋转、只负责提供情绪服务，或以数据分析口吻说话的角色。`
+  const calibration = preset.fields.find(field => field.name === '写前校准')
+  calibration.name = '思维链指导'
+  calibration.description = '写作前简要检查关键约束。'
+  calibration.content = '写作前简要检查用户意图、连续性、角色动机、场景变化和收束位置，并避免重复近期结尾。确定下一段后立即写作，不要在正文中展示规划、分析或创作说明。'
+  preset.fields.find(field => field.name === '格式要求').content = '输出故事正文，并使用当前对话所用的语言。不要输出状态、规划、分析或创作说明。'
+  return preset
 }
 
 test('creates a blank preset or the managed example preset', async () => {
@@ -45,7 +233,7 @@ test('creates a blank preset or the managed example preset', async () => {
     const created = await presets.create(DEFAULT_PRESET)
     const initial = await presets.get(created.id)
     assert.deepEqual(initial.fields.map(field => [field.name, field.position, field.sectionTag]), [
-      ['声明', 'top', true], ['任务描述', 'top', true], ['写作指导', 'top', true], ['思维链指导', 'bottom', true], ['格式要求', 'bottom', true],
+      ['声明', 'top', true], ['任务描述', 'top', true], ['写作指导', 'top', true], ['配角心声', 'top', true], ['写前校准', 'bottom', true], ['格式要求', 'bottom', true],
     ])
     assert.ok(initial.fields.every(field => field.content.length > 0))
     assert.equal(DEFAULT_PRESET.name, '示例预设')
@@ -56,40 +244,94 @@ test('creates a blank preset or the managed example preset', async () => {
     assert.match(taskDescription, /可以在故事中扮演主角，也可以从故事外导演/)
     assert.match(taskDescription, /主角是故事当前聚焦的核心角色/)
     assert.match(taskDescription, /根据当前语境判断用户是在扮演还是导演主角/)
+    assert.match(taskDescription, /可以主动写出主角/)
+    assert.match(taskDescription, /对白、即时反应、日常行为及行动的自然延续/)
+    assert.match(taskDescription, /使场景完整推进/)
+    assert.match(taskDescription, /重大或不可逆选择由用户决定/)
+    assert.match(taskDescription, /用户已明确表达或从故事外导演这些选择时，写出相应过程与后果/)
     assert.doesNotMatch(taskDescription, /只能完成用户最新输入已经明确开始的直接动作/)
-    assert.doesNotMatch(taskDescription, /同意|重大或不可逆|补写合理的简短对白/)
-    assert.match(taskDescription, /没有被用户当前输入直接扮演或导演的角色由你表现/)
-    assert.match(taskDescription, /写出故事接下来鲜活发生的一段/)
+    assert.doesNotMatch(taskDescription, /补写合理的简短对白/)
+    assert.match(taskDescription, /其他角色由你主动表现，包括其对白、行动与反应/)
+    assert.match(taskDescription, /用户当前扮演或明确导演其中某个角色时/)
+    assert.match(taskDescription, /自然补全执行过程、互动与后果/)
+    assert.match(taskDescription, /继续写故事正文/)
+    assert.doesNotMatch(taskDescription, /鲜活发生的一段/)
     assert.doesNotMatch(taskDescription, /询问故事中的事物|不回答关于故事的问题|只输出故事本身/)
     assert.doesNotMatch(taskDescription, /「我的人设」|「角色卡」|「世界设定」|「扮演指导」|「重要规则」|「会话变量」|「对话历史」|「当前输入」/)
     const writingGuidance = initial.fields.find(field => field.name === '写作指导').content
-    assert.match(writingGuidance, /其他角色拥有自己的动机、知识、局限、偏见/)
-    assert.doesNotMatch(writingGuidance, /用户主权|重大或不可逆|替用户作出重大决定/)
-    assert.match(writingGuidance, /人物变化应来自累积的经历和当下压力，而不是为了配合剧情突然转向/)
-    assert.match(writingGuidance, /不要因为一个角色富有魅力、地位强大、与主角关系亲密或拥有可以理解的动机/)
-    assert.match(writingGuidance, /不能抹掉行为的性质、受害者的体验和已经造成的后果/)
-    assert.match(writingGuidance, /也不必安排恶人立刻受罚/)
+    assert.match(writingGuidance, /只揭示当前视角能够感知、回忆或合理推断的内容/)
+    assert.match(writingGuidance, /选择、伤势、承诺、误会、损失和关系变化都会留下后果/)
+    assert.match(writingGuidance, /重要结果应来自已经建立的能力、信息、关系、限制与代价/)
+    assert.match(writingGuidance, /其他角色拥有自己的动机、知识、局限、偏见，以及主角视野之外的生活/)
+    assert.match(writingGuidance, /误解、拒绝、隐瞒、犹豫、抢先行动/)
+    assert.match(writingGuidance, /描写、对白、行动与内心共同承接这一过程/)
+    assert.match(writingGuidance, /不按固定顺序或比例轮换/)
     assert.match(writingGuidance, /安静的观察、停顿和过渡也可以成立，不必每轮制造事件或反转/)
-    assert.match(writingGuidance, /可以留下接续点，也可以完成当前动作、对话或余波/)
-    assert.match(writingGuidance, /不要机械制造悬念，也不要无故跳转时间或场景/)
-    assert.match(writingGuidance, /避免作者式总结、意义升华及近期结尾的机械重复/)
-    assert.match(writingGuidance, /情绪和主题留在人物行为与后果中/)
-    assert.doesNotMatch(writingGuidance, /不写尽余波|每次回复都应|保持因果连续，也要为用户保留多种合理回应空间/)
+    assert.doesNotMatch(writingGuidance, /用户主权|重大或不可逆|替用户作出重大决定/)
+    assert.match(writingGuidance, /重要角色拥有彼此可辨的声音/)
+    assert.match(writingGuidance, /此前发生的互动以及角色受到的对待，真实影响他们此刻的回应/)
+    assert.match(writingGuidance, /人物变化应来自累积的经历和当下压力/)
+    assert.match(writingGuidance, /保留误解、试探、自我欺骗、犹豫和秘密/)
+    assert.match(writingGuidance, /一次交流不能抹去共同的历史/)
+    assert.match(writingGuidance, /不能抹掉行为的性质、受害者的体验和已经造成的后果/)
+    assert.match(writingGuidance, /对手和反派可以按照自己的逻辑主动行动、造成损害，并达成阶段性目标/)
+    assert.match(writingGuidance, /## 长程推进与篇幅/)
+    assert.match(writingGuidance, /一个场景可以跨越多轮/)
+    assert.match(writingGuidance, /本轮只需完成当前最必要的叙事节拍/)
+    assert.match(writingGuidance, /理解、关系、压力、行动条件或后果至少发生一项可感变化/)
+    assert.match(writingGuidance, /不必把铺垫、转折、决定、兑现和余波全部压进一次回复/)
+    assert.match(writingGuidance, /不要用过渡、停顿或悬而不决代替推进/)
+    assert.match(writingGuidance, /回报可以逐步形成，但时机成熟时应当兑现/)
+    assert.match(writingGuidance, /信息随人物接触和因果需要逐步释放/)
+    assert.match(writingGuidance, /只引入当前场景能够消化，并会影响理解、选择或后果的内容/)
+    assert.match(writingGuidance, /不为显得充实同时开启过多新的谜团、规则、人物、支线或危机/)
+    assert.match(writingGuidance, /不急于解释尚可自然展开的内容/)
+    assert.match(writingGuidance, /篇幅由完整呈现本轮必要叙事节拍所需决定/)
+    assert.match(writingGuidance, /不设字数、段数或对白比例/)
+    assert.match(writingGuidance, /不在第一层反应后仓促停下/)
+    assert.match(writingGuidance, /不为一次写完整个场景而过度推进/)
+    assert.match(writingGuidance, /根据长程节奏选择收束方式/)
+    assert.match(writingGuidance, /完成当前动作或小目标/)
+    assert.match(writingGuidance, /已经产生可感变化、当前态势清楚时停在过程之中/)
+    assert.match(writingGuidance, /不要切断尚未形成可读进展的动作、交流或情绪/)
+    assert.match(writingGuidance, /不要为了制造钩子临时追加新秘密、新人物、更大危机或倒计时/)
+    assert.match(writingGuidance, /不要连续重复揭秘、反转、突发危险等同类结尾/)
+    assert.match(writingGuidance, /不要无故跳转时间或场景/)
+    assert.match(writingGuidance, /不要机械复用近期回复的推进路径、转折位置或收束功能/)
+    assert.match(writingGuidance, /除非刻意照应能产生新的含义或后果/)
+    assert.match(writingGuidance, /让本轮从当前场景自然展开和停下/)
+    assert.match(writingGuidance, /助手式开场、确认、道歉、选项列表/)
     assert.match(writingGuidance, /围着主角旋转、只负责提供情绪服务/)
     assert.doesNotMatch(writingGuidance, /第三人称叙事|对白使用双引号|先让意义通过对白|成段倾倒设定|套话式情绪标签|模板化网络表达/)
-    const chainOfThought = initial.fields.find(field => field.name === '思维链指导').content
-    assert.match(chainOfThought, /写作前简要检查用户意图、连续性、角色动机、场景变化和收束位置/)
-    assert.match(chainOfThought, /避免重复近期结尾/)
-    assert.doesNotMatch(chainOfThought, /主角对白|重大决定/)
-    assert.doesNotMatch(chainOfThought, /\d+\s*字|字数|输出空间|输出预算/)
+    const supportingThought = initial.fields.find(field => field.name === '配角心声').content
+    assert.match(supportingThought, /没有其他明确视角要求时，主叙事以主角为知识锚点/)
+    assert.match(supportingThought, /对白只是人物发言，不等于切换视角/)
+    assert.match(supportingThought, /关键反差、补足因果、深化人物或建立悬念/)
+    assert.match(supportingThought, /动作、停顿、神态或话语自然切入/)
+    assert.match(supportingThought, /未说出口的内容不会自动成为主角所知/)
+    assert.match(supportingThought, /同一次切入只进入一人/)
+    assert.match(supportingThought, /避免在多个配角之间连续跳转/)
+    assert.match(supportingThought, /环境变化或主角感知自然退回主角锚点/)
+    assert.match(supportingThought, /没有明确叙事收益时/)
+    assert.doesNotMatch(supportingThought, /\d+\s*字|段|比例/)
+    const calibration = initial.fields.find(field => field.name === '写前校准').content
+    assert.match(calibration, /用户意图与参与方式、视角和连续性/)
+    assert.match(calibration, /角色动机与选择边界/)
+    assert.match(calibration, /本轮在场景中的位置、必要变化和停笔点/)
+    assert.match(calibration, /保留应延后的内容/)
+    assert.match(calibration, /避免同时引入过多新内容或复用近期结构/)
+    assert.match(calibration, /既不强求闭合，也不以停顿代替推进/)
+    assert.doesNotMatch(calibration, /\d+\s*字|字数|输出空间|输出预算/)
     const outputRequirements = initial.fields.find(field => field.name === '格式要求').content
-    assert.match(outputRequirements, /输出故事正文/)
+    assert.match(outputRequirements, /只输出故事正文/)
+    assert.match(outputRequirements, /以完整呈现本轮必要叙事节拍为准/)
+    assert.match(outputRequirements, /不预设字数、段数或对白比例/)
     assert.match(outputRequirements, /不要输出状态、规划、分析或创作说明/)
     assert.doesNotMatch(outputRequirements, /状态栏|变量更新|结构化内容/)
-    const moved = [initial.fields[2], initial.fields[0], initial.fields[1], initial.fields[4], initial.fields[3]]
+    const moved = [initial.fields[2], initial.fields[0], initial.fields[3], initial.fields[1], initial.fields[5], initial.fields[4]]
       .map((field, index) => ({ ...field, content: index === 0 ? '使用近景。' : field.content }))
     const updated = await presets.update(created.id, { name: initial.name, description: '', fields: moved }, initial.revision)
-    assert.deepEqual(updated.fields.map(field => field.name), ['写作指导', '声明', '任务描述', '格式要求', '思维链指导'])
+    assert.deepEqual(updated.fields.map(field => field.name), ['写作指导', '声明', '配角心声', '任务描述', '格式要求', '写前校准'])
     await assert.rejects(presets.update(created.id, { name: '冲突', fields: moved }, 1), error => error.code === 'REVISION_CONFLICT')
   } finally {
     await ctx.fiber.dispose()
@@ -120,7 +362,43 @@ test('seeds one managed default and preserves an explicit default across service
   }
 })
 
-test('migrates the untouched previous default without replacing field identities or later user edits', async () => {
+test('migrates each recent managed preset without replacing field identities', async () => {
+  const stages = [
+    ['before-multi-turn-balance', previousSingleTurnArcPreset],
+    ['before-ending-rule-trim', previousVerboseEndingPreset],
+    ['before-ending-imitation-check', previousEndingImitationPreset],
+    ['before-long-form-pacing', previousLongFormPreset],
+    ['complete', previousCompletePreset],
+    ['concise-writing', previousConciseWritingPreset],
+    ['before-protagonist-control', previousProtagonistControlPreset],
+  ]
+  for (const [label, buildPrevious] of stages) {
+    const root = await mkdtemp(join(tmpdir(), `rp-preset-${label}-migrate-`))
+    const ctx = new Context()
+    const presets = new RpPresets(ctx, configFor(root))
+    try {
+      const previous = buildPrevious()
+      previous.fields.find(field => field.name === '任务描述').sectionTag = false
+      const created = await presets.create(previous)
+      const before = await presets.get(created.id)
+      const migrated = await presets.ensureDefault()
+
+      assert.equal(migrated.id, before.id)
+      assert.equal(migrated.revision, before.revision + 1, label)
+      assert.deepEqual(migrated.fields.map(field => field.id), before.fields.map(field => field.id))
+      assert.deepEqual(migrated.fields.map(field => field.sectionTag), before.fields.map(field => field.sectionTag))
+      assert.deepEqual(
+        migrated.fields.map(field => [field.name, field.description, field.content, field.position]),
+        DEFAULT_PRESET.fields.map(field => [field.name, field.description, field.content, field.position]),
+      )
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  }
+})
+
+test('migrates the earlier five-field default without replacing field identities or later user edits', async () => {
   const root = await mkdtemp(join(tmpdir(), 'rp-preset-migrate-'))
   const ctx = new Context()
   const presets = new RpPresets(ctx, configFor(root))
@@ -132,8 +410,15 @@ test('migrates the untouched previous default without replacing field identities
     const migrated = await presets.ensureDefault()
     assert.equal(migrated.id, before.id)
     assert.equal(migrated.revision, before.revision + 1)
-    assert.deepEqual(migrated.fields.map(field => field.id), before.fields.map(field => field.id))
-    assert.deepEqual(migrated.fields.map(field => field.sectionTag), before.fields.map(field => field.sectionTag))
+    const beforeByName = new Map(before.fields.map(field => [field.name, field]))
+    for (const field of migrated.fields.filter(field => field.name !== '配角心声')) {
+      const previousName = field.name === '写前校准' ? '思维链指导' : field.name
+      assert.equal(field.id, beforeByName.get(previousName).id)
+      assert.equal(field.sectionTag, beforeByName.get(previousName).sectionTag)
+    }
+    const supportingThought = migrated.fields.find(field => field.name === '配角心声')
+    assert.equal(before.fields.some(field => field.id === supportingThought.id), false)
+    assert.equal(supportingThought.sectionTag, true)
     assert.deepEqual(
       migrated.fields.map(field => [field.name, field.description, field.content, field.position]),
       DEFAULT_PRESET.fields.map(field => [field.name, field.description, field.content, field.position]),
@@ -409,7 +694,7 @@ test('resolves a Session binding without inspecting preset fields', async () => 
 test('preset editor opens one blank creation flow without client-side fixed fields', async () => {
   const client = await readFile(new URL('../src/client.js', import.meta.url), 'utf8')
   const styles = await readFile(new URL('../src/client.module.css', import.meta.url), 'utf8')
-  for (const label of ['声明', '任务描述', '写作指导', '思维链指导', '格式要求']) assert.doesNotMatch(client, new RegExp(label))
+  for (const label of ['声明', '任务描述', '写作指导', '配角心声', '写前校准', '思维链指导', '格式要求']) assert.doesNotMatch(client, new RegExp(label))
   assert.doesNotMatch(client, /DEFAULT_FIELDS/)
   assert.doesNotMatch(client, /rpc\(connection, 'templates', \{\}\)/)
   assert.doesNotMatch(client, /function PresetCreateChooser|createChooser|templateCard|空白预设/)

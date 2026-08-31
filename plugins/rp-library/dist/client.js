@@ -10108,6 +10108,66 @@ get: (_target, key) => {
 			return useConstant(createDragControls);
 		}
 		//#endregion
+		//#region ../../node_modules/.pnpm/framer-motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/framer-motion/dist/es/render/dom/viewport/index.mjs
+		const thresholds = {
+			some: 0,
+			all: 1
+		};
+		function inView(elementOrSelector, onStart, { root, margin: rootMargin, amount = "some" } = {}) {
+			const elements = resolveElements(elementOrSelector);
+			const activeIntersections = /* @__PURE__ */ new WeakMap();
+			const onIntersectionChange = (entries) => {
+				entries.forEach((entry) => {
+					const onEnd = activeIntersections.get(entry.target);
+					/**
+					* If there's no change to the intersection, we don't need to
+					* do anything here.
+					*/
+					if (entry.isIntersecting === Boolean(onEnd)) return;
+					if (entry.isIntersecting) {
+						const newOnEnd = onStart(entry.target, entry);
+						if (typeof newOnEnd === "function") activeIntersections.set(entry.target, newOnEnd);
+						else observer.unobserve(entry.target);
+					} else if (typeof onEnd === "function") {
+						onEnd(entry);
+						activeIntersections.delete(entry.target);
+					}
+				});
+			};
+			const observer = new IntersectionObserver(onIntersectionChange, {
+				root,
+				rootMargin,
+				threshold: typeof amount === "number" ? amount : thresholds[amount]
+			});
+			elements.forEach((element) => observer.observe(element));
+			return () => observer.disconnect();
+		}
+		//#endregion
+		//#region ../../node_modules/.pnpm/framer-motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/framer-motion/dist/es/utils/use-in-view.mjs
+		function useInView(ref, { root, margin, amount, once = false, initial = false } = {}) {
+			const [isInView, setInView] = (0, react.useState)(initial);
+			(0, react.useEffect)(() => {
+				if (!ref.current || once && isInView) return;
+				const onEnter = () => {
+					setInView(true);
+					return once ? void 0 : () => setInView(false);
+				};
+				const options = {
+					root: root && root.current || void 0,
+					margin,
+					amount
+				};
+				return inView(ref.current, onEnter, options);
+			}, [
+				root,
+				ref,
+				margin,
+				once,
+				amount
+			]);
+			return isInView;
+		}
+		//#endregion
 		//#region ../../node_modules/.pnpm/framer-motion@12.43.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/framer-motion/dist/es/context/ReorderContext.mjs
 		const ReorderContext = (0, react.createContext)(null);
 		//#endregion
@@ -12731,6 +12791,9 @@ get: (_target, key) => {
 		const EMPTY_RESOURCE_SELECTION = "__rp-empty-resource-selection__";
 		const FINISH_RESOURCE_SELECTION = "__rp-finish-resource-selection__";
 		const STATE_ACTIVITY_PROJECTION_KEY = "rp/state/activity";
+		const RESOURCE_REQUEST_CACHE_LIMIT = 32;
+		const CHARACTER_AVATAR_CACHE_LIMIT = 16;
+		const characterAvatarRequests = /* @__PURE__ */ new WeakMap();
 		function apply(ctx) {
 			ctx.effect(ensureStyles);
 			ctx.uiConversation.events.register(roleplayRunMarkerDefinition);
@@ -13267,6 +13330,8 @@ get: (_target, key) => {
 			const [reloadKey, setReloadKey] = (0, react.useState)(0);
 			const [pendingRevision, setPendingRevision] = (0, react.useState)(null);
 			const defaultsApplied = (0, react.useRef)(false);
+			const listRequests = (0, react.useRef)(/* @__PURE__ */ new Map());
+			const detailRequests = (0, react.useRef)(/* @__PURE__ */ new Map());
 			const dialogRef = useWorkbenchModal(open);
 			(0, react.useEffect)(() => {
 				if (!open) return;
@@ -13328,28 +13393,42 @@ get: (_target, key) => {
 				profile?.revision
 			]);
 			(0, react.useEffect)(() => {
+				if (!open) return;
+				listRequests.current.clear();
+				detailRequests.current.clear();
+			}, [
+				connection,
+				open,
+				reloadKey
+			]);
+			(0, react.useEffect)(() => {
 				if (!open || !guided || capabilities === null) return;
+				let live = true;
 				const timer = setTimeout(() => {
 					loadLists();
 				}, 180);
-				return () => clearTimeout(timer);
+				return () => {
+					live = false;
+					clearTimeout(timer);
+				};
 				async function loadLists() {
 					setLoading(true);
 					setLoadError(null);
 					try {
 						const [characters, lorebooks, personas, presets, writingStyles] = await Promise.all([
-							capabilities.characters ? rpc(connection, "characters/list", {
+							capabilities.characters ? cachedListRequest(listRequests.current, connection, "characters/list", {
 								query: tab === "characters" ? query : "",
 								limit: 100
 							}) : Promise.resolve({ items: [] }),
-							capabilities.lorebooks ? rpc(connection, "lorebooks/list", {
+							capabilities.lorebooks ? cachedListRequest(listRequests.current, connection, "lorebooks/list", {
 								query: tab === "lorebooks" ? query : "",
 								limit: 100
 							}) : Promise.resolve({ items: [] }),
-							capabilities.personas ? rpc(connection, "personas/list", { limit: 100 }) : Promise.resolve({ items: [] }),
-							capabilities.presets ? rpc(connection, "presets/list", { limit: 100 }) : Promise.resolve({ items: [] }),
-							capabilities.writingStyles ? rpc(connection, "writing-styles/list", { limit: 100 }) : Promise.resolve({ items: [] })
+							capabilities.personas ? cachedListRequest(listRequests.current, connection, "personas/list", { limit: 100 }) : Promise.resolve({ items: [] }),
+							capabilities.presets ? cachedListRequest(listRequests.current, connection, "presets/list", { limit: 100 }) : Promise.resolve({ items: [] }),
+							capabilities.writingStyles ? cachedListRequest(listRequests.current, connection, "writing-styles/list", { limit: 100 }) : Promise.resolve({ items: [] })
 						]);
+						if (!live) return;
 						setLists({
 							characters: characters.items,
 							lorebooks: lorebooks.items,
@@ -13369,9 +13448,9 @@ get: (_target, key) => {
 						setStylesAvailable(capabilities.writingStyles);
 						if (Number.isSafeInteger(writingStyles.maxStylesPerSession)) setMaxWritingStyles(writingStyles.maxStylesPerSession);
 					} catch (reason) {
-						setLoadError(reason);
+						if (live) setLoadError(reason);
 					} finally {
-						setLoading(false);
+						if (live) setLoading(false);
 					}
 				}
 			}, [
@@ -13399,7 +13478,7 @@ get: (_target, key) => {
 				}
 				let live = true;
 				setDetailState("loading");
-				rpc(connection, tab === "characters" ? "characters/get" : "lorebooks/get", { id: activeId }).then((value) => {
+				cachedDetailRequest(detailRequests.current, connection, tab === "characters" ? "characters/get" : "lorebooks/get", activeId).then((value) => {
 					if (live) {
 						setDetail(value);
 						setDetailState("ready");
@@ -13428,7 +13507,7 @@ get: (_target, key) => {
 				}
 				let live = true;
 				setActionError(null);
-				rpc(connection, "characters/get", { id: selectedCard }).then((value) => {
+				cachedDetailRequest(detailRequests.current, connection, "characters/get", selectedCard).then((value) => {
 					if (live) setCardPreview(value);
 				}).catch((reason) => {
 					if (live) {
@@ -14870,12 +14949,18 @@ get: (_target, key) => {
 			})));
 		}
 		function Avatar({ item, connection, sourceDisabled = false }) {
+			const avatarRef = (0, react.useRef)(null);
+			const nearViewport = useInView(avatarRef, {
+				margin: "200px 0px",
+				once: true
+			});
 			const [source, setSource] = (0, react.useState)(null);
 			(0, react.useEffect)(() => {
-				if (!item.hasAvatar || sourceDisabled) return;
+				setSource(null);
+				if (!item.hasAvatar || sourceDisabled || !nearViewport) return;
 				let live = true;
-				rpc(connection, "characters/avatar", { id: item.id }).then((value) => {
-					if (live) setSource(`data:${value.mimeType};base64,${value.base64}`);
+				cachedCharacterAvatar(connection, item.id).then((value) => {
+					if (live) setSource(value);
 				}).catch(() => {});
 				return () => {
 					live = false;
@@ -14884,13 +14969,18 @@ get: (_target, key) => {
 				connection,
 				item.hasAvatar,
 				item.id,
+				nearViewport,
 				sourceDisabled
 			]);
 			return source ? h("img", {
+				ref: avatarRef,
 				className: css.avatar,
 				src: source,
 				alt: ""
-			}) : h("span", { className: css.avatarFallback }, (item.name?.trim()?.[0] ?? "卡").toLocaleUpperCase());
+			}) : h("span", {
+				ref: avatarRef,
+				className: css.avatarFallback
+			}, (item.name?.trim()?.[0] ?? "卡").toLocaleUpperCase());
 		}
 		function AssetDetail({ tab, detail, state, onBack }) {
 			const back = h("button", {
@@ -15014,6 +15104,39 @@ get: (_target, key) => {
 			const route = endpoint.startsWith("characters/") ? "/rp-character-cards" : endpoint.startsWith("lorebooks/") ? "/rp-lore-books" : endpoint.startsWith("personas/") ? "/rp-personas" : endpoint.startsWith("presets/") ? "/rp-presets" : endpoint.startsWith("writing-styles/") ? "/rp-writing-styles" : "/rp-assets";
 			const operation = endpoint.includes("/") && route !== "/rp-assets" ? endpoint.slice(endpoint.indexOf("/") + 1) : endpoint;
 			return domainValue(await connection.call(route, operation, payload));
+		}
+		function cachedListRequest(cache, connection, endpoint, payload) {
+			return cachedRequest(cache, `${endpoint}:${JSON.stringify(payload)}`, () => rpc(connection, endpoint, payload));
+		}
+		function cachedDetailRequest(cache, connection, endpoint, id) {
+			return cachedRequest(cache, `${endpoint}:${id}`, () => rpc(connection, endpoint, { id }));
+		}
+		function cachedRequest(cache, key, load) {
+			let request = cache.get(key);
+			if (request !== void 0) return request;
+			request = Promise.resolve().then(load);
+			cache.set(key, request);
+			while (cache.size > RESOURCE_REQUEST_CACHE_LIMIT) cache.delete(cache.keys().next().value);
+			request.catch(() => {
+				if (cache.get(key) === request) cache.delete(key);
+			});
+			return request;
+		}
+		function cachedCharacterAvatar(connection, id) {
+			let cache = characterAvatarRequests.get(connection);
+			if (cache === void 0) {
+				cache = /* @__PURE__ */ new Map();
+				characterAvatarRequests.set(connection, cache);
+			}
+			let request = cache.get(id);
+			if (request !== void 0) return request;
+			request = rpc(connection, "characters/avatar", { id }).then((value) => `data:${value.mimeType};base64,${value.base64}`);
+			cache.set(id, request);
+			while (cache.size > CHARACTER_AVATAR_CACHE_LIMIT) cache.delete(cache.keys().next().value);
+			request.catch(() => {
+				if (cache.get(id) === request) cache.delete(id);
+			});
+			return request;
 		}
 		async function waitForListedSession(sessions, sessionId) {
 			for (let attempt = 0; attempt < 40; attempt += 1) {

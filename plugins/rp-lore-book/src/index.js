@@ -35,6 +35,7 @@ export class RpLoreBooks extends Service {
     this.runAssemblies = new Map()
     this.activationAdapters = new Map()
     this.entryValidators = new Map()
+    ctx.effect(() => () => invalidateLibraryListing(this.config.libraryDir), 'rp-lore-book: release derived library listing')
     ctx.inject(['rpCharacterCards'], cardsCtx => cardsCtx.effect(() => cardsCtx.rpCharacterCards.registerEmbeddedLoreManager({
       materialize: input => this.materializeEmbedded(input),
       rollback: id => this.delete(id),
@@ -344,15 +345,17 @@ export class RpLoreBooks extends Service {
   async list({ query = '', cursor, limit = 50 } = {}) {
     const page = pageOptions(query, cursor, limit)
     await this.ensureEmbeddedLorebooks()
-    await mkdir(this.config.libraryDir, { recursive: true })
-    const rows = []
-    for (const entry of await readdir(this.config.libraryDir, { withFileTypes: true })) {
-      if (!entry.isFile() || !/^[0-9a-f-]{36}\.json$/.test(entry.name)) continue
-      const id = entry.name.slice(0, -5)
-      try { rows.push(summary(await this.get(id))) } catch (error) {
-        rows.push({ id, name: '损坏的世界书', entries: 0, status: 'corrupt', error: error instanceof Error ? error.message : String(error) })
-      }
-    }
+    const rows = await cachedLibraryListing(this.config.libraryDir, async () => {
+      await mkdir(this.config.libraryDir, { recursive: true })
+      const entries = (await readdir(this.config.libraryDir, { withFileTypes: true }))
+        .filter(entry => entry.isFile() && /^[0-9a-f-]{36}\.json$/.test(entry.name))
+      return mapWithConcurrency(entries, LISTING_READ_CONCURRENCY, async entry => {
+        const id = entry.name.slice(0, -5)
+        try { return summary(await this.get(id)) } catch (error) {
+          return { id, name: '损坏的世界书', entries: 0, status: 'corrupt', error: error instanceof Error ? error.message : String(error) }
+        }
+      })
+    })
     const filtered = rows.filter(row => row.name.toLocaleLowerCase().includes(page.query)).sort(compareAssets)
     const items = filtered.slice(page.offset, page.offset + page.limit)
     return { items, nextCursor: page.offset + items.length < filtered.length ? String(page.offset + items.length) : null, total: filtered.length }
@@ -714,6 +717,39 @@ function assertCharacterId(id) { if (typeof id !== 'string' || !/^[0-9a-f-]{36}$
 function coded(code, message, cause) { const error = new Error(message, { cause }); error.code = code; return error }
 
 const libraryMutations = new Map()
+const libraryListings = new Map()
+const LISTING_READ_CONCURRENCY = 8
+
+async function cachedLibraryListing(libraryDir, load) {
+  const cached = libraryListings.get(libraryDir)
+  if (cached !== undefined) return cached
+  const pending = Promise.resolve().then(load)
+  libraryListings.set(libraryDir, pending)
+  try {
+    return await pending
+  } catch (error) {
+    if (libraryListings.get(libraryDir) === pending) libraryListings.delete(libraryDir)
+    throw error
+  }
+}
+
+function invalidateLibraryListing(libraryDir) {
+  libraryListings.delete(libraryDir)
+}
+
+async function mapWithConcurrency(items, limit, map) {
+  const results = new Array(items.length)
+  let nextIndex = 0
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex
+      nextIndex += 1
+      results[index] = await map(items[index])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()))
+  return results
+}
 
 async function withLibraryMutation(libraryDir, operation) {
   const previous = libraryMutations.get(libraryDir) ?? Promise.resolve()
@@ -721,9 +757,11 @@ async function withLibraryMutation(libraryDir, operation) {
   const current = new Promise(resolve => { release = resolve })
   libraryMutations.set(libraryDir, current)
   await previous
+  invalidateLibraryListing(libraryDir)
   try {
     return await operation()
   } finally {
+    invalidateLibraryListing(libraryDir)
     release()
     if (libraryMutations.get(libraryDir) === current) libraryMutations.delete(libraryDir)
   }
