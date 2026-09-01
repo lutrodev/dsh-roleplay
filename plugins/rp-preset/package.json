@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-preset",
-  "version": "0.1.7-alpha",
+  "version": "0.1.7",
   "description": "Reusable prompt preset library and browser UI for Roleplay",
   "license": "MIT",
   "private": true,
@@ -46,21 +46,21 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.2-alpha.2",
+    "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.2-alpha.3",
     "dsh-roleplay-rp-library": "^0.1.0",
-    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
-    "dsh-roleplay-rp-remote": "^0.1.7-alpha"
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.3",
+    "dsh-roleplay-rp-remote": "^0.1.7"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
-    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.2-alpha.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.3",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.2-alpha.3",
     "dsh-roleplay-rp-library": "workspace:^",
     "dsh-roleplay-rp-ui": "workspace:^",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "tsdown": "0.22.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.3",
     "dsh-roleplay-rp-remote": "workspace:^"
   },
   "engines": {

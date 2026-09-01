@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-state-display",
-  "version": "0.1.7-alpha",
+  "version": "0.1.7",
   "description": "Read-only current session variable card below the latest successful Roleplay reply",
   "license": "MIT",
   "private": true,
@@ -45,20 +45,20 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2"
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.3",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.3"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.2",
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.2",
-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.3",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.3",
     "jsdom": "29.1.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "tsdown": "0.22.2",
     "vitest": "4.1.8",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.3",
     "dsh-roleplay-rp-ui": "workspace:^"
   },
   "engines": {

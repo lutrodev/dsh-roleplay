@@ -28,15 +28,9 @@ Agent 会自动完成安装。安装结束后，手动重启 DeepSeek Harness �
 dsh plugin --profile web add -w @lutrodev/dsh-roleplay
 ```
 
-要试用当前预发布版，请使用 `alpha` 标签；它不会替换稳定版的 `latest`：
-
-```bash
-dsh plugin --profile web add -w @lutrodev/dsh-roleplay@alpha
-```
-
 npm 包已包含运行所需的插件、浏览器端资源、Skills 和示例配置，无需另外克隆源码仓库。
 
-当前 alpha 兼容组合为 dsh-roleplay `0.1.7-alpha` 与 DSH `0.1.2-alpha.2`，版本变化详见 [Changelog](CHANGELOG.md)。
+当前兼容组合为 dsh-roleplay `0.1.7` 与 DSH `0.1.2-alpha.3`，版本变化详见 [Changelog](CHANGELOG.md)。
 
 ## 使用
 

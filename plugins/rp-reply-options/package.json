@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-reply-options",
-  "version": "0.1.7-alpha",
+  "version": "0.1.7",
   "description": "Main-model reply directions below successful Roleplay responses",
   "license": "MIT",
   "private": true,
@@ -45,10 +45,10 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
-    "dsh-roleplay-rp-core": "^0.1.7-alpha"
+    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.3",
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.3",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.3",
+    "dsh-roleplay-rp-core": "^0.1.7"
   },
   "peerDependenciesMeta": {
     "dsh-roleplay-rp-core": {
@@ -58,9 +58,9 @@
   "devDependencies": {
     "@testing-library/react": "16.3.2",
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-api-session-controller": "0.1.2-alpha.2",
-    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.2",
+    "@deepseek-ai/dsh-api-session-controller": "0.1.2-alpha.3",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.3",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.3",
     "jsdom": "29.1.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",

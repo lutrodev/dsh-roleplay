@@ -7,7 +7,7 @@ import {
   resolvedRegistryVersion,
 } from './check-harness-compat.mjs'
 
-const dshVersion = '0.1.2-alpha.2'
+const dshVersion = '0.1.2-alpha.3'
 
 test('extracts registry versions without peer suffixes and rejects local links', () => {
   assert.equal(resolvedRegistryVersion({ version: `${dshVersion}(@deepseek-ai/cordis@4.0.2)` }), dshVersion)

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import SqliteSessionPersistence from '@deepseek-ai/dsh-session-persistence-sqlite'
+import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import Storage from '@deepseek-ai/dsh-storage'
 import { JsonStorageBackend } from '@deepseek-ai/dsh-storage-json'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
@@ -28,9 +28,9 @@ test('character deletion leaves real Harness live/cold Session logs intact and r
     ctx.storage.mount('domain', storageDomain)
     ctx.provide('storageDomain', storageDomain)
     await ctx.plugin(SessionStore)
-    await ctx.plugin(SqliteSessionPersistence, {
-      path: join(root, 'sessions.db'),
-      journalMode: 'delete',
+    await ctx.plugin(JsonlSessionPersistence, {
+      root: join(root, 'sessions'),
+      compression: 'none',
       writeBatchMaxDelayMs: 1,
     })
     await ctx.plugin(WorkspaceRegistry)

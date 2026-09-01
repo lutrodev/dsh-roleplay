@@ -107,8 +107,8 @@ function t(key) { return copy[key] ?? key }
 
 function statusView(enabledFeatures, enabledSkills, revision = 0, replyOptionsCount = 3, replyOptionsKeywords = Array.from({ length: replyOptionsCount }, () => '')) {
   return {
-    roleplay: { version: '0.1.7-alpha' },
-    dsh: { version: '0.1.2-alpha.2', compatible: true },
+    roleplay: { version: '0.1.7' },
+    dsh: { version: '0.1.2-alpha.3', compatible: true },
     compatible: true,
     problems: [],
     enabledFeatures: [...enabledFeatures],
@@ -117,14 +117,14 @@ function statusView(enabledFeatures, enabledSkills, revision = 0, replyOptionsCo
     replyOptionsKeywords: [...replyOptionsKeywords],
     settings: { writable: true, revision },
     core: [
-      { label: '回复运行时', description: '协调父代理、Writer、上下文与每轮写作流程。', packageVersion: '0.1.7-alpha', versionCompatible: true },
-      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.7-alpha', versionCompatible: true },
+      { label: '回复运行时', description: '协调父代理、Writer、上下文与每轮写作流程。', packageVersion: '0.1.7', versionCompatible: true },
+      { label: '会话总结', description: '压缩较早的对话，并向 Writer 提供独立的会话总结。', packageVersion: '0.1.7', versionCompatible: true },
     ],
     features: FEATURE_CATALOG.map(item => ({
       ...item,
       enabled: enabledFeatures.includes(item.id),
       active: enabledFeatures.includes(item.id),
-      packageVersion: '0.1.7-alpha',
+      packageVersion: '0.1.7',
       versionCompatible: true,
     })),
     skills: ROLEPLAY_SKILL_CATALOG.map(item => ({
@@ -136,7 +136,7 @@ function statusView(enabledFeatures, enabledSkills, revision = 0, replyOptionsCo
       selected: enabledSkills.includes(item.id),
       featureEnabled: enabledFeatures.includes(item.featureId),
       enabled: enabledSkills.includes(item.id) && enabledFeatures.includes(item.featureId),
-      packageVersion: '0.1.7-alpha',
+      packageVersion: '0.1.7',
       versionCompatible: true,
     })),
   }
@@ -338,7 +338,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     fireEvent.click(await screen.findByText('查看核心组件'))
     const card = screen.getByText('会话总结').closest('li')
     expect(card).toBeTruthy()
-    expect(card.textContent).toContain('v0.1.7-alpha')
+    expect(card.textContent).toContain('v0.1.7')
     expect(card.textContent).toContain('压缩较早的对话，并向 Writer 提供独立的会话总结。')
   })
 
