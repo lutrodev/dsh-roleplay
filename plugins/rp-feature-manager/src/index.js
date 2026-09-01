@@ -7,9 +7,12 @@ import { buildRoleplayPromptPreview } from 'dsh-roleplay-rp-core/prompts'
 import {
   assertReplyOptionKeywords,
   DEFAULT_REPLY_OPTION_KEYWORDS,
+  DEFAULT_REPLY_OPTION_MAX_CHARACTERS,
   DEFAULT_REPLY_OPTIONS_COUNT,
   normalizeReplyOptionKeywords,
+  normalizeReplyOptionMaxCharacters,
   normalizeReplyOptionsCount,
+  REPLY_OPTION_MAX_CHARACTERS,
 } from 'dsh-roleplay-rp-reply-options/protocol'
 import {
   CORE_PACKAGES,
@@ -53,6 +56,7 @@ export const Config = Schema.object({
   enabledFeatures: Schema.array(Schema.union([...FEATURE_IDS, ...RETIRED_FEATURE_IDS])).default(DEFAULT_ENABLED_FEATURES),
   enabledSkills: Schema.array(Schema.union(SKILL_IDS)).default(DEFAULT_ENABLED_SKILLS),
   replyOptionsCount: Schema.number().min(1).max(5).step(1).default(DEFAULT_REPLY_OPTIONS_COUNT),
+  replyOptionsMaxCharacters: Schema.number().min(1).max(REPLY_OPTION_MAX_CHARACTERS).step(1).default(DEFAULT_REPLY_OPTION_MAX_CHARACTERS),
   replyOptionsKeywords: Schema.array(Schema.string()).default([...DEFAULT_REPLY_OPTION_KEYWORDS]),
   harnessIdentity: Schema.string().default(''),
 })
@@ -70,6 +74,7 @@ export class RpFeatureManager extends Service {
     this.enabled = migrateLegacyFeatureSelection(config.enabledFeatures)
     this.enabledSkills = normalizeSkillSelection(config.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
     this.replyOptionsCountValue = normalizeReplyOptionsCount(config.replyOptionsCount)
+    this.replyOptionsMaxCharactersValue = normalizeReplyOptionMaxCharacters(config.replyOptionsMaxCharacters)
     this.replyOptionsKeywordsValue = normalizeReplyOptionKeywords(
       config.replyOptionsKeywords,
       this.replyOptionsCountValue,
@@ -93,6 +98,7 @@ export class RpFeatureManager extends Service {
           migrateLegacyFeatureSelection(value.enabledFeatures)
           assertSkillSelection(value.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
           const replyOptionsCount = normalizeReplyOptionsCount(value.replyOptionsCount)
+          normalizeReplyOptionMaxCharacters(value.replyOptionsMaxCharacters)
           normalizeReplyOptionKeywords(value.replyOptionsKeywords, replyOptionsCount)
           normalizeHarnessIdentityOverride(value.harnessIdentity)
         },
@@ -125,6 +131,7 @@ export class RpFeatureManager extends Service {
       enabledFeatures: Object.freeze([...this.enabled]),
       enabledSkills: Object.freeze([...this.enabledSkills]),
       replyOptionsCount: this.replyOptionsCountValue,
+      replyOptionsMaxCharacters: this.replyOptionsMaxCharactersValue,
       replyOptionsKeywords: Object.freeze([...this.replyOptionsKeywordsValue]),
       harnessIdentity: this.identity,
       compatible: this.environment.compatible,
@@ -148,6 +155,11 @@ export class RpFeatureManager extends Service {
   /** Return the exact number of reply options requested from the main model. */
   replyOptionsCount() {
     return this.replyOptionsCountValue
+  }
+
+  /** Return the model-facing maximum Unicode character guidance for each option. */
+  replyOptionsMaxCharacters() {
+    return this.replyOptionsMaxCharactersValue
   }
 
   /** Return one normalized, optional direction keyword for each requested option. */
@@ -198,6 +210,7 @@ export class RpFeatureManager extends Service {
       enabledFeatures: [...this.enabled],
       enabledSkills: [...this.enabledSkills],
       replyOptionsCount: this.replyOptionsCountValue,
+      replyOptionsMaxCharacters: this.replyOptionsMaxCharactersValue,
       replyOptionsKeywords: [...this.replyOptionsKeywordsValue],
       settings: this.settingsStatus(),
       core: this.environment.core,
@@ -259,12 +272,13 @@ export class RpFeatureManager extends Service {
     return this.status()
   }
 
-  /** Persist reply count and its index-aligned direction keywords atomically. */
+  /** Persist reply count, character limit, and index-aligned directions atomically. */
   async setReplyOptionsSettings(payload) {
-    const { count, keywords, expectedRevision } = parseReplyOptionsSettingsWrite(payload)
+    const { count, maxCharacters, keywords, expectedRevision } = parseReplyOptionsSettingsWrite(payload)
     const settings = this.requireWritableSettings()
     await settings.update(ROLEPLAY_SETTINGS_NAMESPACE, {
       replyOptionsCount: count,
+      replyOptionsMaxCharacters: maxCharacters,
       replyOptionsKeywords: keywords,
     }, expectedRevision)
     this.refresh()
@@ -305,6 +319,7 @@ export class RpFeatureManager extends Service {
     const next = migrateLegacyFeatureSelection(source.enabledFeatures)
     const nextSkills = normalizeSkillSelection(source.enabledSkills ?? DEFAULT_ENABLED_SKILLS)
     const nextReplyOptionsCount = normalizeReplyOptionsCount(source.replyOptionsCount)
+    const nextReplyOptionsMaxCharacters = normalizeReplyOptionMaxCharacters(source.replyOptionsMaxCharacters)
     const nextReplyOptionsKeywords = normalizeReplyOptionKeywords(
       source.replyOptionsKeywords,
       nextReplyOptionsCount,
@@ -313,16 +328,19 @@ export class RpFeatureManager extends Service {
     const nextIdentity = nextOverride ?? this.defaultHarnessIdentity
     const selectionChanged = !sameSelection(next, this.enabled) || !sameSelection(nextSkills, this.enabledSkills)
     const replyOptionsCountChanged = nextReplyOptionsCount !== this.replyOptionsCountValue
+    const replyOptionsMaxCharactersChanged = nextReplyOptionsMaxCharacters !== this.replyOptionsMaxCharactersValue
     const replyOptionsKeywordsChanged = !sameSelection(nextReplyOptionsKeywords, this.replyOptionsKeywordsValue)
     const identityChanged = nextIdentity !== this.identity || nextOverride !== this.identityOverride
     this.enabled = next
     this.enabledSkills = nextSkills
     this.replyOptionsCountValue = nextReplyOptionsCount
+    this.replyOptionsMaxCharactersValue = nextReplyOptionsMaxCharacters
     this.replyOptionsKeywordsValue = nextReplyOptionsKeywords
     this.identityOverride = nextOverride
     this.identity = nextIdentity
     if (selectionChanged) this.scheduleReconcile()
-    if (!selectionChanged && !identityChanged && !replyOptionsCountChanged && !replyOptionsKeywordsChanged) return
+    if (!selectionChanged && !identityChanged && !replyOptionsCountChanged
+      && !replyOptionsMaxCharactersChanged && !replyOptionsKeywordsChanged) return
     const snapshot = this.snapshot()
     const listeners = [...this.listeners]
     this.listenerTail = this.listenerTail.then(async () => {
@@ -425,6 +443,7 @@ async function resolveHarnessPromptSections(ctx) {
 
 export async function apply(ctx, config) {
   const replyOptionsCount = normalizeReplyOptionsCount(config.replyOptionsCount)
+  normalizeReplyOptionMaxCharacters(config.replyOptionsMaxCharacters)
   normalizeReplyOptionKeywords(config.replyOptionsKeywords, replyOptionsCount)
   normalizeHarnessIdentityOverride(config.harnessIdentity)
   const manager = new RpFeatureManager(ctx, config, await resolveHarnessPromptSections(ctx))
@@ -575,6 +594,7 @@ function parseReplyOptionsSettingsWrite(payload) {
   const count = normalizeReplyOptionsCount(payload.count)
   return {
     count,
+    maxCharacters: normalizeReplyOptionMaxCharacters(payload.maxCharacters),
     keywords: assertReplyOptionKeywords(payload.keywords, count),
     expectedRevision: parseExpectedRevision(payload.expectedRevision),
   }

@@ -22,7 +22,7 @@
     "README.md"
   ],
   "scripts": {
-    "check": "node --check src/index.js && node --check src/protocol.js && node --check src/entity-projection.js && node --check src/context-build.js && node --check src/conversation.js && node --check src/subagent-run.js && node --check src/prompts.js && node --check src/runtime.js",
+    "check": "node --check src/index.js && node --check src/protocol.js && node --check src/entity-projection.js && node --check src/context-build.js && node --check src/conversation.js && node --check src/subagent-run.js && node --check src/commit-retry.js && node --check src/prompts.js && node --check src/runtime.js",
     "test": "node --test",
     "verify": "pnpm run check && pnpm test"
   },

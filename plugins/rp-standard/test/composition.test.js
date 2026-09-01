@@ -130,6 +130,7 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     await ctx.plugin(ReplyOptions, {
       registerRuntime: true,
       count: 3,
+      maxCharacters: 80,
       keywords: ['调查线索', '', '离开现场'],
     })
     await ctx.plugin(SubagentManager, {
@@ -166,13 +167,15 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     assert.deepEqual(commitSchema.required, ['extensions'])
     assert.equal(commitSchema.properties.extensions.additionalProperties, false)
     assert.deepEqual(commitSchema.properties.extensions.required, ['rp.reply-options'])
+    assert.deepEqual(commitSchema.properties.retry.required, ['token', 'patches'])
     const replyOptionsSchema = commitSchema.properties.extensions.properties['rp.reply-options']
     assert.ok(replyOptionsSchema)
-    assert.equal(replyOptionsSchema.additionalProperties, false)
+    assert.equal(replyOptionsSchema.additionalProperties, true)
     assert.match(replyOptionsSchema.description, /option 1: "调查线索"/)
     assert.match(replyOptionsSchema.description, /option 3: "离开现场"/)
     assert.equal(Object.hasOwn(replyOptionsSchema.properties.options, 'minItems'), false)
     assert.equal(Object.hasOwn(replyOptionsSchema.properties.options, 'maxItems'), false)
+    assert.match(replyOptionsSchema.properties.options.description, /no longer than 80 Unicode characters/)
 
     const stateEffectSchema = commitSchema.properties.effects.items
     assert.equal(stateEffectSchema.properties.kind.const, 'state.update')

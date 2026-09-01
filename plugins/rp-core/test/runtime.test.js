@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
-import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { HarnessError, ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import { validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
 import { createRpMessageActionMetadata } from '../src/conversation.js'
 import { RpRuntime } from '../src/runtime.js'
 
@@ -169,6 +170,24 @@ test('commit exposes required artifact extension schemas and persists canonical 
     required: 'yes',
     validate: value => value,
   }), /required must be a boolean/)
+  assert.throws(() => runtime.registerArtifactExtension({
+    namespace: 'invalid.additional-properties-policy',
+    schema: { type: 'object', additionalProperties: true, properties: {} },
+    acceptAdditionalProperties: 'yes',
+    validate: value => value,
+  }), /acceptAdditionalProperties must be a boolean/)
+  assert.throws(() => runtime.registerArtifactExtension({
+    namespace: 'mismatched.additional-properties-policy',
+    schema: { type: 'object', additionalProperties: false, properties: {} },
+    acceptAdditionalProperties: true,
+    validate: value => value,
+  }), /requires schema\.additionalProperties to be true/)
+  const disposeOpen = runtime.registerArtifactExtension({
+    namespace: 'tolerant.options',
+    schema: { type: 'object', additionalProperties: true, properties: { options: { type: 'array' } } },
+    acceptAdditionalProperties: true,
+    validate: value => ({ version: 1, options: value.options ?? [] }),
+  })
 
   const dispose = runtime.registerArtifactExtension({
     namespace: 'test.options',
@@ -186,18 +205,23 @@ test('commit exposes required artifact extension schemas and persists canonical 
   assert.equal(extensionSchema.additionalProperties, false)
   assert.deepEqual(extensionSchema.required, ['test.options'])
   assert.deepEqual(commit.parameters.required, ['extensions'])
+  assert.deepEqual(commit.parameters.properties.retry.required, ['token', 'patches'])
+  assert.match(extensionSchema.description, /required extension namespaces/i)
   assert.equal(extensionSchema.properties['test.options'].properties.choice.description, 'One non-empty choice.')
-  assert.equal(toolChanges, 1)
+  assert.equal(extensionSchema.properties['tolerant.options'].additionalProperties, true)
+  assert.deepEqual(validateJsonSchemaValue(commit.parameters, {
+    extensions: {
+      'test.options': { choice: 'continue' },
+      'tolerant.options': { options: ['continue'], description: 'model-added annotation' },
+    },
+  }), [])
+  assert.equal(toolChanges, 2)
 
   const invalidExec = {
     agent: { session: { events: [] } },
     callId: 'invalid-extension',
     concludeTurn() { throw new Error('invalid arguments must not conclude') },
   }
-  await assert.rejects(
-    commit.execute({}, invalidExec),
-    error => error.code === 'INVALID_ARGS' && error.violations.some(item => item.includes('extensions')),
-  )
   await assert.rejects(
     commit.execute({
       extensions: { 'test.options': { choice: 'continue' }, unknown: {} },
@@ -209,10 +233,32 @@ test('commit exposes required artifact extension schemas and persists canonical 
   const agent = { session: { events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   seedWriter(run, 'The road continues.')
-  appendCommitCall(events, 1, 1, 'extension-commit', 'The road continues.')
+  appendCommitCall(events, 1, 1, 'missing-extension', 'The road continues.')
+  const missingExec = {
+    agent,
+    callId: 'missing-extension',
+    concludeTurn() { throw new Error('invalid arguments must not conclude') },
+  }
+  let missingFailure
+  await assert.rejects(
+    commit.execute({}, missingExec),
+    error => {
+      missingFailure = error
+      return error.code === 'INVALID_ARGS'
+        && error.issues.some(item => item.path === '/extensions/test.options' && item.code === 'RP_REQUIRED_EXTENSION_MISSING')
+    },
+  )
+  const missingContent = commit.finalizeContent(missingExec, {
+    isError: true,
+    error: { message: missingFailure.message, info: { name: missingFailure.name, code: missingFailure.code } },
+    content: [{ type: 'text', text: `Error: ${missingFailure.message}` }],
+  })
+  const missingFeedback = JSON.parse(missingContent[0].text).error
+  appendCommitCall(events, 1, 2, 'extension-commit', 'The road continues.')
   let concluded = false
   const result = await commit.execute({
     extensions: { 'test.options': { choice: '  take the eastern road  ' } },
+    retry: { token: missingFeedback.retry.token, patches: [] },
   }, { agent, callId: 'extension-commit', concludeTurn() { concluded = true } })
   assert.equal(concluded, true)
   assert.deepEqual(result.meta.extensions, {
@@ -220,10 +266,181 @@ test('commit exposes required artifact extension schemas and persists canonical 
   })
 
   dispose()
-  assert.equal(toolChanges, 2)
+  disposeOpen()
+  assert.equal(toolChanges, 4)
   assert.equal(commit.parameters.required, undefined)
   assert.deepEqual(commit.parameters.properties.extensions.properties, {})
   assert.equal(commit.parameters.properties.extensions.additionalProperties, false)
+  await ctx.fiber.dispose()
+})
+
+test('commit reports independent capability failures together and repairs the cached draft with minimal patches', async () => {
+  const ctx = new Context()
+  const tools = new Map()
+  ctx.provide('systemPrompt', { section() {} })
+  ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
+  ctx.provide('agents', { get() { return undefined } })
+  const runtime = new RpRuntime(ctx, {
+    chatMaxStepsPerRun: 5, agentMaxStepsPerRun: 8,
+    maxEffectsPerCommit: 4, maxArtifactBytes: 8192,
+  })
+  runtime.registerEffectType({
+    kind: 'repair.effect',
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        kind: { type: 'string', const: 'repair.effect' },
+        target: { type: 'string' },
+        payload: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { approved: { type: 'boolean' }, stable: { type: 'string' } },
+          required: ['approved', 'stable'],
+        },
+      },
+      required: ['kind', 'target', 'payload'],
+    },
+    validate: effect => {
+      if (effect.payload.approved !== true) {
+        throw Object.assign(new Error('repair.effect requires an approved payload.'), {
+          code: 'REPAIR_EFFECT_NOT_APPROVED',
+          feedback: { field: 'payload.approved', expected: true },
+        })
+      }
+      return effect
+    },
+  })
+  runtime.registerArtifactExtension({
+    namespace: 'repair.options',
+    required: true,
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { choice: { type: 'string' } },
+      required: ['choice'],
+    },
+    validate: value => {
+      if (value.choice !== 'continue') {
+        throw Object.assign(new Error('repair.options choice must be "continue".'), {
+          code: 'REPAIR_OPTION_INVALID',
+          feedback: { field: 'choice', expected: 'continue' },
+        })
+      }
+      return { choice: value.choice }
+    },
+  })
+  const commit = tools.get('rp_commit_turn')
+  const events = []
+  const agent = { session: { events, append() {} } }
+  const run = await runtime.prepareRun(agent, 1, [currentInput()])
+  seedWriter(run, 'The cached prose remains visible.')
+  appendCommitCall(events, 1, 1, 'repair-full', 'The cached prose remains visible.')
+  const fullDraft = {
+    runSummary: 'keep this summary',
+    effects: [{ kind: 'repair.effect', target: 'gate', payload: { approved: false, stable: 'keep me' } }],
+    references: [],
+    extensions: { 'repair.options': { choice: 'stop', type: 'array' } },
+  }
+  const fullExec = {
+    agent,
+    callId: 'repair-full',
+    concludeTurn() { throw new Error('failed commits must not conclude') },
+  }
+  let failure
+  await assert.rejects(commit.execute(fullDraft, fullExec), error => {
+    failure = error
+    return error.code === 'INVALID_ARGS'
+      && error.violations.some(item => item.includes('repair.options.type'))
+      && error.issues.some(item => item.path === '/effects/0' && item.code === 'REPAIR_EFFECT_NOT_APPROVED')
+      && error.issues.some(item => item.path === '/extensions/repair.options' && item.code === 'REPAIR_OPTION_INVALID')
+  })
+  const failureContent = commit.finalizeContent(fullExec, {
+    isError: true,
+    error: { message: failure.message, info: { name: failure.name, code: failure.code } },
+    content: [{ type: 'text', text: `Error: ${failure.message}` }],
+  })
+  const feedback = JSON.parse(failureContent[0].text).error
+  assert.equal(feedback.retry.tool, 'rp_commit_turn')
+  assert.equal(feedback.retry.mode, 'json_pointer_patch')
+  assert.deepEqual(feedback.retry.requiredExtensions, ['repair.options'])
+  assert.equal(feedback.issues.length, 2)
+  assert.match(feedback.retry.instruction, /complete extensions object/i)
+
+  events.push({
+    seq: events.length,
+    type: 'tool/result',
+    surfaceOp: 'append',
+    data: {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: ToolCallId('repair-full'),
+        content: failureContent,
+        isError: true,
+      }),
+    },
+  })
+  appendCommitCall(events, 1, 2, 'repair-invalid-patch', '')
+  const invalidPatchExec = {
+    agent,
+    callId: 'repair-invalid-patch',
+    concludeTurn() { throw new Error('failed patches must not conclude') },
+  }
+  let invalidPatchFailure
+  await assert.rejects(commit.execute({
+    extensions: { 'repair.options': { choice: 'continue' } },
+    retry: {
+      token: feedback.retry.token,
+      patches: [{ op: 'add', path: '/unexpected', value: true }],
+    },
+  }, invalidPatchExec), error => {
+    invalidPatchFailure = error
+    return error.code === 'INVALID_ARGS'
+      && error.violations.some(item => item.includes('unexpected'))
+      && error.issues.some(item => item.code === 'REPAIR_EFFECT_NOT_APPROVED')
+  })
+  const invalidPatchContent = commit.finalizeContent(invalidPatchExec, {
+    isError: true,
+    error: { message: invalidPatchFailure.message, info: { name: invalidPatchFailure.name, code: invalidPatchFailure.code } },
+    content: [{ type: 'text', text: `Error: ${invalidPatchFailure.message}` }],
+  })
+  const invalidPatchFeedback = JSON.parse(invalidPatchContent[0].text).error
+  assert.equal(invalidPatchFeedback.retry.token, feedback.retry.token)
+
+  appendCommitCall(events, 1, 3, 'repair-patch', '')
+  let concluded = false
+  const result = await commit.execute({
+    extensions: { 'repair.options': { choice: 'continue' } },
+    retry: {
+      token: feedback.retry.token,
+      patches: [
+        { op: 'replace', path: '/effects/0/payload/approved', value: true },
+        { op: 'remove', path: '/unexpected' },
+      ],
+    },
+  }, { agent, callId: 'repair-patch', concludeTurn() { concluded = true } })
+  assert.equal(concluded, true)
+  assert.equal(result.meta.runSummary, 'keep this summary')
+  assert.equal(result.meta.effects[0].payload.stable, 'keep me')
+  assert.deepEqual(result.meta.extensions, { 'repair.options': { choice: 'continue' } })
+  assert.deepEqual(result.meta.assistant, { seq: 0, messageId: 'assistant-repair-full' })
+
+  const domainEvents = []
+  const domainAgent = { session: { events: domainEvents, append() {} } }
+  const domainRun = await runtime.prepareRun(domainAgent, 1, [currentInput()])
+  seedWriter(domainRun, 'Another visible reply.')
+  appendCommitCall(domainEvents, 1, 1, 'domain-full', 'Another visible reply.')
+  await assert.rejects(commit.execute({
+    effects: [{ kind: 'repair.effect', target: 'gate', payload: { approved: false, stable: 'still here' } }],
+    extensions: { 'repair.options': { choice: 'stop' } },
+  }, { agent: domainAgent, callId: 'domain-full', concludeTurn() { throw new Error('failed commits must not conclude') } }), error => (
+    error instanceof HarnessError
+      && error.code === 'RP_COMMIT_VALIDATION_FAILED'
+      && error.issues.length === 2
+      && error.issues.some(item => item.code === 'REPAIR_EFFECT_NOT_APPROVED')
+      && error.issues.some(item => item.code === 'REPAIR_OPTION_INVALID')
+  ))
   await ctx.fiber.dispose()
 })
 
@@ -397,7 +614,7 @@ test('accepts harmless content blocks, blank text, and a commit block before lat
   await ctx.fiber.dispose()
 })
 
-test('tool-only retry reuses prose from the latest failed commit in the same turn', async () => {
+test('Chat retry keeps prose from the latest failed commit even if parent commentary leaks through', async () => {
   const ctx = new Context()
   const tools = new Map()
   ctx.provide('systemPrompt', { section() {} })
@@ -435,7 +652,10 @@ test('tool-only retry reuses prose from the latest failed commit in the same tur
       message: {
         id: 'assistant-retry',
         source: { kind: 'model' },
-        content: [{ type: 'tool-call', id: 'retry-commit', name: 'rp_commit_turn', arguments: '{}' }],
+        content: [
+          { type: 'text', text: '错误解释不应成为新的正文。' },
+          { type: 'tool-call', id: 'retry-commit', name: 'rp_commit_turn', arguments: '{}' },
+        ],
       },
     },
   })
@@ -1443,6 +1663,85 @@ test('Chat Writer receives one flat Prompt and its prose replaces the parent str
   assert.deepEqual(committed.meta.assistant, { seq: 0, messageId: 'assistant-chat-stream' })
   assert.equal(committed.meta.writer.writerSessionId, 'writer-child-1')
   assert.equal(committed.meta.writer.promptHash, result.meta.promptHash)
+  await ctx.fiber.dispose()
+})
+
+test('Chat commit retries suppress parent explanations and keep the original Writer prose', async () => {
+  const ctx = new Context()
+  const tools = new Map()
+  let agent
+  ctx.provide('systemPrompt', { section() {} })
+  ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
+  ctx.provide('agents', { get(id) { return id === agent?.session.id ? agent : undefined } })
+  const runtime = new RpRuntime(ctx, {
+    chatMaxStepsPerRun: 5, agentMaxStepsPerRun: 8,
+    maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 1000,
+  })
+  const events = []
+  agent = { session: { id: 'chat-commit-retry', events, append() {} } }
+  const run = await runtime.prepareRun(agent, 1, [currentInput()])
+  seedWriter(run, '原始 Writer 正文。')
+  run.chatWriterRelayed = true
+  appendCommitCall(events, 1, 1, 'failed-commit', '原始 Writer 正文。')
+  events.push({
+    seq: events.length,
+    type: 'tool/result',
+    surfaceOp: 'append',
+    data: {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: ToolCallId('failed-commit'),
+        content: [{ type: 'text', text: 'Error: invalid State update' }],
+        isError: true,
+      }),
+    },
+  })
+
+  const retryId = ToolCallId('retry-commit')
+  const parentRetryStream = (async function* () {
+    yield { type: 'block-start', index: 0, blockType: 'reasoning' }
+    yield { type: 'reasoning-delta', index: 0, text: '父代理正在解释提交错误。' }
+    yield { type: 'block-end', index: 0, block: { type: 'reasoning', text: '父代理正在解释提交错误。' } }
+    yield { type: 'block-start', index: 1, blockType: 'text' }
+    yield { type: 'text-delta', index: 1, text: '这段错误解释绝不能替换正文。' }
+    yield { type: 'block-end', index: 1, block: { type: 'text', text: '这段错误解释绝不能替换正文。' } }
+    yield { type: 'block-start', index: 2, blockType: 'tool-call' }
+    yield { type: 'tool-call-delta', index: 2, id: retryId, name: 'rp_commit_turn', argumentsDelta: '{}' }
+    yield { type: 'block-end', index: 2, block: { type: 'tool-call', id: retryId, name: 'rp_commit_turn', arguments: '{}' } }
+    yield { type: 'usage', usage: { inputTokens: 8, outputTokens: 5 } }
+    yield { type: 'finish', reason: { kind: 'tool-calls' } }
+  })()
+  const retryChunks = []
+  const relayed = ctx.waterfall('llm/stream', { sessionId: agent.session.id }, () => parentRetryStream)
+  for await (const chunk of relayed) retryChunks.push(chunk)
+
+  assert.doesNotMatch(JSON.stringify(retryChunks), /父代理正在解释|错误解释绝不能替换正文/)
+  assert.equal(retryChunks.filter(chunk => chunk.type === 'text-delta').length, 0)
+  assert.deepEqual(retryChunks.filter(chunk => chunk.type === 'block-end').map(chunk => chunk.block.type), ['tool-call'])
+  assert.equal(retryChunks.find(chunk => chunk.type === 'block-end').block.id, retryId)
+
+  const retryContent = retryChunks.filter(chunk => chunk.type === 'block-end').map(chunk => chunk.block)
+  events.push({
+    seq: events.length,
+    type: 'assistant/message',
+    surfaceOp: 'append',
+    data: {
+      turn: 1,
+      step: 2,
+      message: { id: 'assistant-retry', source: { kind: 'model' }, content: retryContent },
+    },
+  })
+  events.push({ seq: events.length, type: 'tool/call', data: { turn: 1, step: 2, callId: retryId, name: 'rp_commit_turn', arguments: '{}' } })
+  let concluded = false
+  const committed = await tools.get('rp_commit_turn').execute({}, {
+    agent,
+    callId: retryId,
+    concludeTurn() { concluded = true },
+  })
+  assert.equal(concluded, true)
+  assert.equal(committed.meta.runSummary, '原始 Writer 正文。')
+  assert.deepEqual(committed.meta.assistant, { seq: 0, messageId: 'assistant-failed-commit' })
   await ctx.fiber.dispose()
 })
 

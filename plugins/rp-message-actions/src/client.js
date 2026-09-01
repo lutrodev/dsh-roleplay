@@ -368,7 +368,7 @@ function AssistantFloorEffects(props) {
   if (!isCanonicalAssistantAction(props.node)) return h(InactiveActionNodeMarker)
   return h(React.Fragment, null,
     h(AssistantEffectNodeMarker),
-    h(SettledAssistantTraceEffect),
+    h(SettledAssistantTraceEffect, { target: props.node.data.target }),
     props.node.data.edited === true
       ? h(EditedMessagePortal, { surface: 'assistant', text: props.node.data.text })
       : null)
@@ -384,7 +384,7 @@ function OpeningFloorEffects(props) {
   }
   return h(React.Fragment, null,
     h(AssistantEffectNodeMarker),
-    h(SettledAssistantTraceEffect),
+    h(SettledAssistantTraceEffect, { target: props.node.data.target }),
     props.node.data.edited === true
       ? h(EditedMessagePortal, { surface: 'assistant', text: props.node.data.text })
       : null)
@@ -588,17 +588,22 @@ function FailedAssistantEffects(props) {
       : null)
 }
 
-function SettledAssistantTraceEffect() {
+function SettledAssistantTraceEffect({ target }) {
   const ref = useRef(null)
+  const owner = target === undefined ? 'settled-assistant' : `settled-${rpMessageActionTargetKey(target)}`
   useLayoutEffect(() => {
     const host = ref.current?.closest('[data-chat-flow-kind="rp-floor-assistant-actions"], [data-chat-flow-kind="rp-floor-opening-actions"]')
     if (!(host instanceof HTMLElement)) return undefined
-    const hidden = settledAssistantTraceRows(host)
-    for (const row of hidden) row.setAttribute('data-rp-message-actions-hidden-trace', '')
-    return () => {
-      for (const row of hidden) row.removeAttribute('data-rp-message-actions-hidden-trace')
-    }
-  }, [])
+    // Chat Nodes can be reordered once the final tool result closes the Turn.
+    // Reconcile ownership after those moves so a transient tool-only retry row
+    // can never remain selected while the durable prose row stays hidden.
+    return ownDynamicRows(
+      host,
+      () => settledAssistantTraceRows(host),
+      'data-rp-message-actions-hidden-trace',
+      owner,
+    )
+  }, [owner])
   return h('span', { ref, className: css.traceEffectAnchor, hidden: true, 'aria-hidden': true })
 }
 
@@ -618,14 +623,11 @@ function FailedAssistantTraceEffect({ endReasonKind }) {
 
 export function settledAssistantTraceRows(host) {
   const hidden = []
-  let keptClosing = false
+  const closing = messageRowForAction(host, 'assistant')
   for (let row = host?.previousElementSibling ?? null; row !== null; row = row.previousElementSibling) {
     const kind = row.dataset?.chatFlowKind
     if (kind === 'user' || kind === 'steering') break
-    if (kind === 'assistant-step' && !keptClosing) {
-      keptClosing = true
-      continue
-    }
+    if (row === closing) continue
     if (kind === 'rp-message-avatar-assistant'
       || kind === 'rp-message-avatar-opening'
       || kind === 'rp-message-avatar-user'
@@ -1291,8 +1293,8 @@ export function assistantMessageContent(messageRow) {
 
 /** Resolve the native user stack so editing can replace text without hiding image attachments. */
 export function userMessageContentStack(messageRow) {
-  const hover = messageRow?.querySelector?.('[data-time-hover-root]')
-  const stack = hover?.firstElementChild
+  const userBubble = messageRow?.querySelector?.('[data-actions-reveal]')
+  const stack = userBubble?.firstElementChild
   return stack instanceof HTMLElement ? stack : null
 }
 

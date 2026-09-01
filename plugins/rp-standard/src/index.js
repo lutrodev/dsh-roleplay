@@ -9,7 +9,7 @@ import { normalizeInitialSubagents } from 'dsh-roleplay-rp-subagent-manager'
 const PRESET_ID = 'roleplay'
 const PRESET_OWNER = 'dsh-roleplay-rp-standard'
 // Bump whenever managed composition or bundled guidance Skill files change.
-const PRESET_VERSION = 39
+const PRESET_VERSION = 40
 const MARKER_FILE = '.rp-standard.json'
 const COMPOSITION_FILE = 'agent.cordis.yml'
 const METADATA_FILE = 'preset.yml'
@@ -209,6 +209,7 @@ async function buildPresetFiles(config, presetDirectory, features) {
     '__RP_SUBAGENT_MANAGER_DISABLED__': !features.isEnabled('subagent-manager'),
     '__RP_REPLY_OPTIONS_DISABLED__': !features.isEnabled('reply-options'),
     '__RP_REPLY_OPTIONS_COUNT__': features.replyOptionsCount(),
+    '__RP_REPLY_OPTIONS_MAX_CHARACTERS__': features.replyOptionsMaxCharacters(),
     '__RP_REPLY_OPTIONS_KEYWORDS__': features.replyOptionsKeywords(),
     '__RP_CHARACTER_CARD_DISABLED__': !features.isEnabled('character-card'),
     '__RP_STATE_DISABLED__': !features.isEnabled('state'),

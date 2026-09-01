@@ -41,6 +41,7 @@ test('feature manager is the suite bundle and carries every managed Roleplay pac
   assert.equal(DEFAULT_ENABLED_FEATURES.includes('reply-options'), true)
   assert.match(patch.match(/enabledFeatures:([\s\S]*?)enabledSkills:/)?.[1] ?? '', /- reply-options/)
   assert.match(patchEntry(patch, 'rp-feature-manager'), /replyOptionsCount: 3/)
+  assert.match(patchEntry(patch, 'rp-feature-manager'), /replyOptionsMaxCharacters: 50/)
   assert.match(patchEntry(patch, 'rp-feature-manager'), /replyOptionsKeywords:\s+- ''\s+- ''\s+- ''/)
   for (const entryId of PARKED_BROWSER_ENTRY_IDS) {
     assert.match(patchEntry(patch, entryId), /disabled: true/, `${entryId} must start parked`)

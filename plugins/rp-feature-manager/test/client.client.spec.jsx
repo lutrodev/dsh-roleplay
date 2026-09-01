@@ -46,7 +46,7 @@ vi.mock('motion/react', async () => {
 })
 
 import { FEATURE_CATALOG, ROLEPLAY_SKILL_CATALOG } from '../src/catalog.js'
-import { RoleplaySettingsSection, apply } from '../src/client.js'
+import { ReplyOptionsSettingsOverlay, RoleplaySettingsSection, apply } from '../src/client.js'
 import { QuickReplyManager } from '../src/quick-reply-settings.js'
 import { buildRoleplayPromptPreview } from 'dsh-roleplay-rp-core/prompts'
 import { DEFAULT_QUICK_REPLIES } from 'dsh-roleplay-rp-quick-replies/protocol'
@@ -64,7 +64,7 @@ const copy = {
   applies: '下一次对话生效。', saveError: '启用状态没有保存，请稍后重试。',
   quickRepliesConfigure: '设置快捷回复', quickRepliesEnableFirst: '启用快捷回复后设置',
   replyOptionsConfigure: '设置回复选项', replyOptionsEnableFirst: '启用回复选项后设置',
-  replyOptionsSettingsSaved: '回复条数和方向关键词已保存；新建或重新打开对话后生效。',
+  replyOptionsSettingsSaved: '回复条数、字数上限和方向关键词已保存；新建或重新打开对话后生效。',
   skillsTitle: 'Roleplay Skills', skillsDescription: '逐项选择 Roleplay 插件向 Agent 提供的工作指南。',
   skillsScope: '这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。',
   visibilityTitle: '可见性预览', parentAgent: 'Agent 模式父代理',
@@ -105,7 +105,14 @@ const copy = {
 
 function t(key) { return copy[key] ?? key }
 
-function statusView(enabledFeatures, enabledSkills, revision = 0, replyOptionsCount = 3, replyOptionsKeywords = Array.from({ length: replyOptionsCount }, () => '')) {
+function statusView(
+  enabledFeatures,
+  enabledSkills,
+  revision = 0,
+  replyOptionsCount = 3,
+  replyOptionsKeywords = Array.from({ length: replyOptionsCount }, () => ''),
+  replyOptionsMaxCharacters = 50,
+) {
   return {
     roleplay: { version: '0.1.7' },
     dsh: { version: '0.1.2-alpha.3', compatible: true },
@@ -114,6 +121,7 @@ function statusView(enabledFeatures, enabledSkills, revision = 0, replyOptionsCo
     enabledFeatures: [...enabledFeatures],
     enabledSkills: [...enabledSkills],
     replyOptionsCount,
+    replyOptionsMaxCharacters,
     replyOptionsKeywords: [...replyOptionsKeywords],
     settings: { writable: true, revision },
     core: [
@@ -148,11 +156,19 @@ function harness(
   {
     remote = false,
     replyOptionsCount = 3,
+    replyOptionsMaxCharacters = 50,
     replyOptionsKeywords = Array.from({ length: replyOptionsCount }, () => ''),
     failReplyOptionsSave = false,
   } = {},
 ) {
-  let status = statusView(enabledFeatures, enabledSkills, 0, replyOptionsCount, replyOptionsKeywords)
+  let status = statusView(
+    enabledFeatures,
+    enabledSkills,
+    0,
+    replyOptionsCount,
+    replyOptionsKeywords,
+    replyOptionsMaxCharacters,
+  )
   let quickReplies = readyQuickReplyState()
   let snapshot = {
     status: remote ? 'unavailable' : 'ready',
@@ -162,6 +178,7 @@ function harness(
       enabledFeatures: [...enabledFeatures],
       enabledSkills: [...enabledSkills],
       replyOptionsCount,
+      replyOptionsMaxCharacters,
       replyOptionsKeywords: [...replyOptionsKeywords],
       harnessIdentity: '',
     },
@@ -186,6 +203,7 @@ function harness(
         snapshot.revision,
         snapshot.value.replyOptionsCount ?? 3,
         snapshot.value.replyOptionsKeywords,
+        snapshot.value.replyOptionsMaxCharacters ?? 50,
       )
       for (const listener of listeners) listener()
     }),
@@ -214,6 +232,7 @@ function harness(
             value: {
               ...snapshot.value,
               replyOptionsCount: payload.count,
+              replyOptionsMaxCharacters: payload.maxCharacters,
               replyOptionsKeywords: [...payload.keywords],
             },
           }
@@ -223,6 +242,7 @@ function harness(
             snapshot.revision,
             snapshot.value.replyOptionsCount,
             snapshot.value.replyOptionsKeywords,
+            snapshot.value.replyOptionsMaxCharacters,
           )
         } else if (endpoint === 'settings/set') {
           const stored = Array.isArray(payload.value) ? [...payload.value] : payload.value
@@ -237,6 +257,7 @@ function harness(
             snapshot.revision,
             snapshot.value.replyOptionsCount ?? 3,
             snapshot.value.replyOptionsKeywords,
+            snapshot.value.replyOptionsMaxCharacters ?? 50,
           )
         } else if (endpoint === 'settings/unset') {
           snapshot = {
@@ -250,6 +271,7 @@ function harness(
             snapshot.revision,
             snapshot.value.replyOptionsCount ?? 3,
             snapshot.value.replyOptionsKeywords,
+            snapshot.value.replyOptionsMaxCharacters ?? 50,
           )
         }
         return {
@@ -313,22 +335,33 @@ function promptView(enabledFeatures, identityOverride = '') {
 
 describe('Roleplay 一级设置与 Skill 管理', () => {
   it('在 Agent 预设之后注册一级 Roleplay 入口，不再注册插件页签', () => {
-    let registration
+    const registrations = []
+    const services = new Map()
     const inject = vi.fn((_name, setup) => setup())
     const ctx = {
       rpRemote: {},
-      effect: vi.fn(),
+      effect: vi.fn(setup => setup()),
+      reflect: { provide: vi.fn((name, value) => { services.set(name, value); return () => {} }) },
       locale: { register: vi.fn(), bind: () => t },
       settingsScope: { bind: vi.fn(() => ({})) },
       slots: {
         inject,
-        register: vi.fn(options => { registration = options }),
+        register: vi.fn((options, component) => { registrations.push({ options, component }); return () => {} }),
       },
     }
     apply(ctx)
     expect(inject).toHaveBeenCalledWith('settings.section', expect.any(Function))
-    expect(registration).toMatchObject({ name: 'settings.section', id: 'roleplay', order: 25 })
-    expect(registration.label()).toBe('Roleplay')
+    expect(inject).toHaveBeenCalledWith('shell.overlay', expect.any(Function))
+    const section = registrations.find(item => item.options.name === 'settings.section')
+    const overlay = registrations.find(item => item.options.name === 'shell.overlay')
+    expect(section.options).toMatchObject({ name: 'settings.section', id: 'roleplay', order: 25 })
+    expect(section.options.label()).toBe('Roleplay')
+    expect(overlay.options).toMatchObject({ name: 'shell.overlay', id: 'rp-reply-options-settings' })
+    const settingsController = services.get('rpReplyOptionsSettings')
+    expect(settingsController).toBeTruthy()
+    expect(overlay.options.inject().controller).toBe(settingsController)
+    settingsController.open()
+    expect(settingsController.getSnapshot()).toMatchObject({ open: true, request: 1 })
   })
 
   it('用插件卡片展示核心组件的名称、版本和简介', async () => {
@@ -340,6 +373,33 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     expect(card).toBeTruthy()
     expect(card.textContent).toContain('v0.1.7')
     expect(card.textContent).toContain('压缩较早的对话，并向 Writer 提供独立的会话总结。')
+  })
+
+  it('会话卡片入口通过全局浮层读取并保存同一份回复选项设置', async () => {
+    const { connection } = harness(['reply-options'], [], {
+      replyOptionsCount: 3,
+      replyOptionsMaxCharacters: 30,
+      replyOptionsKeywords: ['试探', '', '离开'],
+    })
+    const command = { open: true, request: 1 }
+    const controller = {
+      subscribe: () => () => {},
+      getSnapshot: () => command,
+      open: vi.fn(),
+      close: vi.fn(),
+    }
+    render(React.createElement(ReplyOptionsSettingsOverlay, { controller, connection }))
+
+    expect(await screen.findByRole('dialog', { name: '设置回复选项' })).toBeTruthy()
+    fireEvent.input(screen.getByRole('spinbutton', { name: '每条最多字数' }), { target: { value: '36' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存设置' }))
+    await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-features', 'settings/reply-options', {
+      count: 3,
+      maxCharacters: 36,
+      keywords: ['试探', '', '离开'],
+      expectedRevision: 0,
+    }))
+    await waitFor(() => expect(controller.close).toHaveBeenCalledTimes(1))
   })
 
   it('在快捷回复功能卡中提供设置入口，并保存完整的自定义列表', async () => {
@@ -374,13 +434,18 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     fireEvent.click(await screen.findByRole('button', { name: '设置回复选项' }))
     expect(await screen.findByRole('dialog', { name: '设置回复选项' })).toBeTruthy()
     const input = screen.getByRole('spinbutton', { name: '回复条数' })
+    const maxCharactersInput = screen.getByRole('spinbutton', { name: '每条最多字数' })
     expect(input.value).toBe('3')
+    expect(maxCharactersInput.value).toBe('50')
+    expect(screen.getByText('回复条数可填写 1–5；每条最多字数可填写 1–200，默认 50 字以内。')).toBeTruthy()
+    expect(screen.queryByText(/不会按此数值拦截提交/)).toBeNull()
     expect(input.disabled).toBe(false)
     expect(screen.getAllByRole('textbox')).toHaveLength(3)
     expect(screen.getByLabelText('选项 1 的方向关键词').value).toBe('试探')
     expect(screen.getByLabelText('选项 3 的方向关键词').value).toBe('离开')
 
     fireEvent.input(input, { target: { value: '5' } })
+    fireEvent.input(maxCharactersInput, { target: { value: '48' } })
     expect(input.value).toBe('5')
     expect(screen.getAllByRole('textbox')).toHaveLength(5)
     fireEvent.change(screen.getByLabelText('选项 2 的方向关键词'), { target: { value: ' 直接反抗 ' } })
@@ -390,10 +455,11 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     fireEvent.click(saveButton)
     await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-features', 'settings/reply-options', {
       count: 5,
+      maxCharacters: 48,
       keywords: ['试探', '直接反抗', '离开', '寻求帮助', ''],
       expectedRevision: 0,
     }))
-    expect(await screen.findByText('回复条数和方向关键词已保存；新建或重新打开对话后生效。')).toBeTruthy()
+    expect(await screen.findByText('回复条数、字数上限和方向关键词已保存；新建或重新打开对话后生效。')).toBeTruthy()
     expect(screen.queryByRole('dialog', { name: '设置回复选项' })).toBeNull()
   })
 
@@ -408,6 +474,19 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     expect(input.value).toBe('6')
     expect(screen.getAllByRole('textbox')).toHaveLength(3)
     expect(screen.getByRole('alert').textContent).toBe('请输入 1 到 5 之间的整数。')
+    expect(screen.getByRole('button', { name: '保存设置' }).disabled).toBe(true)
+    expect(connection.call).not.toHaveBeenCalledWith('/rp-features', 'settings/reply-options', expect.anything())
+  })
+
+  it('每条字数上限超出 1–200 时保留输入并阻止保存', async () => {
+    const { scope, connection } = harness(['reply-options'], [])
+    render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
+
+    fireEvent.click(await screen.findByRole('button', { name: '设置回复选项' }))
+    const input = await screen.findByRole('spinbutton', { name: '每条最多字数' })
+    fireEvent.input(input, { target: { value: '201' } })
+    expect(input.value).toBe('201')
+    expect(screen.getByRole('alert').textContent).toBe('请输入 1 到 200 之间的整数。')
     expect(screen.getByRole('button', { name: '保存设置' }).disabled).toBe(true)
     expect(connection.call).not.toHaveBeenCalledWith('/rp-features', 'settings/reply-options', expect.anything())
   })

@@ -486,10 +486,11 @@ describe('Roleplay message action presentation', () => {
 
     const parent = document.createElement('div')
     const userRow = flowRow('user', parent)
-    const hover = document.createElement('div')
-    hover.dataset.timeHoverRoot = ''
-    hover.append(document.createElement('div'), document.createElement('div'))
-    userRow.append(hover)
+    const userBubble = document.createElement('div')
+    userBubble.dataset.actionsReveal = 'always'
+    const nativeActions = document.createElement('div')
+    userBubble.append(document.createElement('div'), nativeActions)
+    userRow.append(userBubble)
     const actionRow = flowRow('rp-floor-user-actions', parent)
     const mount = document.createElement('div')
     actionRow.append(mount)
@@ -522,6 +523,9 @@ describe('Roleplay message action presentation', () => {
     expect(connection.call).not.toHaveBeenCalled()
     expect(screen.queryByText('暂时无法完成这次更改，请稍后再试。')).toBeNull()
     expect(userRow.hasAttribute('data-rp-message-actions-user-native-hidden')).toBe(true)
+    const disposeStyles = ensureStyles()
+    expect(getComputedStyle(nativeActions).display).toBe('none')
+    disposeStyles()
 
     view.unmount()
     expect(userRow.hasAttribute('data-rp-message-actions-user-native-hidden')).toBe(false)
@@ -557,12 +561,12 @@ describe('Roleplay message action presentation', () => {
 
     const parent = document.createElement('div')
     const userRow = flowRow('user', parent)
-    const hover = document.createElement('div')
-    hover.dataset.timeHoverRoot = ''
+    const userBubble = document.createElement('div')
+    userBubble.dataset.actionsReveal = 'always'
     const content = document.createElement('div')
     content.append(document.createElement('div'))
-    hover.append(content, document.createElement('div'))
-    userRow.append(hover)
+    userBubble.append(content, document.createElement('div'))
+    userRow.append(userBubble)
     const actionRow = flowRow('rp-floor-user-actions', parent)
     const mount = document.createElement('div')
     actionRow.append(mount)
@@ -791,14 +795,14 @@ describe('Roleplay message action presentation', () => {
     expect(node?.kind).toBe('rp-floor-user-actions')
 
     const row = document.createElement('div')
-    const hover = document.createElement('div')
-    hover.dataset.timeHoverRoot = ''
+    const userBubble = document.createElement('div')
+    userBubble.dataset.actionsReveal = 'always'
     const stack = document.createElement('div')
     const gallery = document.createElement('div')
     gallery.dataset.testGallery = ''
     stack.append(gallery)
-    hover.append(stack, document.createElement('div'))
-    row.append(hover)
+    userBubble.append(stack, document.createElement('div'))
+    row.append(userBubble)
 
     expect(userMessageContentStack(row)).toBe(stack)
     expect(userMessageContentStack(row)?.contains(gallery)).toBe(true)
@@ -950,6 +954,64 @@ describe('Roleplay message action presentation', () => {
     expect(settledAssistantTraceRows(host)).not.toContain(avatar)
     expect(settledTurnTailRow(host)).toBe(nativeTail)
     expect(settledTurnTailRow(host)).not.toBe(notice)
+  })
+
+  it('restores canonical prose when Chat reorders a tool-only retry around its action node', async () => {
+    let AssistantEffects
+    const ctx = {
+      rpRemote: {},
+      sessions: {},
+      uiConversation: { events: { register: () => {} } },
+      effect: cleanup => cleanup,
+      slots: {
+        inject: (_name, callback) => callback(),
+        register: (config, component) => {
+          if (config.name === 'conversation.chat.node' && config.key === 'rp-floor-assistant-actions') {
+            AssistantEffects = component
+          }
+          return { config, component }
+        },
+      },
+    }
+    apply(ctx)
+
+    const target = {
+      kind: 'message', role: 'assistant', messageId: 'canonical-prose', turn: 7, step: 2,
+    }
+    const state = { failed: false, finalAssistantSeq: 71 }
+    const parent = document.createElement('div')
+    flowRow('user', parent)
+    const prose = flowRow('assistant-step', parent)
+    const retry = flowRow('assistant-step', parent)
+    const host = flowRow('rp-floor-assistant-actions', parent)
+    const mount = document.createElement('div')
+    host.append(mount)
+    document.body.append(parent)
+
+    const view = render(React.createElement(AssistantEffects, {
+      sessionId: 'session-1',
+      node: {
+        location: {
+          kind: 'turn',
+          turn: { turn: 7, status: 'closed', data: new Map([['rp-floor-failed-assistant', state]]) },
+        },
+        data: { seq: 71, target, text: '工具重试前已经展示的正文', deleted: false, edited: false },
+      },
+      useSessions: selector => selector({
+        byId: { 'session-1': { projectionValues: { agentPreset: 'roleplay' } } },
+      }),
+    }), { container: mount })
+
+    expect(prose.hasAttribute('data-rp-message-actions-hidden-trace')).toBe(true)
+    expect(retry.hasAttribute('data-rp-message-actions-hidden-trace')).toBe(false)
+
+    parent.insertBefore(host, retry)
+    await waitFor(() => {
+      expect(prose.hasAttribute('data-rp-message-actions-hidden-trace')).toBe(false)
+    })
+
+    view.unmount()
+    parent.remove()
   })
 
   it('hides only internal commit attempts once the turn commits successfully', () => {
@@ -1543,6 +1605,8 @@ describe('Roleplay message action presentation', () => {
     expect(source).toMatch(/function InlineMessageEditorPortal/)
     expect(source).toMatch(/function EditedMessagePortal/)
     expect(source).toMatch(/function userMessageContentStack/)
+    expect(source).toMatch(/querySelector\?\.\('\[data-actions-reveal\]'\)/)
+    expect(source).not.toMatch(/data-time-hover-root/)
     expect(source).toMatch(/function assistantMessageContent/)
     expect(source).toMatch(/MarkdownText/)
     expect(source).toMatch(/messageRowForAction/)
@@ -1587,6 +1651,8 @@ describe('Roleplay message action presentation', () => {
     expect(styles).toMatch(/data-rp-message-actions-original-hidden/)
     expect(styles).toMatch(/inactiveActionNodeMarker/)
     expect(styles).toMatch(/rp-message-avatar-user/)
+    expect(styles).toMatch(/data-actions-reveal/)
+    expect(styles).not.toMatch(/data-time-hover-root/)
     expect(styles).toMatch(/rp-floor-opening-actions[^}]*inlineEditorPortalAnchor/)
     expect(styles).toMatch(/\.inlineEditor\s*\{[^}]*background:\s*var\(--dsw-specific-tip\)/s)
     expect(styles).toMatch(/\.inlineEditor\[data-surface="user"\]\s*\{[^}]*background:\s*var\(--dsw-specific-bubble\)/s)

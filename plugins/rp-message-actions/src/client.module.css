@@ -122,31 +122,32 @@
 }
 
 /* The Slot outlet inserts a display:contents anchor between the flow item and
-   the user renderer, so the message root is a descendant, not a direct child.
-   Require a real mounted plugin host in the adjacent projection before hiding
-   the resident time/copy row; declined standard-session projections stay out. */
+   the user renderer. Current DSH UserStyleBubble exposes data-actions-reveal
+   on its root and keeps the resident time/copy row as the last child. Require
+   a real mounted plugin host before replacing that row; declined standard-
+   session projections keep the native controls. */
 [data-chat-flow-kind="user"]:has(
   + [data-chat-flow-kind="rp-floor-user-actions"] .userFloorActionHost
 )
-  [data-time-hover-root]
-  > :last-child:not(.inlineEditor),
+  [data-actions-reveal]
+  > :last-child,
 [data-chat-flow-kind="user"]:has(
   + [data-chat-flow-kind="rp-message-avatar-user"]
   + [data-chat-flow-kind="rp-floor-user-actions"] .userFloorActionHost
 )
-  [data-time-hover-root]
-  > :last-child:not(.inlineEditor) {
+  [data-actions-reveal]
+  > :last-child {
   display: none;
 }
 
 /* JS ownership covers arbitrary public Conversation Nodes inserted between
    the native user row and this plugin's projected action row. */
 [data-chat-flow-kind="user"][data-rp-message-actions-user-native-hidden]
-  [data-time-hover-root]
-  > :last-child:not(.inlineEditor),
+  [data-actions-reveal]
+  > :last-child,
 [data-chat-flow-kind="steering"][data-rp-message-actions-user-native-hidden]
-  [data-time-hover-root]
-  > :last-child:not(.inlineEditor) {
+  [data-actions-reveal]
+  > :last-child {
   display: none;
 }
 

@@ -558,44 +558,70 @@
   gap: 18px;
 }
 
-.replyOptionsCountSection {
+.replyOptionsBasicSection {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
 }
 
-.replyOptionsCountField {
+.replyOptionsBasicFields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px;
-  align-items: center;
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.replyOptionsBasicField {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
   color: var(--dsw-alias-label-primary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 11px;
+  line-height: 17px;
   font-weight: 600;
 }
 
-.replyOptionsCountField input {
-  width: 100%;
-  min-height: 44px;
-  box-sizing: border-box;
+.replyOptionsNumberInput {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 9px;
-  outline: none;
-  padding: 9px 11px;
   background: var(--dsw-alias-bg-layer-2);
+}
+
+.replyOptionsNumberInput input {
+  width: 100%;
+  min-height: 44px;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: inherit;
+  outline: none;
+  padding: 9px 4px 9px 11px;
+  background: transparent;
   color: var(--dsw-alias-label-primary);
   font: 14px/20px var(--dsw-font-family);
   font-variant-numeric: tabular-nums;
 }
 
-.replyOptionsCountField input:focus-visible {
+.replyOptionsNumberInput:focus-within {
   border-color: var(--dsw-alias-state-business-primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);
 }
 
-.replyOptionsCountField input[aria-invalid='true'] {
+.replyOptionsNumberInput:has(input[aria-invalid='true']) {
   border-color: var(--dsw-alias-state-error-primary);
+}
+
+.replyOptionsNumberInput > span {
+  padding-right: 10px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  line-height: 18px;
+  font-weight: 450;
+  text-align: right;
 }
 
 .replyOptionsKeywordSection {
@@ -755,6 +781,15 @@
   gap: 8px;
 }
 
+.replyOptionsOverlayState {
+  margin: 0;
+  padding: 24px 4px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+
 @media (max-width: 480px) {
   .replyOptionsDialog {
     width: calc(100vw - 16px);
@@ -764,8 +799,8 @@
     max-height: calc(100dvh - 190px);
   }
 
-  .replyOptionsCountField {
-    grid-template-columns: minmax(0, 1fr) 88px;
+  .replyOptionsBasicFields {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .replyOptionsKeywordRow {

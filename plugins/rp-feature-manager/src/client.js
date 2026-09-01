@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m, useReducedMotion } from 'motion/react'
 import {
+  Button,
   IconCheckOutline16,
   IconChevronDownOutline14,
   IconCodeOutline16,
@@ -9,6 +10,7 @@ import {
   IconRefreshOutline16,
   IconSettingsOutline14,
   IconSkillOutline16,
+  Modal,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { SETTINGS_NAMESPACE } from './catalog.js'
@@ -69,7 +71,7 @@ const zh = {
   quickRepliesEnableFirst: '启用快捷回复后设置',
   replyOptionsConfigure: '设置回复选项',
   replyOptionsEnableFirst: '启用回复选项后设置',
-  replyOptionsSettingsSaved: '回复条数和方向关键词已保存；新建或重新打开对话后生效。',
+  replyOptionsSettingsSaved: '回复条数、字数上限和方向关键词已保存；新建或重新打开对话后生效。',
   skillsTitle: 'Roleplay Skills',
   skillsDescription: '逐项选择 Roleplay 插件向 Agent 提供的工作指南。停用 Skill 不会停用插件，也不会删除资料。',
   skillsScope: '这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。',
@@ -184,7 +186,7 @@ const en = {
   saveError: 'The enabled state was not saved. Try again.',
   quickRepliesConfigure: 'Configure quick replies', quickRepliesEnableFirst: 'Enable Quick replies to configure',
   replyOptionsConfigure: 'Configure reply options', replyOptionsEnableFirst: 'Enable Reply options to configure',
-  replyOptionsSettingsSaved: 'The reply count and direction keywords are saved and apply to newly created or reopened conversations.',
+  replyOptionsSettingsSaved: 'The reply count, length limit, and direction keywords are saved and apply to newly created or reopened conversations.',
   skillsTitle: 'Roleplay Skills',
   skillsDescription: 'Select the guides Roleplay plugins expose to agents. Disabling a Skill does not disable its plugin or delete data.',
   skillsScope: 'This page only manages Skills contributed by Roleplay plugins. Project and user Skills are unaffected.',
@@ -241,6 +243,11 @@ export function apply(ctx) {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'rp-feature-manager: dictionaries')
   const scope = ctx.settingsScope.bind({ namespace: SETTINGS_NAMESPACE })
   const t = ctx.locale.bind(NS)
+  const replyOptionsSettings = new ReplyOptionsSettingsController()
+  ctx.effect(() => {
+    const dispose = ctx.reflect.provide('rpReplyOptionsSettings', replyOptionsSettings)
+    return () => { void dispose() }
+  }, 'rp-feature-manager: reply-options settings service')
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     id: 'roleplay',
@@ -249,6 +256,120 @@ export function apply(ctx) {
     locale: NS,
     inject: () => ({ scope, connection: ctx.rpRemote }),
   }, RoleplaySettingsSection))
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'rp-reply-options-settings',
+    order: 30,
+    inject: () => ({ controller: replyOptionsSettings, connection: ctx.rpRemote }),
+  }, ReplyOptionsSettingsOverlay))
+}
+
+/** Root-scoped command surface used by the reply-options card to open settings. */
+export class ReplyOptionsSettingsController {
+  constructor() {
+    this.listeners = new Set()
+    this.value = Object.freeze({ open: false, request: 0 })
+    this.subscribe = listener => {
+      this.listeners.add(listener)
+      return () => { this.listeners.delete(listener) }
+    }
+    this.getSnapshot = () => this.value
+  }
+
+  open() {
+    this.value = Object.freeze({ open: true, request: this.value.request + 1 })
+    this.publish()
+  }
+
+  close() {
+    if (!this.value.open) return
+    this.value = Object.freeze({ ...this.value, open: false })
+    this.publish()
+  }
+
+  publish() {
+    for (const listener of this.listeners) listener()
+  }
+}
+
+/** Keep the settings dialog mounted at shell scope so conversation cards can open it directly. */
+export function ReplyOptionsSettingsOverlay({ controller, connection }) {
+  const command = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
+  const [status, setStatus] = useState({ phase: 'idle' })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!command.open) return undefined
+    let live = true
+    setSaving(false)
+    setStatus({ phase: 'loading' })
+    void featureStatus(connection).then(
+      value => { if (live) setStatus({ phase: 'ready', value }) },
+      () => { if (live) setStatus({ phase: 'error' }) },
+    )
+    return () => { live = false }
+  }, [command.open, command.request, connection])
+
+  if (!command.open) return null
+  if (status.phase !== 'ready') {
+    const failed = status.phase === 'error'
+    return h(Modal, {
+      open: true,
+      onClose: () => controller.close(),
+      title: '设置回复选项',
+      closeLabel: '关闭回复选项设置',
+      description: '设置主模型生成的选项数量、每条字数上限和可选方向。',
+      className: css.replyOptionsDialog,
+      footer: failed
+        ? h('div', { className: css.replyOptionsSettingsFooter },
+            h(Button, { type: 'button', variant: 'outline', onClick: () => controller.close() }, '取消'),
+            h(Button, { type: 'button', variant: 'primary', onClick: () => controller.open() }, '重试'))
+        : undefined,
+    }, h('p', {
+      className: css.replyOptionsOverlayState,
+      role: failed ? 'alert' : 'status',
+    }, failed ? '暂时无法读取回复选项设置。' : '正在读取回复选项设置…'))
+  }
+
+  const settingsRevision = status.value.settings?.revision
+  const writable = status.value.compatible === true
+    && status.value.settings?.writable === true
+    && Number.isSafeInteger(settingsRevision)
+  const save = async ({ count, maxCharacters, keywords }) => {
+    if (!writable || saving) return false
+    setSaving(true)
+    try {
+      const nextStatus = await setReplyOptionsSettings(
+        connection,
+        count,
+        maxCharacters,
+        keywords,
+        settingsRevision,
+      )
+      if (nextStatus.replyOptionsCount !== count
+        || nextStatus.replyOptionsMaxCharacters !== maxCharacters
+        || !sameSelection(nextStatus.replyOptionsKeywords, keywords)) {
+        throw new Error('Roleplay reply option settings were not applied')
+      }
+      setStatus({ phase: 'ready', value: nextStatus })
+      return true
+    } catch {
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return h(ReplyOptionsSettingsDialog, {
+    open: true,
+    count: status.value.replyOptionsCount,
+    maxCharacters: status.value.replyOptionsMaxCharacters,
+    keywords: status.value.replyOptionsKeywords,
+    writable,
+    saving,
+    onSave: save,
+    onClose: () => controller.close(),
+  })
 }
 
 export function RoleplaySettingsSection({ scope, connection, t }) {
@@ -380,7 +501,7 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
     }
   }
 
-  const updateReplyOptions = async ({ count, keywords }) => {
+  const updateReplyOptions = async ({ count, maxCharacters, keywords }) => {
     if (!canWrite) return false
     setPending('reply-options-settings')
     setNotice('')
@@ -388,10 +509,13 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
       const nextStatus = await setReplyOptionsSettings(
         connection,
         count,
+        maxCharacters,
         keywords,
         settingsRevision,
       )
-      if (nextStatus.replyOptionsCount !== count || !sameSelection(nextStatus.replyOptionsKeywords, keywords)) {
+      if (nextStatus.replyOptionsCount !== count
+        || nextStatus.replyOptionsMaxCharacters !== maxCharacters
+        || !sameSelection(nextStatus.replyOptionsKeywords, keywords)) {
         throw new Error('Roleplay reply option settings were not applied')
       }
       setStatus({ phase: 'ready', value: nextStatus })
@@ -486,6 +610,7 @@ export function RoleplaySettingsSection({ scope, connection, t }) {
         ? h(ReplyOptionsSettingsDialog, {
             open: true,
             count: status.value.replyOptionsCount,
+            maxCharacters: status.value.replyOptionsMaxCharacters,
             keywords: status.value.replyOptionsKeywords,
             writable: settingsWritable,
             saving: pending === 'reply-options-settings',

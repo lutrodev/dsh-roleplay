@@ -8,10 +8,10 @@ Chat 模式适合直接续写；Agent 模式还可以使用资料工具和任务
 
 角色卡、世界书、人设、创作预设和文风都是可选的实时资料。未绑定时直接生成；绑定资料被删除、损坏或超出可读限制时，Core 会把对应来源标为不可用并从本轮 Prompt 跳过，同时保留绑定 ID 供界面提示和 Agent 修复，不会因此阻断 Writer。运行服务、会话状态或非资料代码本身的错误仍会明确失败。
 
-提交参数不符合当前能力 Schema 时，Core 会保留原正文并返回能力提供的精确字段纠错，供模型在同一轮只重试提交；失败尝试不会产生部分状态变化。
+提交失败统一规范化为带稳定 code 的结构化结果，并返回所有已经能够独立确认的 reference、effect、extension 与 guard 问题及其 JSON Pointer 范围。即使参数先违反当前能力 Schema，Core 也会对同一草稿做一次无写入领域预检，让模型一次看到 Schema 违规和其他独立业务错误，而不是修完一个才暴露下一个。Core 只在当前 Run 内缓存最新失败草稿；错误结果携带与 Writer 和 Context Build 绑定的 token 后，模型可用同一个 `rp_commit_turn` 只发送有界 `add`／`replace`／`remove` 补丁，以及 live Schema 仍要求的完整 extensions。后者按 namespace 覆盖缓存值，未重发的可选 extension 和其他字段保持不变。重建后的完整草稿必须重新通过当前动态 Schema、全部领域校验和 live context 校验，之后才原子提交；上下文变化会使 token 失效。重试时父模型生成的推理或错误解释不会显示，也不会替换 Writer 正文，失败尝试不会产生部分状态变化。
 
-Artifact 扩展通过 `registerArtifactExtension` 注册根对象闭合的 JSON Schema，并可声明为必需。Core 会按当前注册表动态生成 `rp_commit_turn.extensions` 的闭合结构、拒绝未知命名空间，并在注册或卸载时发送 `tools/change`；必需扩展缺失或扩展领域校验失败都会沿用可重试的提交错误，只有规范化结果随成功提交进入事件元数据。
+Artifact 扩展通过 `registerArtifactExtension` 注册对象 JSON Schema，并可声明为必需。默认仍要求 namespace 内对象闭合；确实拥有规范化边界的扩展可显式设置 `acceptAdditionalProperties: true` 并使用开放 Schema，从而忽略模型附加的非权威注释，最终事件仍只保存 validator 返回的规范值。Core 始终保持顶层 `extensions` 闭合并拒绝未知命名空间，在注册或卸载时发送 `tools/change`；完整提交和补丁重试都保留顶层及 namespace 级 required 约束，因此重试会重新发送必需 extensions，但不重复 summary、effects、references 或可选 extension。必需扩展缺失或扩展领域校验失败都会沿用可重试的提交错误，只有规范化结果随成功提交进入事件元数据。
 
-Chat 的首个父模型步骤会从同一份 Context Build 获得当前角色卡与用户人设，用于识别角色、用户控制身份和生成回复选项；世界书、预设、文风和 Writer 的其他完整 Slot 仍不向 Chat 展开。Chat 与 Agent 同时在首步获得同一份由 Context Source 声明的提交专用上下文，后续 Writer、子代理和提交步骤复用该前缀。运行中资料刷新会同时重建 Writer 与提交视图；只有提交素材变化时才返回完整替代内容，避免继续使用旧 revision，也避免无变化刷新增加输入。
+Chat 的首个父模型步骤会从同一份 Context Build 获得当前角色卡与用户人设，用于识别角色、用户控制身份和生成回复选项；世界书、预设、文风和 Writer 的其他完整 Slot 仍不向 Chat 展开。Core 的上下文说明只声明 `<section name="人设信息"><item name="我的人设">` 的内容是 user-controlled protagonist，不把实际姓名或人设正文再拼入工具 Schema；该 item 不存在时，Chat 与 Agent 都从其余上下文和当前对话自行判断。两种模式同时在首步获得同一份由 Context Source 声明的提交专用上下文，后续 Writer、子代理和提交步骤复用该前缀。运行中资料刷新会同时重建 Writer 与提交视图；只有提交素材变化时才返回完整替代内容，避免继续使用旧 revision，也避免无变化刷新增加输入。
 
 Writer 的固定系统提示仅保留输入执行与结果交付约定，不规定正文形态或写法。连续性、角色控制、长程推进、信息释放、收束和默认篇幅全部由实时输入及对应资产栏位维护，避免高优先级规则重复或覆盖用户配置。

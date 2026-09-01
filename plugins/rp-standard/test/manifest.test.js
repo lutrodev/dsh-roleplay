@@ -108,7 +108,7 @@ test('Roleplay preset composes every standard Roleplay capability once', async (
   assert.match(patch, /id: rp-conversation-summary[\s\S]*?name: __RP_CONVERSATION_SUMMARY_MODULE__/)
   assert.match(patch, /id: rp-conversation-summary[\s\S]*?id: command-compact[\s\S]*?name: __COMMAND_COMPACT_MODULE__/)
   assert.match(patch, /id: rp-core[\s\S]*?id: rp-conversation-summary-bridge[\s\S]*?name: __RP_CONVERSATION_SUMMARY_BRIDGE_MODULE__/)
-  assert.match(patch, /id: rp-reply-options[\s\S]*?name: __RP_REPLY_OPTIONS_MODULE__[\s\S]*?registerRuntime: true[\s\S]*?count: __RP_REPLY_OPTIONS_COUNT__/)
+  assert.match(patch, /id: rp-reply-options[\s\S]*?name: __RP_REPLY_OPTIONS_MODULE__[\s\S]*?registerRuntime: true[\s\S]*?count: __RP_REPLY_OPTIONS_COUNT__[\s\S]*?maxCharacters: __RP_REPLY_OPTIONS_MAX_CHARACTERS__/)
   assert.equal(patch.match(/id: tool-subagent/g)?.length ?? 0, 0)
   for (const id of ['persistent-shell', 'pty', 'terminal-bash', 'persistent-bash', 'terminal-pwsh', 'persistent-pwsh', 'str-replace-editor']) {
     assert.equal(patch.match(new RegExp(`id: ${id}(?:\\n|$)`, 'g'))?.length, 1)

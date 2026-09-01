@@ -8,6 +8,7 @@
       config:
         harnessIdentity: ''
         replyOptionsCount: 3
+        replyOptionsMaxCharacters: 50
         replyOptionsKeywords:
           - ''
           - ''

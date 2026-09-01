@@ -34,16 +34,18 @@ afterEach(cleanup)
 const options = ['熙雯伸手推开门，谨慎地走进去。', '她先从窗边观察里面的动静。', '熙雯回头寻找能帮忙的同伴。']
 
 describe('Roleplay reply options', () => {
-  it('registers its public conversation nodes and declares every client service it reads', () => {
+  it('registers its public nodes and resolves the optional settings service at click time', () => {
     expect(clientInject).toEqual(['slots', 'uiConversation', 'sessions', 'conversation'])
     const definitions = []
     const slots = []
     const send = vi.fn()
+    const open = vi.fn()
     const ctx = {
       effect: cleanupEffect => cleanupEffect,
       uiConversation: { events: { register: definition => definitions.push(definition) } },
       sessions: { scope: () => ({ get: () => ({ send }) }) },
       conversation: {},
+      get: name => name === 'rpReplyOptionsSettings' ? { open } : undefined,
       slots: {
         inject: (_name, callback) => callback(),
         register: (config, component) => { slots.push({ config, component }); return () => {} },
@@ -53,6 +55,8 @@ describe('Roleplay reply options', () => {
     expect(definitions.map(item => item.kind)).toEqual(['rp-reply-options-anchor', 'rp-reply-options-retraction'])
     expect(slots.map(item => item.config.key)).toEqual(['rp-reply-options-anchor', 'rp-reply-options-retraction'])
     expect(typeof slots[0].config.inject().sendReply).toBe('function')
+    slots[0].config.inject().openSettings()
+    expect(open).toHaveBeenCalledTimes(1)
   })
 
   it('renders only the active non-subagent Roleplay choices and sends the exact selected text', async () => {
@@ -71,6 +75,7 @@ describe('Roleplay reply options', () => {
       useInput: selector => selector({ phase: 'plain', draft: '保留这段草稿' }),
       inputActions: { setDraft },
       sendReply,
+      openSettings: vi.fn(),
     }
     render(React.createElement(ReplyOptionsAnchor, props))
     expect(screen.getByRole('heading', { name: '接下来想怎么做？' })).toBeTruthy()
@@ -78,6 +83,11 @@ describe('Roleplay reply options', () => {
     expect(screen.getByText('1').getAttribute('aria-hidden')).toBe('true')
     expect(screen.getByText('2').getAttribute('aria-hidden')).toBe('true')
     expect(screen.getByText('3').getAttribute('aria-hidden')).toBe('true')
+    const settingsButton = screen.getByRole('button', { name: '设置回复选项' })
+    expect(settingsButton.closest('header')).toBeTruthy()
+    expect(screen.queryByText('发送')).toBeNull()
+    fireEvent.click(settingsButton)
+    expect(props.openSettings).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: options[1] }))
     await waitFor(() => expect(sendReply).toHaveBeenCalledWith('session-1', options[1]))
     expect(sendReply).toHaveBeenCalledTimes(1)

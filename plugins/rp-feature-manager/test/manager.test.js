@@ -263,6 +263,7 @@ test('manager publishes its enabled selection through the shared settings namesp
       enabledFeatures: ['lore-book', 'state'],
       enabledSkills: DEFAULT_ENABLED_SKILLS,
       replyOptionsCount: 3,
+      replyOptionsMaxCharacters: 50,
       replyOptionsKeywords: ['', '', ''],
       harnessIdentity: '',
     })
@@ -331,14 +332,17 @@ test('browser API follows the typed Remote boundary and persists Roleplay settin
 
     const count = await handler('settings/reply-options', {
       count: 5,
+      maxCharacters: 48,
       keywords: ['试探', '反抗', '', '求助', '离开'],
       expectedRevision: 1,
     })
     assert.equal(count.value.ok, true)
     assert.equal(count.value.value.replyOptionsCount, 5)
+    assert.equal(count.value.value.replyOptionsMaxCharacters, 48)
     assert.deepEqual(count.value.value.replyOptionsKeywords, ['试探', '反抗', '', '求助', '离开'])
     assert.equal(count.value.value.settings.revision, 2)
     assert.equal(ctx.get('rpFeatures').replyOptionsCount(), 5)
+    assert.equal(ctx.get('rpFeatures').replyOptionsMaxCharacters(), 48)
     assert.deepEqual(ctx.get('rpFeatures').replyOptionsKeywords(), ['试探', '反抗', '', '求助', '离开'])
 
     const identity = await handler('settings/set', {
@@ -366,7 +370,7 @@ test('browser API follows the typed Remote boundary and persists Roleplay settin
   }
 })
 
-test('manager atomically validates reply option count and index-aligned direction keywords', async () => {
+test('manager atomically validates reply option count, length, and index-aligned directions', async () => {
   const ctx = new Context()
   provideSystemPrompt(ctx)
   ctx.provide('loader', { entries: () => [], async await() {} })
@@ -379,26 +383,41 @@ test('manager atomically validates reply option count and index-aligned directio
 
     for (const value of [0, 6, 1.5]) {
       await assert.rejects(
-        manager.setReplyOptionsSettings({ count: value, keywords: [], expectedRevision: 0 }),
+        manager.setReplyOptionsSettings({ count: value, maxCharacters: 30, keywords: [], expectedRevision: 0 }),
         /integer|between 1 and 5/,
       )
     }
     assert.equal(manager.replyOptionsCount(), 3)
+    assert.equal(manager.replyOptionsMaxCharacters(), 50)
     assert.deepEqual(manager.replyOptionsKeywords(), ['', '', ''])
+    for (const value of [0, 201, 1.5]) {
+      await assert.rejects(
+        manager.setReplyOptionsSettings({ count: 3, maxCharacters: value, keywords: ['', '', ''], expectedRevision: 0 }),
+        /integer|between 1 and 200/,
+      )
+    }
     await assert.rejects(
-      manager.setReplyOptionsSettings({ count: 3, keywords: ['试探'], expectedRevision: 0 }),
+      manager.setReplyOptionsSettings({ count: 3, maxCharacters: 30, keywords: ['试探'], expectedRevision: 0 }),
       /exactly 3 items/,
     )
     await assert.rejects(
-      manager.setReplyOptionsSettings({ count: 1, keywords: ['界'.repeat(41)], expectedRevision: 0 }),
+      manager.setReplyOptionsSettings({ count: 1, maxCharacters: 30, keywords: ['界'.repeat(41)], expectedRevision: 0 }),
       /exceeds 40 Unicode/,
     )
-    const status = await manager.setReplyOptionsSettings({ count: 1, keywords: [' 试探\n对方 '], expectedRevision: 0 })
+    const status = await manager.setReplyOptionsSettings({
+      count: 1,
+      maxCharacters: 48,
+      keywords: [' 试探\n对方 '],
+      expectedRevision: 0,
+    })
     assert.equal(status.replyOptionsCount, 1)
+    assert.equal(status.replyOptionsMaxCharacters, 48)
     assert.deepEqual(status.replyOptionsKeywords, ['试探 对方'])
     assert.equal(manager.snapshot().replyOptionsCount, 1)
+    assert.equal(manager.snapshot().replyOptionsMaxCharacters, 48)
     assert.deepEqual(manager.snapshot().replyOptionsKeywords, ['试探 对方'])
     assert.equal(snapshots.at(-1).replyOptionsCount, 1)
+    assert.equal(snapshots.at(-1).replyOptionsMaxCharacters, 48)
     assert.deepEqual(snapshots.at(-1).replyOptionsKeywords, ['试探 对方'])
     await assert.rejects(ctx.settings.update('roleplay-features', { replyOptionsCount: 6 }), /<= 5|between 1 and 5/)
   } finally {
@@ -446,6 +465,7 @@ test('manager persists the legacy implicit-State MVU selection as an explicit de
       enabledFeatures: ['character-card', 'lore-book', 'state', 'compat-mvu'],
       enabledSkills: DEFAULT_ENABLED_SKILLS,
       replyOptionsCount: 3,
+      replyOptionsMaxCharacters: 50,
       replyOptionsKeywords: ['', '', ''],
       harnessIdentity: '',
     })

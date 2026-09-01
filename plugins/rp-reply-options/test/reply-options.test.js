@@ -6,9 +6,11 @@ import { RpRuntime } from 'dsh-roleplay-rp-core'
 import * as ReplyOptionsPlugin from '../src/index.js'
 import {
   assertReplyOptionKeywords,
+  DEFAULT_REPLY_OPTION_MAX_CHARACTERS,
   DEFAULT_REPLY_OPTIONS_COUNT,
   decodeStoredReplyOptions,
   normalizeReplyOptionKeywords,
+  normalizeReplyOptionMaxCharacters,
   normalizeReplyOptionsCount,
   normalizeReplyOptionsInput,
   REPLY_OPTION_KEYWORD_MAX_CHARACTERS,
@@ -20,7 +22,7 @@ import {
 const three = ['林岚靠近门边，低声问：“外面是谁？”', '林岚走到窗边，俯身检查留下的脚印。', '她退回走廊，快步去找同伴。']
 const five = [...three, '她暂时保持沉默，留意四周。', '林岚转身离开这里。']
 
-test('normalizes exactly the configured number of complete messages into the persisted protocol', () => {
+test('normalizes usable messages up to the configured target without blocking on count or annotations', () => {
   assert.deepEqual(normalizeReplyOptionsInput({
     options: ['  林岚靠近门边，低声问：“外面是谁？”\r\n', '林岚走到窗边，俯身检查留下的脚印。', '她退回走廊，快步去找同伴。'],
   }), {
@@ -29,28 +31,44 @@ test('normalizes exactly the configured number of complete messages into the per
   })
   assert.deepEqual(normalizeReplyOptionsInput({ options: [three[0]] }, 1).options, [three[0]])
   assert.equal(normalizeReplyOptionsInput({ options: five }, 5).options.length, 5)
-  assert.doesNotThrow(() => normalizeReplyOptionsInput({
-    options: ['界'.repeat(REPLY_OPTION_MAX_CHARACTERS), three[1], three[2]],
-  }))
+  assert.deepEqual(normalizeReplyOptionsInput({
+    description: 'model-added annotation',
+    options: [three[0], '', ` ${three[0]} `, three[1]],
+  }).options, [three[0], three[1]])
+  assert.deepEqual(normalizeReplyOptionsInput({ options: five }, 3).options, three)
+  const longOption = '界'.repeat(REPLY_OPTION_MAX_CHARACTERS * 10)
+  assert.deepEqual(normalizeReplyOptionsInput({
+    options: [longOption, three[1], three[2]],
+  }).options, [longOption, three[1], three[2]])
 })
 
-test('rejects count mismatches, text violations, duplicates, and invalid count settings', () => {
+test('rejects unusable structures while treating configured count and length as guidance', () => {
   assert.equal(normalizeReplyOptionsCount(), DEFAULT_REPLY_OPTIONS_COUNT)
   assert.equal(normalizeReplyOptionsCount(1), 1)
   assert.equal(normalizeReplyOptionsCount(5), 5)
   for (const invalid of [0, 6, 1.5, '3']) {
     assert.throws(() => normalizeReplyOptionsCount(invalid), /integer|between 1 and 5/)
   }
-  assert.throws(() => normalizeReplyOptionsInput({ options: three.slice(0, 2) }), /exactly 3 items/)
-  assert.throws(() => normalizeReplyOptionsInput({ options: three }, 1), /exactly 1 item/)
-  assert.throws(() => normalizeReplyOptionsInput({ options: three }, 5), /exactly 5 items/)
-  assert.throws(() => normalizeReplyOptionsInput({ options: ['', three[1], three[2]] }), /must not be empty/)
+  assert.equal(normalizeReplyOptionMaxCharacters(), DEFAULT_REPLY_OPTION_MAX_CHARACTERS)
+  assert.equal(normalizeReplyOptionMaxCharacters(1), 1)
+  assert.equal(normalizeReplyOptionMaxCharacters(REPLY_OPTION_MAX_CHARACTERS), REPLY_OPTION_MAX_CHARACTERS)
+  for (const invalid of [0, REPLY_OPTION_MAX_CHARACTERS + 1, 1.5, '30']) {
+    assert.throws(() => normalizeReplyOptionMaxCharacters(invalid), /integer|between 1 and 200/)
+  }
+  assert.deepEqual(normalizeReplyOptionsInput({ options: three.slice(0, 2) }).options, three.slice(0, 2))
+  assert.deepEqual(normalizeReplyOptionsInput({ options: three }, 1).options, [three[0]])
+  assert.deepEqual(normalizeReplyOptionsInput({ options: three }, 5).options, three)
+  assert.deepEqual(normalizeReplyOptionsInput({ options: ['', three[1], three[2]] }).options, three.slice(1))
   assert.throws(() => normalizeReplyOptionsInput({ options: [1, three[1], three[2]] }), /must be a string/)
-  assert.throws(() => normalizeReplyOptionsInput({
+  assert.doesNotThrow(() => normalizeReplyOptionsInput({
     options: ['界'.repeat(REPLY_OPTION_MAX_CHARACTERS + 1), three[1], three[2]],
-  }), /exceeds 200 Unicode/)
-  assert.throws(() => normalizeReplyOptionsInput({ options: [three[0], ` ${three[0]} `, three[2]] }), /duplicates/)
-  assert.throws(() => normalizeReplyOptionsInput({ options: three, title: 'hidden' }), /closed object/)
+  }))
+  assert.deepEqual(
+    normalizeReplyOptionsInput({ options: [three[0], ` ${three[0]} `, three[2]] }).options,
+    [three[0], three[2]],
+  )
+  assert.deepEqual(normalizeReplyOptionsInput({ options: three, title: 'ignored annotation' }).options, three)
+  assert.throws(() => normalizeReplyOptionsInput({ options: ['', ' '] }), /at least one usable item/)
 })
 
 test('normalizes one optional direction keyword per configured option', () => {
@@ -71,7 +89,9 @@ test('normalizes one optional direction keyword per configured option', () => {
 
 test('decodes only canonical versioned event values and exposes model-facing guidance', () => {
   const stored = { version: 1, options: three }
+  const longStored = { version: 1, options: ['界'.repeat(REPLY_OPTION_MAX_CHARACTERS * 10)] }
   assert.deepEqual(decodeStoredReplyOptions(stored), stored)
+  assert.deepEqual(decodeStoredReplyOptions(longStored), longStored)
   assert.deepEqual(decodeStoredReplyOptions({ version: 1, options: [three[0]] }), { version: 1, options: [three[0]] })
   assert.deepEqual(decodeStoredReplyOptions({ version: 1, options: five }), { version: 1, options: five })
   assert.equal(decodeStoredReplyOptions({ version: 1, options: [] }), undefined)
@@ -79,14 +99,18 @@ test('decodes only canonical versioned event values and exposes model-facing gui
   assert.equal(decodeStoredReplyOptions({ version: 2, options: three }), undefined)
   assert.equal(decodeStoredReplyOptions({ version: 1, options: [` ${three[0]}`, three[1], three[2]] }), undefined)
   assert.equal(decodeStoredReplyOptions({ version: 1, options: three, hidden: true }), undefined)
-  const schema = replyOptionsExtensionSchema(5, ['试探', '直接反抗', '', '寻求帮助', ''])
-  assert.equal(schema.additionalProperties, false)
+  const schema = replyOptionsExtensionSchema(5, ['试探', '直接反抗', '', '寻求帮助', ''], 48)
+  assert.equal(schema.additionalProperties, true)
   assert.deepEqual(schema.required, ['options'])
   assert.equal(Object.hasOwn(schema.properties.options, 'minItems'), false)
   assert.equal(Object.hasOwn(schema.properties.options, 'maxItems'), false)
   assert.equal(schema.properties.options.items.type, 'string')
+  assert.equal(Object.hasOwn(schema.properties.options.items, 'minLength'), false)
+  assert.equal(Object.hasOwn(schema.properties.options.items, 'maxLength'), false)
   assert.match(schema.description, /directly sendable third-person next messages/)
-  assert.match(schema.description, /use the protagonist's established name or third-person pronoun as the narrative subject/)
+  assert.match(schema.description, /resolved by the surrounding roleplay_context context_guide/)
+  assert.match(schema.description, /otherwise infer the protagonist from the remaining context and conversation/)
+  assert.match(schema.description, /use that protagonist's established name or third-person pronoun as the narrative subject/)
   assert.match(schema.description, /what the protagonist says and\/or does next/)
   assert.match(schema.description, /First-person wording may appear only inside the protagonist's quoted dialogue/)
   assert.match(schema.description, /Do not write director instructions, other characters' reactions/)
@@ -98,16 +122,20 @@ test('decodes only canonical versioned event values and exposes model-facing gui
   assert.match(schema.description, /do not copy it as a label/)
   assert.doesNotMatch(schema.description, /option 3:/)
   assert.match(schema.properties.options.description, /distinct third-person protagonist messages/)
+  assert.match(schema.properties.options.description, /no longer than 48 Unicode characters/)
   assert.match(schema.properties.options.items.description, /established name or pronoun/)
 })
 
 test('returns concise third-person correction guidance when model input is invalid', () => {
   assert.throws(
-    () => normalizeReplyOptionsInput({ options: three.slice(0, 2) }),
+    () => normalizeReplyOptionsInput({ options: ['', ' '] }),
     error => error.feedback?.correction.includes('third-person protagonist messages')
-      && error.feedback.correction.includes("protagonist's established name or pronoun as the narrative subject")
-      && error.feedback.correction.includes('first-person is allowed only inside quoted dialogue')
-      && error.feedback.correction.includes('what the protagonist says or does next'),
+      && error.feedback.correction.includes('surrounding roleplay_context context_guide')
+      && error.feedback.correction.includes('otherwise infer the protagonist from the remaining context and conversation')
+      && error.feedback.correction.includes("that protagonist's established name or pronoun as the narrative subject")
+      && error.feedback.correction.includes('allow first-person wording only inside quoted dialogue')
+      && error.feedback.correction.includes('what the protagonist says or does next')
+      && !error.feedback.correction.includes('Unicode characters'),
   )
 })
 
@@ -121,14 +149,23 @@ test('registers the required runtime extension only for the preset instance', ()
   }
   ReplyOptionsPlugin.apply(ctx, { registerRuntime: false })
   assert.equal(definitions.length, 0)
-  ReplyOptionsPlugin.apply(ctx, { registerRuntime: true, count: 5, keywords: ['试探', '反抗', '', '求助', '离开'] })
+  ReplyOptionsPlugin.apply(ctx, {
+    registerRuntime: true,
+    count: 5,
+    maxCharacters: 30,
+    keywords: ['试探', '反抗', '', '求助', '离开'],
+  })
   assert.equal(definitions.length, 1)
   assert.equal(definitions[0].namespace, REPLY_OPTIONS_EXTENSION_NAMESPACE)
   assert.equal(definitions[0].required, true)
+  assert.equal(definitions[0].acceptAdditionalProperties, true)
   assert.match(definitions[0].schema.description, /exactly 5/)
   assert.match(definitions[0].schema.description, /option 2: "反抗"/)
+  assert.match(definitions[0].schema.properties.options.description, /no longer than 30 Unicode characters/)
   assert.deepEqual(definitions[0].validate({ options: five }), { version: 1, options: five })
-  assert.throws(() => definitions[0].validate({ options: three }), /exactly 5 items/)
+  const aboveGuidance = ['界'.repeat(31), ...five.slice(1)]
+  assert.deepEqual(definitions[0].validate({ options: aboveGuidance }).options, aboveGuidance)
+  assert.deepEqual(definitions[0].validate({ options: three }).options, three)
 })
 
 test('registers through real Cordis and RpRuntime schema validation', async () => {
@@ -153,27 +190,34 @@ test('registers through real Cordis and RpRuntime schema validation', async () =
     await ctx.plugin(ReplyOptionsPlugin, {
       registerRuntime: true,
       count: 3,
+      maxCharacters: 30,
       keywords: ['试探', '', '正面应对'],
     })
 
     const registered = runtime.artifactExtensions.get(REPLY_OPTIONS_EXTENSION_NAMESPACE)
     assert.ok(registered)
     assert.equal(registered.required, true)
+    assert.equal(registered.acceptAdditionalProperties, true)
 
     const commitSchema = tools.get('rp_commit_turn').parameters
     assert.deepEqual(commitSchema.required, ['extensions'])
     assert.equal(commitSchema.properties.extensions.additionalProperties, false)
     assert.deepEqual(commitSchema.properties.extensions.required, [REPLY_OPTIONS_EXTENSION_NAMESPACE])
+    assert.deepEqual(commitSchema.properties.retry.required, ['token', 'patches'])
 
     const extensionSchema =
       commitSchema.properties.extensions.properties[REPLY_OPTIONS_EXTENSION_NAMESPACE]
     assert.ok(extensionSchema)
+    assert.equal(extensionSchema.additionalProperties, true)
     assert.equal(Object.hasOwn(extensionSchema.properties.options, 'minItems'), false)
     assert.equal(Object.hasOwn(extensionSchema.properties.options, 'maxItems'), false)
     assert.deepEqual(registered.validate({ options }), { version: 1, options })
-    assert.throws(
-      () => registered.validate({ options: options.slice(0, 2) }),
-      /exactly 3 options|exactly 3 items/,
+    const aboveGuidance = ['界'.repeat(31), ...options.slice(1)]
+    assert.deepEqual(registered.validate({ options: aboveGuidance }).options, aboveGuidance)
+    assert.deepEqual(registered.validate({ options: options.slice(0, 2) }).options, options.slice(0, 2))
+    assert.deepEqual(
+      registered.validate({ options, description: 'model-added annotation' }),
+      { version: 1, options },
     )
   } finally {
     await ctx.fiber.dispose()

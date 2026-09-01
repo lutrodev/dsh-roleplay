@@ -20,11 +20,36 @@
 .header {
   display: flex;
   min-width: 0;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 11px 13px 10px;
   border-bottom: 1px solid color-mix(in srgb, var(--dsw-alias-separator-primary) 72%, transparent);
+}
+
+.settingsButton {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  margin: -6px -5px -6px 0;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  outline: none;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.settingsButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.settingsButton:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 20%, transparent);
+  color: var(--dsw-alias-brand-primary);
 }
 
 .titleGroup {
@@ -72,7 +97,7 @@
   min-height: 48px;
   min-width: 0;
   box-sizing: border-box;
-  grid-template-columns: 28px minmax(0, 1fr) max-content;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
   gap: 6px;
   padding: 8px 10px;
@@ -133,19 +158,16 @@
   white-space: pre-wrap;
 }
 
-.optionAction,
 .sending {
-  min-width: 48px;
-  flex: none;
-  text-align: right;
+  grid-column: 2;
+  padding: 0 4px 1px;
+  text-align: left;
   white-space: nowrap;
   font-size: 10px;
   line-height: 18px;
   font-weight: 560;
 }
 
-.optionAction { color: var(--dsw-alias-label-tertiary); }
-.option:hover:not(:disabled) .optionAction { color: var(--dsw-alias-brand-primary); }
 .sending { color: var(--dsw-alias-brand-primary); }
 
 .error {
@@ -159,12 +181,10 @@
 }
 
 @container (max-width: 420px) {
-  .header { align-items: flex-start; }
+  .header { align-items: center; }
   .titleGroup { align-items: flex-start; flex-direction: column; gap: 0; }
   .options { padding: 7px; }
   .option { grid-template-columns: 28px minmax(0, 1fr); align-items: start; padding: 9px; }
   .optionNumber { margin-top: 1px; }
-  .optionAction,
   .sending { grid-column: 2; min-width: 0; padding: 0 4px 1px; text-align: left; }
-  .optionAction { display: none; }
 }

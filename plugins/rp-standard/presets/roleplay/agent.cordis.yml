@@ -156,6 +156,7 @@
       config:
         registerRuntime: true
         count: __RP_REPLY_OPTIONS_COUNT__
+        maxCharacters: __RP_REPLY_OPTIONS_MAX_CHARACTERS__
         keywords: __RP_REPLY_OPTIONS_KEYWORDS__
 
     - id: rp-subagent-manager

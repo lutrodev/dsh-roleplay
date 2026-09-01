@@ -6423,12 +6423,18 @@ get: (_target, key) => {
 		const REPLY_OPTIONS_EXTENSION_NAMESPACE = "rp.reply-options";
 		Object.freeze(Array.from({ length: 3 }, () => ""));
 		const STORED_KEYS = /* @__PURE__ */ new Set(["version", "options"]);
+		/** Normalize the user-configurable exact option count. */
+		function normalizeReplyOptionsCount(value = 3) {
+			if (!Number.isSafeInteger(value)) throw new TypeError("reply options count must be a safe integer");
+			if (value < 1 || value > 5) throw new RangeError(`reply options count must be between 1 and 5`);
+			return value;
+		}
 		/** Decode one persisted extension without throwing across the browser event boundary. */
 		function decodeStoredReplyOptions(value) {
 			if (!record(value) || value.version !== 1 || Object.keys(value).some((key) => !STORED_KEYS.has(key))) return void 0;
 			try {
-				const options = normalizeOptions(value.options);
-				if (!options.every((option, index) => option === value.options[index])) return void 0;
+				const options = normalizeOptions(value.options, 5);
+				if (options.length !== value.options.length || !options.every((option, index) => option === value.options[index])) return void 0;
 				return {
 					version: 1,
 					options
@@ -6437,19 +6443,20 @@ get: (_target, key) => {
 				return;
 			}
 		}
-		function normalizeOptions(value, expectedCount) {
-			if (!Array.isArray(value)) throw invalidReplyOptions("options must be an array", expectedCount);
-			if (expectedCount !== void 0 && value.length !== expectedCount) throw invalidReplyOptions(`options must contain exactly ${expectedCount} ${expectedCount === 1 ? "item" : "items"}`, expectedCount);
-			if (expectedCount === void 0 && (value.length < 1 || value.length > 5)) throw invalidReplyOptions(`options must contain 1 to 5 items`);
-			const options = value.map((candidate, index) => {
-				if (typeof candidate !== "string") throw invalidReplyOptions(`options[${index}] must be a string`, expectedCount);
+		function normalizeOptions(value, preferredCount) {
+			if (!Array.isArray(value)) throw invalidReplyOptions("options must be an array", preferredCount);
+			const limit = normalizeReplyOptionsCount(preferredCount);
+			const options = [];
+			const seen = /* @__PURE__ */ new Set();
+			for (const [index, candidate] of value.entries()) {
+				if (typeof candidate !== "string") throw invalidReplyOptions(`options[${index}] must be a string`, limit);
 				const normalized = candidate.replaceAll(/\r\n?/gu, "\n").trim();
-				const characters = [...normalized].length;
-				if (characters === 0) throw invalidReplyOptions(`options[${index}] must not be empty`, expectedCount);
-				if (characters > 200) throw invalidReplyOptions(`options[${index}] exceeds 200 Unicode characters`, expectedCount);
-				return normalized;
-			});
-			if (new Set(options).size !== options.length) throw invalidReplyOptions("options must not contain duplicates", expectedCount);
+				if (normalized === "" || seen.has(normalized)) continue;
+				seen.add(normalized);
+				options.push(normalized);
+				if (options.length === limit) break;
+			}
+			if (options.length === 0) throw invalidReplyOptions("options must contain at least one usable item", limit);
 			return options;
 		}
 		function invalidReplyOptions(message, expectedCount) {
@@ -6458,7 +6465,7 @@ get: (_target, key) => {
 			error.code = "RP_REPLY_OPTIONS_INVALID";
 			error.feedback = {
 				extension: REPLY_OPTIONS_EXTENSION_NAMESPACE,
-				correction: expectedCount === void 0 ? `Replace only rp.reply-options with 1 to 5 distinct, directly sendable third-person protagonist messages. Use the protagonist's established name or pronoun as the narrative subject in every option; first-person is allowed only inside quoted dialogue. Describe only what the protagonist says or does next, follow any option direction guidance, omit numbers and labels, then retry.` : `Replace only rp.reply-options with exactly ${expectedCount} distinct, directly sendable third-person protagonist ${expectedCount === 1 ? "message" : "messages"}. Use the protagonist's established name or pronoun as the narrative subject in every option; first-person is allowed only inside quoted dialogue. Describe only what the protagonist says or does next, follow any option direction guidance, omit numbers and labels, then retry.`
+				correction: `Replace only rp.reply-options with at least one usable and preferably exactly ${expectedCount} distinct, directly sendable third-person protagonist ${expectedCount === 1 ? "message" : "messages"}. Resolve the user-controlled protagonist from the surrounding roleplay_context context_guide when present; otherwise infer the protagonist from the remaining context and conversation. Use that protagonist's established name or pronoun as the narrative subject in every option, allow first-person wording only inside quoted dialogue, describe only what the protagonist says or does next, follow any option direction guidance, omit numbers and labels, then retry.`
 			};
 			return error;
 		}
@@ -6625,17 +6632,17 @@ get: (_target, key) => {
 			"header": "rp-reply-options-header",
 			"hiddenMarker": "rp-reply-options-hiddenMarker",
 			"option": "rp-reply-options-option",
-			"optionAction": "rp-reply-options-optionAction",
 			"optionItem": "rp-reply-options-optionItem",
 			"optionNumber": "rp-reply-options-optionNumber",
 			"optionText": "rp-reply-options-optionText",
 			"options": "rp-reply-options-options",
 			"sending": "rp-reply-options-sending",
+			"settingsButton": "rp-reply-options-settingsButton",
 			"titleGroup": "rp-reply-options-titleGroup"
 		};
 		const STYLE_ID = "dsh-roleplay-rp-reply-options-styles";
 		const STYLE_OWNER = "dsh-roleplay-rp-reply-options";
-		const STYLE_TEXT = "[data-chat-flow-kind=\"rp-reply-options-retraction\"],\n[data-chat-flow-kind=\"rp-reply-options-anchor\"]:not(:has([data-rp-reply-options-card])) {\n  display: none;\n}\n\n.rp-reply-options-hiddenMarker { display: none; }\n\n.rp-reply-options-card {\n  container-type: inline-size;\n  width: min(100%, 760px);\n  box-sizing: border-box;\n  overflow: hidden;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 84%, transparent);\n  border-radius: 12px;\n  color: var(--dsw-alias-label-primary);\n  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 98%, var(--dsw-specific-selector));\n  font-family: var(--dsw-font-family);\n}\n\n.rp-reply-options-header {\n  display: flex;\n  min-width: 0;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 12px;\n  padding: 11px 13px 10px;\n  border-bottom: 1px solid color-mix(in srgb, var(--dsw-alias-separator-primary) 72%, transparent);\n}\n\n.rp-reply-options-titleGroup {\n  display: flex;\n  min-width: 0;\n  align-items: baseline;\n  gap: 8px;\n}\n\n.rp-reply-options-titleGroup h2,\n.rp-reply-options-titleGroup p,\n.rp-reply-options-error { margin: 0; }\n\n.rp-reply-options-titleGroup h2 {\n  color: var(--dsw-alias-label-primary);\n  font-size: 13px;\n  line-height: 20px;\n  font-weight: 620;\n}\n\n.rp-reply-options-titleGroup p {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 18px;\n}\n\n.rp-reply-options-options {\n  display: grid;\n  min-width: 0;\n  gap: 6px;\n  margin: 0;\n  padding: 8px;\n  list-style: none;\n}\n\n.rp-reply-options-optionItem {\n  min-width: 0;\n  margin: 0;\n  padding: 0;\n}\n\n.rp-reply-options-option {\n  display: grid;\n  width: 100%;\n  min-height: 48px;\n  min-width: 0;\n  box-sizing: border-box;\n  grid-template-columns: 28px minmax(0, 1fr) max-content;\n  align-items: center;\n  gap: 6px;\n  padding: 8px 10px;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-separator-primary) 82%, transparent);\n  border-radius: 10px;\n  outline: none;\n  color: var(--dsw-alias-label-primary);\n  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 82%, transparent);\n  text-align: left;\n  cursor: pointer;\n  font: 450 12px/19px var(--dsw-font-family);\n}\n\n.rp-reply-options-option:hover:not(:disabled) {\n  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 34%, var(--dsw-alias-separator-primary));\n  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 6%, var(--dsw-alias-bg-layer-2));\n}\n\n.rp-reply-options-option:focus-visible {\n  border-color: var(--dsw-alias-brand-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);\n}\n\n.rp-reply-options-option:disabled { cursor: default; }\n.rp-reply-options-option:disabled:not([aria-busy=\"true\"]) { opacity: .56; }\n.rp-reply-options-option[data-sending=\"true\"] {\n  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 36%, var(--dsw-alias-separator-primary));\n  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, var(--dsw-alias-bg-layer-2));\n}\n\n.rp-reply-options-optionNumber {\n  display: grid;\n  width: 26px;\n  height: 26px;\n  box-sizing: border-box;\n  place-items: center;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent);\n  border-radius: 8px;\n  color: var(--dsw-alias-brand-primary);\n  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, var(--dsw-alias-bg-layer-1));\n  font-size: 11px;\n  line-height: 1;\n  font-weight: 650;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-reply-options-option:hover:not(:disabled) .rp-reply-options-optionNumber,\n.rp-reply-options-option[data-sending=\"true\"] .rp-reply-options-optionNumber {\n  border-color: transparent;\n  color: var(--dsw-alias-label-primary-foreground);\n  background: var(--dsw-alias-brand-primary);\n}\n\n.rp-reply-options-optionText {\n  min-width: 0;\n  padding: 2px 4px;\n  overflow-wrap: anywhere;\n  white-space: pre-wrap;\n}\n\n.rp-reply-options-optionAction,\n.rp-reply-options-sending {\n  min-width: 48px;\n  flex: none;\n  text-align: right;\n  white-space: nowrap;\n  font-size: 10px;\n  line-height: 18px;\n  font-weight: 560;\n}\n\n.rp-reply-options-optionAction { color: var(--dsw-alias-label-tertiary); }\n.rp-reply-options-option:hover:not(:disabled) .rp-reply-options-optionAction { color: var(--dsw-alias-brand-primary); }\n.rp-reply-options-sending { color: var(--dsw-alias-brand-primary); }\n\n.rp-reply-options-error {\n  margin: 0 8px 8px;\n  padding: 8px 10px;\n  border-radius: 8px;\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 7%, transparent);\n  font-size: 10px;\n  line-height: 17px;\n}\n\n@container (max-width: 420px) {\n  .rp-reply-options-header { align-items: flex-start; }\n  .rp-reply-options-titleGroup { align-items: flex-start; flex-direction: column; gap: 0; }\n  .rp-reply-options-options { padding: 7px; }\n  .rp-reply-options-option { grid-template-columns: 28px minmax(0, 1fr); align-items: start; padding: 9px; }\n  .rp-reply-options-optionNumber { margin-top: 1px; }\n  .rp-reply-options-optionAction,\n  .rp-reply-options-sending { grid-column: 2; min-width: 0; padding: 0 4px 1px; text-align: left; }\n  .rp-reply-options-optionAction { display: none; }\n}\n";
+		const STYLE_TEXT = "[data-chat-flow-kind=\"rp-reply-options-retraction\"],\n[data-chat-flow-kind=\"rp-reply-options-anchor\"]:not(:has([data-rp-reply-options-card])) {\n  display: none;\n}\n\n.rp-reply-options-hiddenMarker { display: none; }\n\n.rp-reply-options-card {\n  container-type: inline-size;\n  width: min(100%, 760px);\n  box-sizing: border-box;\n  overflow: hidden;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 84%, transparent);\n  border-radius: 12px;\n  color: var(--dsw-alias-label-primary);\n  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 98%, var(--dsw-specific-selector));\n  font-family: var(--dsw-font-family);\n}\n\n.rp-reply-options-header {\n  display: flex;\n  min-width: 0;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  padding: 11px 13px 10px;\n  border-bottom: 1px solid color-mix(in srgb, var(--dsw-alias-separator-primary) 72%, transparent);\n}\n\n.rp-reply-options-settingsButton {\n  display: grid;\n  width: 44px;\n  height: 44px;\n  flex: none;\n  margin: -6px -5px -6px 0;\n  place-items: center;\n  border: 0;\n  border-radius: 9px;\n  outline: none;\n  background: transparent;\n  color: var(--dsw-alias-label-tertiary);\n  cursor: pointer;\n}\n\n.rp-reply-options-settingsButton:hover {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n\n.rp-reply-options-settingsButton:focus-visible {\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 20%, transparent);\n  color: var(--dsw-alias-brand-primary);\n}\n\n.rp-reply-options-titleGroup {\n  display: flex;\n  min-width: 0;\n  align-items: baseline;\n  gap: 8px;\n}\n\n.rp-reply-options-titleGroup h2,\n.rp-reply-options-titleGroup p,\n.rp-reply-options-error { margin: 0; }\n\n.rp-reply-options-titleGroup h2 {\n  color: var(--dsw-alias-label-primary);\n  font-size: 13px;\n  line-height: 20px;\n  font-weight: 620;\n}\n\n.rp-reply-options-titleGroup p {\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  line-height: 18px;\n}\n\n.rp-reply-options-options {\n  display: grid;\n  min-width: 0;\n  gap: 6px;\n  margin: 0;\n  padding: 8px;\n  list-style: none;\n}\n\n.rp-reply-options-optionItem {\n  min-width: 0;\n  margin: 0;\n  padding: 0;\n}\n\n.rp-reply-options-option {\n  display: grid;\n  width: 100%;\n  min-height: 48px;\n  min-width: 0;\n  box-sizing: border-box;\n  grid-template-columns: 28px minmax(0, 1fr);\n  align-items: center;\n  gap: 6px;\n  padding: 8px 10px;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-separator-primary) 82%, transparent);\n  border-radius: 10px;\n  outline: none;\n  color: var(--dsw-alias-label-primary);\n  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 82%, transparent);\n  text-align: left;\n  cursor: pointer;\n  font: 450 12px/19px var(--dsw-font-family);\n}\n\n.rp-reply-options-option:hover:not(:disabled) {\n  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 34%, var(--dsw-alias-separator-primary));\n  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 6%, var(--dsw-alias-bg-layer-2));\n}\n\n.rp-reply-options-option:focus-visible {\n  border-color: var(--dsw-alias-brand-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);\n}\n\n.rp-reply-options-option:disabled { cursor: default; }\n.rp-reply-options-option:disabled:not([aria-busy=\"true\"]) { opacity: .56; }\n.rp-reply-options-option[data-sending=\"true\"] {\n  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 36%, var(--dsw-alias-separator-primary));\n  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, var(--dsw-alias-bg-layer-2));\n}\n\n.rp-reply-options-optionNumber {\n  display: grid;\n  width: 26px;\n  height: 26px;\n  box-sizing: border-box;\n  place-items: center;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent);\n  border-radius: 8px;\n  color: var(--dsw-alias-brand-primary);\n  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, var(--dsw-alias-bg-layer-1));\n  font-size: 11px;\n  line-height: 1;\n  font-weight: 650;\n  font-variant-numeric: tabular-nums;\n}\n\n.rp-reply-options-option:hover:not(:disabled) .rp-reply-options-optionNumber,\n.rp-reply-options-option[data-sending=\"true\"] .rp-reply-options-optionNumber {\n  border-color: transparent;\n  color: var(--dsw-alias-label-primary-foreground);\n  background: var(--dsw-alias-brand-primary);\n}\n\n.rp-reply-options-optionText {\n  min-width: 0;\n  padding: 2px 4px;\n  overflow-wrap: anywhere;\n  white-space: pre-wrap;\n}\n\n.rp-reply-options-sending {\n  grid-column: 2;\n  padding: 0 4px 1px;\n  text-align: left;\n  white-space: nowrap;\n  font-size: 10px;\n  line-height: 18px;\n  font-weight: 560;\n}\n\n.rp-reply-options-sending { color: var(--dsw-alias-brand-primary); }\n\n.rp-reply-options-error {\n  margin: 0 8px 8px;\n  padding: 8px 10px;\n  border-radius: 8px;\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 7%, transparent);\n  font-size: 10px;\n  line-height: 17px;\n}\n\n@container (max-width: 420px) {\n  .rp-reply-options-header { align-items: center; }\n  .rp-reply-options-titleGroup { align-items: flex-start; flex-direction: column; gap: 0; }\n  .rp-reply-options-options { padding: 7px; }\n  .rp-reply-options-option { grid-template-columns: 28px minmax(0, 1fr); align-items: start; padding: 9px; }\n  .rp-reply-options-optionNumber { margin-top: 1px; }\n  .rp-reply-options-sending { grid-column: 2; min-width: 0; padding: 0 4px 1px; text-align: left; }\n}\n";
 		function ensureStyles() {
 			document.getElementById(STYLE_ID)?.remove();
 			const style = document.createElement("style");
@@ -6659,10 +6666,17 @@ get: (_target, key) => {
 			ctx.uiConversation.events.register(replyOptionsAnchorNodeDefinition);
 			ctx.uiConversation.events.register(replyOptionsRetractionNodeDefinition);
 			const sendReply = createReplySender(ctx.sessions);
+			const openSettings = () => {
+				const settings = ctx.get?.("rpReplyOptionsSettings");
+				if (typeof settings?.open === "function") settings.open();
+			};
 			ctx.slots.inject("conversation.chat.node", () => ctx.slots.register({
 				name: "conversation.chat.node",
 				key: REPLY_OPTIONS_ANCHOR_KIND,
-				inject: () => ({ sendReply })
+				inject: () => ({
+					sendReply,
+					openSettings
+				})
 			}, ReplyOptionsAnchor));
 			ctx.slots.inject("conversation.chat.node", () => ctx.slots.register({
 				name: "conversation.chat.node",
@@ -6671,7 +6685,7 @@ get: (_target, key) => {
 		}
 		/** Render choices only for the latest actionable committed Roleplay reply. */
 		function ReplyOptionsAnchor(props) {
-			const { node, sessionId, useChat, useInput, useSession, useSessions, sendReply } = props;
+			const { node, sessionId, useChat, useInput, useSession, useSessions, sendReply, openSettings } = props;
 			const activeKey = useChat(latestReplyOptionsAnchorKey);
 			const roleplay = useSessions((state) => {
 				const summary = state.byId?.[sessionId];
@@ -6684,7 +6698,8 @@ get: (_target, key) => {
 				options: node.data.options,
 				sessionId,
 				disabled: removed || inputPhase !== "plain",
-				sendReply
+				sendReply,
+				openSettings
 			});
 		}
 		function ReplyOptionsRetraction() {
@@ -6697,7 +6712,7 @@ get: (_target, key) => {
 				"aria-hidden": true
 			});
 		}
-		function ReplyOptionsCard({ options, sessionId, disabled = false, sendReply }) {
+		function ReplyOptionsCard({ options, sessionId, disabled = false, sendReply, openSettings }) {
 			const [sendingIndex, setSendingIndex] = (0, react.useState)(null);
 			const [error, setError] = (0, react.useState)(false);
 			const sending = (0, react.useRef)(false);
@@ -6728,7 +6743,13 @@ get: (_target, key) => {
 				initial: motion.initial,
 				animate: motion.animate,
 				transition: motion.transition
-			}, h("header", { className: css.header }, h("div", { className: css.titleGroup }, h("h2", { id: headingId }, "接下来想怎么做？"), h("p", { id: helpId }, "选择一项将直接发送"))), h("ol", {
+			}, h("header", { className: css.header }, h("div", { className: css.titleGroup }, h("h2", { id: headingId }, "接下来想怎么做？"), h("p", { id: helpId }, "选择一项将直接发送")), typeof openSettings === "function" ? h("button", {
+				type: "button",
+				className: css.settingsButton,
+				"aria-label": "设置回复选项",
+				title: "设置回复选项",
+				onClick: openSettings
+			}, h(SettingsIcon)) : null), h("ol", {
 				className: css.options,
 				role: "list"
 			}, ...options.map((option, index) => h("li", {
@@ -6748,13 +6769,27 @@ get: (_target, key) => {
 			}, String(index + 1)), h("span", { className: css.optionText }, option), sendingIndex === index ? h("span", {
 				className: css.sending,
 				role: "status"
-			}, "正在发送…") : h("span", {
-				className: css.optionAction,
-				"aria-hidden": true
-			}, "发送"))))), error ? h("p", {
+			}, "正在发送…") : null)))), error ? h("p", {
 				className: css.error,
 				role: "alert"
 			}, "这条回复没能发送，请再试一次。") : null)));
+		}
+		function SettingsIcon() {
+			return h("svg", {
+				width: 16,
+				height: 16,
+				viewBox: "0 0 24 24",
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 1.8,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				"aria-hidden": true
+			}, h("circle", {
+				cx: 12,
+				cy: 12,
+				r: 3
+			}), h("path", { d: "M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.94 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.57 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.57 1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15.06 4.6a1.7 1.7 0 0 0 1.88-.34L17 4.2 19.83 7l-.06.06A1.7 1.7 0 0 0 19.43 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z" }));
 		}
 		function createReplySender(sessions) {
 			return async (sessionId, text) => {

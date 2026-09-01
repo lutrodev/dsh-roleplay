@@ -1,9 +1,12 @@
 import Schema from '@deepseek-ai/schemastery'
 import {
+  DEFAULT_REPLY_OPTION_MAX_CHARACTERS,
   DEFAULT_REPLY_OPTIONS_COUNT,
   normalizeReplyOptionKeywords,
+  normalizeReplyOptionMaxCharacters,
   normalizeReplyOptionsCount,
   normalizeReplyOptionsInput,
+  REPLY_OPTION_MAX_CHARACTERS,
   REPLY_OPTIONS_EXTENSION_NAMESPACE,
   replyOptionsExtensionSchema,
 } from './protocol.js'
@@ -15,17 +18,20 @@ export const inject = []
 export const Config = Schema.object({
   registerRuntime: Schema.boolean().default(true),
   count: Schema.number().min(1).max(5).step(1).default(DEFAULT_REPLY_OPTIONS_COUNT),
+  maxCharacters: Schema.number().min(1).max(REPLY_OPTION_MAX_CHARACTERS).step(1).default(DEFAULT_REPLY_OPTION_MAX_CHARACTERS),
   keywords: Schema.array(Schema.string()).default([]),
 })
 
 export function apply(ctx, config) {
   if (config.registerRuntime !== true) return
   const count = normalizeReplyOptionsCount(config.count)
+  const maxCharacters = normalizeReplyOptionMaxCharacters(config.maxCharacters)
   const keywords = normalizeReplyOptionKeywords(config.keywords, count)
   ctx.inject(['rpRuntime'], runtimeCtx => runtimeCtx.rpRuntime.registerArtifactExtension({
     namespace: REPLY_OPTIONS_EXTENSION_NAMESPACE,
-    schema: replyOptionsExtensionSchema(count, keywords),
+    schema: replyOptionsExtensionSchema(count, keywords, maxCharacters),
     required: true,
+    acceptAdditionalProperties: true,
     validate: value => normalizeReplyOptionsInput(value, count),
   }))
 }

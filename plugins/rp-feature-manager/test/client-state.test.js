@@ -53,7 +53,7 @@ test('Roleplay setting writes use the suite RPC with revision guards', async () 
     { settings: { writable: true, revision: 4 } },
   )
   await unsetRoleplaySetting(connection, 'harnessIdentity', 4)
-  await setReplyOptionsSettings(connection, 3, ['试探', '', '离开'], 5)
+  await setReplyOptionsSettings(connection, 3, 30, ['试探', '', '离开'], 5)
   assert.deepEqual(calls, [
     {
       path: '/rp-features', endpoint: 'settings/set',
@@ -65,7 +65,7 @@ test('Roleplay setting writes use the suite RPC with revision guards', async () 
     },
     {
       path: '/rp-features', endpoint: 'settings/reply-options',
-      payload: { count: 3, keywords: ['试探', '', '离开'], expectedRevision: 5 },
+      payload: { count: 3, maxCharacters: 30, keywords: ['试探', '', '离开'], expectedRevision: 5 },
     },
   ])
 })
