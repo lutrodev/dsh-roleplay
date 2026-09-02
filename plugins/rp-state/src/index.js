@@ -3,6 +3,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import Schema from '@deepseek-ai/schemastery'
 import { foldSurfaceOwnedEntities } from 'dsh-roleplay-rp-core/entity-projection'
 import { resolveRpToolCallAssistant } from 'dsh-roleplay-rp-core/protocol'
+import { snapshotSessionEvents } from 'dsh-roleplay-rp-core/session-runtime'
 import { applySessionCommandEvent, emptySessionCommandState } from 'dsh-roleplay-rp-session/protocol'
 import { compileStateCondition, evaluateStateCondition } from './condition.js'
 import {
@@ -14,7 +15,7 @@ import {
   RP_STATE_PROTOCOL_VERSION,
 } from './definition.js'
 import { parseJsonPointer, readJsonPointer } from './json-pointer.js'
-import { cloneJson, normalizeJson, validateStateValue } from './schema.js'
+import { cloneJson, normalizeJson, stateSchemaAtPointer, validateStateValue } from './schema.js'
 import {
   applyStateChanges,
   stateUpdateArgumentCorrections,
@@ -55,12 +56,6 @@ const STATE_COMMIT_CONSTRAINTS = Object.freeze([
   'Paths in one effect must not duplicate, overlap, or contain one another.',
   'All changes in one commit are atomic.',
 ])
-
-const STATE_UPDATE_MODE_GUIDANCE = Object.freeze({
-  'rules-required': 'Every change requires the matching ruleId.',
-  'schema-only': 'ruleId is optional; operations and the resulting value must satisfy the schema.',
-  disabled: 'Do not submit state.update for this namespace.',
-})
 
 /** Session-owned event-sourced roleplay State service. */
 export class RpState extends Service {
@@ -135,7 +130,7 @@ export class RpState extends Service {
   /** Return the current detached State projection for one Agent Session. */
   get(agent) {
     const projection = this.ctx.get('sessionProjections')?.stateOf(agent.session, 'rp/state')
-    return cloneJson(projection === undefined ? this.rebuild(agent.session.snapshotEvents()) : projection.value)
+    return cloneJson(projection === undefined ? this.rebuild(snapshotSessionEvents(agent.session)) : projection.value)
   }
 
   /** Rebuild the complete State projection from an explicit event sequence. */
@@ -221,20 +216,60 @@ export class RpState extends Service {
   }
 
   validateEffect(effect, validation) {
-    exactFields(effect, ['kind', 'namespace', 'expectedRevision', 'payload'], 'state.update')
-    if (effect.kind !== 'state.update') throw new RpStateError('INVALID_EFFECT', 'State effect kind must be state.update.')
-    const namespace = normalizeNamespaceId(effect.namespace)
-    if (!record(effect.payload)) throw new RpStateError('INVALID_EFFECT', 'state.update payload must be an object.')
-    exactFields(effect.payload, ['changes'], 'state.update payload')
+    const namespaceHint = record(effect) && typeof effect.namespace === 'string' ? effect.namespace : null
+    assertStateEffectFields(effect, ['kind', 'namespace', 'expectedRevision', 'payload'], {
+      label: 'state.update',
+      namespace: namespaceHint,
+      path: '',
+    })
+    if (effect.kind !== 'state.update') {
+      throw stateEffectError('INVALID_EFFECT', 'State effect kind must be state.update.', {
+        namespace: namespaceHint,
+        path: '/kind',
+      })
+    }
+    let namespace
+    try {
+      namespace = normalizeNamespaceId(effect.namespace)
+    } catch (error) {
+      throw stateEffectError(
+        'INVALID_NAMESPACE',
+        error instanceof Error ? error.message : String(error),
+        { namespace: typeof effect.namespace === 'string' ? effect.namespace : null, path: '/namespace' },
+      )
+    }
+    assertStateEffectFields(effect.payload, ['changes'], {
+      label: 'state.update payload',
+      namespace,
+      path: '/payload',
+    })
     const base = this.get(validation.agent)
     const working = applyAcceptedEffects(base, validation.acceptedEffects)
     if (validation.acceptedEffects.some(candidate => candidate.kind === 'state.update' && candidate.namespace === namespace)) {
-      throw new RpStateError('INVALID_EFFECT', `Only one state.update effect may target "${namespace}" in one commit.`)
+      throw stateEffectError(
+        'INVALID_EFFECT',
+        `Only one state.update effect may target "${namespace}" in one commit.`,
+        { namespace, path: '/namespace' },
+      )
     }
     const snapshot = working.namespaces[namespace]
-    if (snapshot === undefined) throw new RpStateError('NAMESPACE_NOT_FOUND', `State namespace "${namespace}" does not exist.`)
+    if (snapshot === undefined) {
+      throw stateEffectError(
+        'NAMESPACE_NOT_FOUND',
+        `State namespace "${namespace}" does not exist.`,
+        { namespace, path: '/namespace' },
+      )
+    }
     if (!Number.isSafeInteger(effect.expectedRevision) || effect.expectedRevision !== snapshot.revision) {
-      throw new RpStateError('REVISION_CONFLICT', `State revision conflict for "${namespace}": expected ${String(effect.expectedRevision)}, current ${snapshot.revision}.`)
+      throw stateEffectError(
+        'REVISION_CONFLICT',
+        `State revision conflict for "${namespace}": expected ${String(effect.expectedRevision)}, current ${snapshot.revision}.`,
+        {
+          namespace,
+          path: '/expectedRevision',
+          details: { expectedRevision: effect.expectedRevision, currentRevision: snapshot.revision },
+        },
+      )
     }
     const prepared = applyStateChanges({ state: working, namespace, snapshot, changes: effect.payload.changes })
     return {
@@ -291,36 +326,12 @@ export class RpState extends Service {
       })),
     }, null, 2)
     const parentText = JSON.stringify({
-      version: RP_STATE_COMMIT_CONTEXT_VERSION,
-      stateProtocolVersion: RP_STATE_PROTOCOL_VERSION,
-      contract: {
+      state_commit_contract: {
+        version: RP_STATE_COMMIT_CONTEXT_VERSION,
+        stateProtocolVersion: RP_STATE_PROTOCOL_VERSION,
         effectKind: 'state.update',
-        updateModes: STATE_UPDATE_MODE_GUIDANCE,
         constraints: STATE_COMMIT_CONSTRAINTS,
-        namespaces: entries.map(([namespace, snapshot]) => ({
-          namespace,
-          updateMode: snapshot.definition.updateMode,
-          title: snapshot.definition.title,
-          ...(snapshot.definition.description === undefined ? {} : { description: snapshot.definition.description }),
-          ...(snapshot.definition.updateMode === 'disabled'
-            ? {}
-            : { schema: snapshot.definition.schema, rules: snapshot.definition.rules }),
-        })),
-      },
-      snapshot: {
-        stateRevision: state.revision,
-        namespaces: entries.flatMap(([namespace, namespaceSnapshot]) => {
-          const diagnostics = commitContextDiagnostics(namespaceSnapshot.diagnostics)
-          if (namespaceSnapshot.definition.updateMode === 'disabled') {
-            return diagnostics === undefined ? [] : [{ namespace, diagnostics }]
-          }
-          return [{
-            namespace,
-            expectedRevision: namespaceSnapshot.revision,
-            value: namespaceSnapshot.value,
-            ...(diagnostics === undefined ? {} : { diagnostics }),
-          }]
-        }),
+        namespaces: entries.map(([namespace, snapshot]) => stateCommitNamespaceContract(namespace, snapshot)),
       },
     })
     return {
@@ -329,6 +340,48 @@ export class RpState extends Service {
       parentText,
       diagnostics: { namespaces: entries.map(([namespace]) => namespace) },
     }
+  }
+}
+
+function stateCommitNamespaceContract(namespace, snapshot) {
+  const diagnostics = commitContextDiagnostics(snapshot.diagnostics)
+  const base = {
+    namespace,
+    expectedRevision: snapshot.revision,
+    updateMode: snapshot.definition.updateMode,
+    title: snapshot.definition.title,
+    ...(snapshot.definition.description === undefined ? {} : { description: snapshot.definition.description }),
+    currentValue: snapshot.value,
+    ...(diagnostics === undefined ? {} : { diagnostics }),
+  }
+  if (snapshot.definition.updateMode === 'schema-only') {
+    return { ...base, schema: snapshot.definition.schema }
+  }
+  if (snapshot.definition.updateMode !== 'rules-required') return base
+  return {
+    ...base,
+    rules: snapshot.definition.rules.map(rule => stateCommitRuleContract(snapshot.definition.schema, rule)),
+  }
+}
+
+function stateCommitRuleContract(rootSchema, rule) {
+  const targetSchema = stateSchemaAtPointer(rootSchema, parseJsonPointer(rule.target, { allowRoot: true }))
+  const valueSchema = rule.effect.op === 'set'
+    ? targetSchema
+    : rule.effect.op === 'append' && record(targetSchema?.items)
+      ? targetSchema.items
+      : undefined
+  return {
+    ruleId: rule.id,
+    target: rule.target,
+    op: rule.effect.op,
+    ...(rule.effect.minimum === undefined ? {} : { minimum: rule.effect.minimum }),
+    ...(rule.effect.maximum === undefined ? {} : { maximum: rule.effect.maximum }),
+    when: rule.when,
+    ...(rule.condition === undefined ? {} : { condition: rule.condition }),
+    cadence: rule.cadence,
+    ...(rule.guidance.length === 0 ? {} : { guidance: rule.guidance }),
+    ...(valueSchema === undefined ? {} : { valueSchema }),
   }
 }
 
@@ -515,7 +568,7 @@ function stateToolOutput() {
 }
 
 function stateToolOwner(agent, callId) {
-  const resolved = resolveRpToolCallAssistant(agent.session.snapshotEvents(), callId, RP_STATE_TOOL)
+  const resolved = resolveRpToolCallAssistant(snapshotSessionEvents(agent.session), callId, RP_STATE_TOOL)
   if (resolved === undefined) {
     throw new RpStateError('RP_STATE_OWNER_MISSING', 'rp_state requires one durable model assistant tool call in the current turn and step.')
   }
@@ -918,6 +971,46 @@ function exactFields(value, fields, label) {
   const unknown = Object.keys(value).find(key => !allowed.has(key))
   if (unknown !== undefined) throw new RpStateError('INVALID_REQUEST', `${label} contains unknown field "${unknown}".`)
   for (const field of fields) if (!Object.prototype.hasOwnProperty.call(value, field)) throw new RpStateError('INVALID_REQUEST', `${label} requires ${field}.`)
+}
+
+function stateEffectError(code, message, { namespace, path, details = {} }) {
+  const error = new RpStateError(code, message)
+  const issue = {
+    path,
+    code,
+    message,
+    namespace,
+    changeIndex: null,
+    ruleId: null,
+    details: { ...details, namespace, changeIndex: null, ruleId: null },
+  }
+  error.issues = [issue]
+  return error
+}
+
+function assertStateEffectFields(value, fields, { label, namespace, path }) {
+  if (!record(value)) {
+    throw stateEffectError('INVALID_EFFECT', `${label} must be an object.`, { namespace, path })
+  }
+  const allowed = new Set(fields)
+  const unknown = Object.keys(value).find(key => !allowed.has(key))
+  if (unknown !== undefined) {
+    throw stateEffectError('INVALID_EFFECT', `${label} contains unknown field "${unknown}".`, {
+      namespace,
+      path: `${path}/${escapePointerSegment(unknown)}`,
+    })
+  }
+  for (const field of fields) {
+    if (Object.hasOwn(value, field)) continue
+    throw stateEffectError('INVALID_EFFECT', `${label} requires ${field}.`, {
+      namespace,
+      path: `${path}/${escapePointerSegment(field)}`,
+    })
+  }
+}
+
+function escapePointerSegment(value) {
+  return String(value).replaceAll('~', '~0').replaceAll('/', '~1')
 }
 
 function record(value) {

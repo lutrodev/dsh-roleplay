@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "check:compat": "node tools/check-harness-compat.mjs",
-    "test:compat": "node --test tools/check-harness-compat.test.mjs",
+    "test:compat": "node --test tools/check-harness-compat.test.mjs plugins/rp-core/test/harness-contract.contract.js plugins/rp-core/test/subagent-run.test.js",
     "check:dev": "node --check scripts/dev.mjs",
     "test:dev": "node --test scripts/dev.test.mjs",
     "check": "pnpm run check:compat && pnpm run check:dev && pnpm -r --if-present run check",

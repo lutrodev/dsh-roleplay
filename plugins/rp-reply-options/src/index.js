@@ -1,4 +1,5 @@
 import Schema from '@deepseek-ai/schemastery'
+import { assertCompletedSubagent } from 'dsh-roleplay-rp-core/subagent-run'
 import {
   DEFAULT_REPLY_OPTION_MAX_CHARACTERS,
   DEFAULT_REPLY_OPTIONS_COUNT,
@@ -8,7 +9,8 @@ import {
   normalizeReplyOptionsInput,
   REPLY_OPTION_MAX_CHARACTERS,
   REPLY_OPTIONS_EXTENSION_NAMESPACE,
-  replyOptionsExtensionSchema,
+  renderReplyOptionsPrompt,
+  replyOptionsOutputSchema,
 } from './protocol.js'
 
 export * from './protocol.js'
@@ -22,16 +24,41 @@ export const Config = Schema.object({
   keywords: Schema.array(Schema.string()).default([]),
 })
 
+const REPLY_OPTIONS_GENERATOR_TIMEOUT_MS = 30000
+const REPLY_OPTIONS_GENERATOR_PERSONA = 'Generate concise roleplay quick replies from the supplied final narrative and context. Return only the requested structured output and never call tools.'
+
 export function apply(ctx, config) {
   if (config.registerRuntime !== true) return
   const count = normalizeReplyOptionsCount(config.count)
   const maxCharacters = normalizeReplyOptionMaxCharacters(config.maxCharacters)
   const keywords = normalizeReplyOptionKeywords(config.keywords, count)
-  ctx.inject(['rpRuntime'], runtimeCtx => runtimeCtx.rpRuntime.registerArtifactExtension({
+  ctx.inject(['rpRuntime'], runtimeCtx => runtimeCtx.rpRuntime.registerArtifactGenerator({
     namespace: REPLY_OPTIONS_EXTENSION_NAMESPACE,
-    schema: replyOptionsExtensionSchema(count, keywords, maxCharacters),
-    required: true,
-    acceptAdditionalProperties: true,
+    order: 100,
+    async generate(context) {
+      const prompt = renderReplyOptionsPrompt({
+        narrative: context.artifact.narrative,
+        roleplayContext: context.parentContextText,
+        count,
+        keywords,
+        maxCharacters,
+        maxPromptCharacters: context.maxPromptCharacters,
+      })
+      const child = await context.runStructuredSubagent({
+        label: '回复选项',
+        prompt: [{ type: 'text', text: prompt }],
+        persona: REPLY_OPTIONS_GENERATOR_PERSONA,
+        outputSchema: replyOptionsOutputSchema(count, keywords, maxCharacters),
+        timeoutMs: REPLY_OPTIONS_GENERATOR_TIMEOUT_MS,
+      })
+      assertCompletedSubagent(child.result, 'Reply options subagent')
+      if (child.result.structured === undefined) {
+        const error = new Error('Reply options subagent returned no structured result.')
+        error.code = 'RP_REPLY_OPTIONS_STRUCTURED_OUTPUT_MISSING'
+        throw error
+      }
+      return child.result.structured
+    },
     validate: value => normalizeReplyOptionsInput(value, count),
   }))
 }

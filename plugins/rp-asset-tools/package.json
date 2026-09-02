@@ -29,7 +29,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
     "@deepseek-ai/schemastery": "^3.18.2",
-    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-tools": "0.1.2-alpha.4",
     "dsh-roleplay-rp-core": "^0.1.0",
     "dsh-roleplay-rp-session": "^0.1.0"
   },

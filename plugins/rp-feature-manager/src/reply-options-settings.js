@@ -14,7 +14,7 @@ import { css } from './client-styles.generated.js'
 const h = React.createElement
 const KEYWORD_PLACEHOLDERS = Object.freeze(['例如：试探', '例如：反抗', '例如：暂时退让', '例如：寻求帮助', '例如：离开现场'])
 
-/** Configure count, maximum length, and one optional main-model direction per option. */
+/** Configure count, length guidance, and one optional generator direction per option. */
 export function ReplyOptionsSettingsDialog({
   open,
   count,
@@ -91,7 +91,7 @@ export function ReplyOptionsSettingsDialog({
     onClose: saving ? () => {} : onClose,
     title: '设置回复选项',
     closeLabel: '关闭回复选项设置',
-    description: '设置主模型生成的选项数量、每条字数上限和可选方向。',
+    description: '设置提交后生成的选项数量、每条长度指导和可选方向。',
     className: css.replyOptionsDialog,
     contentClassName: css.replyOptionsDialogContent,
     footer,
@@ -120,7 +120,7 @@ export function ReplyOptionsSettingsDialog({
           }),
           h('span', { 'aria-hidden': true }, '条'))),
       h('label', { className: css.replyOptionsBasicField },
-        h('span', null, '每条最多字数'),
+        h('span', null, '每条长度指导'),
         h('span', { className: css.replyOptionsNumberInput },
           h('input', {
             type: 'number',
@@ -130,14 +130,14 @@ export function ReplyOptionsSettingsDialog({
             step: 1,
             value: maxCharactersDraft,
             disabled: saving,
-            'aria-label': '每条最多字数',
+            'aria-label': '每条长度指导',
             'aria-invalid': parsedMaxCharacters === undefined ? 'true' : 'false',
             'aria-describedby': `${basicsHelpId} ${errorId}`,
             onInput: event => { setMaxCharactersDraft(event.currentTarget.value); setSaveError('') },
           }),
           h('span', { 'aria-hidden': true }, '字')))),
     h('p', { id: basicsHelpId, className: css.replyOptionsSettingsHint },
-      `回复条数可填写 1–5；每条最多字数可填写 1–${REPLY_OPTION_MAX_CHARACTERS}，默认 ${DEFAULT_REPLY_OPTION_MAX_CHARACTERS} 字以内。`)),
+      `回复条数可填写 1–5；每条长度指导可填写 1–${REPLY_OPTION_MAX_CHARACTERS}，默认目标为 ${DEFAULT_REPLY_OPTION_MAX_CHARACTERS} 字以内。生成结果不会按该值硬性拒绝。`)),
   h('section', { className: css.replyOptionsKeywordSection, 'aria-labelledby': 'rp-reply-options-keywords-title' },
     h('header', { className: css.replyOptionsKeywordHeader },
       h('div', null,

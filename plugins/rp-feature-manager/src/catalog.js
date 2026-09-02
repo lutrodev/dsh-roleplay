@@ -88,7 +88,7 @@ export const FEATURE_CATALOG = Object.freeze([
   }),
   feature({
     id: 'reply-options', category: 'conversation', label: '回复选项',
-    description: '在成功的剧情回复后提供由主模型生成的主角对白与行动，点击后直接发送。',
+    description: '在成功的剧情回复后非阻断生成主角对白与行动选项，点击后直接发送。',
     packageName: 'dsh-roleplay-rp-reply-options',
     hostEntryIds: ['rp-reply-options'], runtimeKey: 'replyOptions',
   }),

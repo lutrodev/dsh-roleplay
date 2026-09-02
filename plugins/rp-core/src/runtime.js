@@ -1,9 +1,21 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { Service } from '@deepseek-ai/cordis'
 import { createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
-import { assertObjectJsonSchema, defineTool, ToolArgsError, validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
-import { assertCompletedSubagent, runFreshSubagent, subagentVisibleText } from './subagent-run.js'
+import {
+  assertObjectJsonSchema,
+  assertSupportedJsonSchema,
+  defineTool,
+  ToolArgsError,
+  validateJsonSchemaValue,
+} from '@deepseek-ai/dsh-tools'
+import {
+  assertCompletedSubagent,
+  runFreshStructuredSubagent,
+  runFreshSubagent,
+  subagentVisibleText,
+} from './subagent-run.js'
 import { roleplayAssistantReplyKind, roleplayTranscriptMessages } from './conversation.js'
+import { resolveSessionToolCall } from './session-runtime.js'
 import {
   applyCommitPatches,
   commitRetryParameterSchema,
@@ -166,6 +178,13 @@ class RpCommitFailureError extends HarnessError {
     super(message, code, error instanceof Error ? { cause: error } : undefined)
     const feedback = safeJsonRecordClone(error?.feedback)
     if (feedback !== undefined) this.feedback = feedback
+    if (Array.isArray(error?.issues)) {
+      this.issues = error.issues.slice(0, MAX_COMMIT_VALIDATION_ISSUES)
+        .flatMap(issue => {
+          const cloned = safeJsonRecordClone(issue)
+          return cloned === undefined ? [] : [cloned]
+        })
+    }
   }
 }
 
@@ -192,6 +211,7 @@ export class RpRuntime extends Service {
     this.runGuards = new Map()
     this.commitDiagnosticProviders = new Map()
     this.artifactExtensions = new Map()
+    this.artifactGenerators = new Map()
     this.chatReadableTools = new Map()
     this.taskSubagents = new Map()
     this.subagentProfileProvider = undefined
@@ -411,36 +431,21 @@ export class RpRuntime extends Service {
     }
     const normalized = { ...definition, schema }
     this.effectTypes.set(definition.kind, normalized)
-    this.ctx.emit('tools/change')
     const dispose = this.ctx.effect(() => () => {
       if (this.effectTypes.get(definition.kind) !== normalized) return
       this.effectTypes.delete(definition.kind)
-      this.ctx.emit('tools/change')
     }, `rpRuntime.register(effect type:${definition.kind})`)
     return () => void dispose()
   }
 
-  /** Return the live closed commit schema assembled from registered effect schemas. */
+  /** Return the static model-facing commit protocol. */
   commitParametersSchema() {
-    return commitParametersSchema(
-      [...this.effectTypes.values()].map(definition => definition.schema),
-      [...this.artifactExtensions.values()].map(definition => ({
-        namespace: definition.namespace,
-        schema: definition.schema,
-        required: definition.required,
-      })),
-    )
+    return commitParametersSchema()
   }
 
   /** Return the strict full-draft branch used after applying retry patches. */
   fullCommitParametersSchema() {
-    const schema = this.commitParametersSchema()
-    delete schema.properties.retry
-    if (Array.isArray(schema.properties.extensions.required) && schema.properties.extensions.required.length > 0) {
-      schema.required = ['extensions']
-    }
-    assertObjectJsonSchema(schema)
-    return schema
+    return fullCommitParametersSchema()
   }
 
   /** Collect bounded capability-owned hints for otherwise opaque nested schema failures. */
@@ -469,6 +474,29 @@ export class RpRuntime extends Service {
     return [...corrections]
   }
 
+  /** Validate registered capability payloads without changing the static tool schema. */
+  commitCapabilityArgumentViolations(args) {
+    if (!isRecord(args)) return []
+    const violations = []
+    if (Array.isArray(args.effects)) {
+      for (const [index, effect] of args.effects.entries()) {
+        if (!isRecord(effect) || typeof effect.kind !== 'string') continue
+        const schema = this.effectTypes.get(effect.kind)?.schema
+        if (schema === undefined) violations.push(`/effects/${index}.kind is not registered as an effect kind`)
+        else violations.push(...validateJsonSchemaValue(schema, effect, `/effects/${index}`))
+      }
+    }
+    if (isRecord(args.extensions)) {
+      for (const [namespace, value] of Object.entries(args.extensions)) {
+        const schema = this.artifactExtensions.get(namespace)?.schema
+        const path = `/extensions/${encodeJsonPointerSegment(namespace)}`
+        if (schema === undefined) violations.push(`${path} is not a registered parent-authored extension`)
+        else violations.push(...validateJsonSchemaValue(schema, value, path))
+      }
+    }
+    return violations
+  }
+
   /** Store one model-facing correction payload until the tool pipeline finalizes the failed call. */
   recordCommitErrorFeedback(agent, callId, error) {
     if (!isRecord(agent) || typeof callId !== 'string' || callId.length === 0) return
@@ -477,10 +505,7 @@ export class RpRuntime extends Service {
       calls = new Map()
       this.commitErrorFeedback.set(agent, calls)
     }
-    const requiredExtensions = [...this.artifactExtensions.values()]
-      .filter(definition => definition.required === true)
-      .map(definition => definition.namespace)
-    calls.set(callId, commitErrorFeedback(error, this.runs.get(agent)?.failedCommit, requiredExtensions))
+    calls.set(callId, commitErrorFeedback(error, this.runs.get(agent)?.failedCommit))
   }
 
   /** Consume the correction payload for one settled commit call. */
@@ -546,7 +571,7 @@ export class RpRuntime extends Service {
         `artifact extension "${definition.namespace}" schema must be a closed object unless acceptAdditionalProperties explicitly owns normalization`,
       )
     }
-    if (this.artifactExtensions.has(definition.namespace)) {
+    if (this.artifactExtensions.has(definition.namespace) || this.artifactGenerators.has(definition.namespace)) {
       throw new RpRuntimeError('RP_DUPLICATE_REGISTRATION', `artifact extension "${definition.namespace}" is already registered`)
     }
     const normalized = {
@@ -556,12 +581,43 @@ export class RpRuntime extends Service {
       acceptAdditionalProperties: acceptsAdditionalProperties,
     }
     this.artifactExtensions.set(definition.namespace, normalized)
-    this.ctx.emit('tools/change')
     const dispose = this.ctx.effect(() => () => {
       if (this.artifactExtensions.get(definition.namespace) !== normalized) return
       this.artifactExtensions.delete(definition.namespace)
-      this.ctx.emit('tools/change')
     }, `rpRuntime.register(artifact extension:${definition.namespace})`)
+    return () => void dispose()
+  }
+
+  /**
+   * Register one non-blocking extension generated from a validated final
+   * artifact. Generated namespaces never enter the parent commit schema.
+   *
+   * @param {{ namespace: string, order?: number, generate(context: object): unknown | Promise<unknown>, validate(value: unknown, context: object): unknown | Promise<unknown> }} definition
+   */
+  registerArtifactGenerator(definition) {
+    if (!isRecord(definition)
+      || typeof definition.namespace !== 'string'
+      || definition.namespace.length === 0
+      || typeof definition.generate !== 'function'
+      || typeof definition.validate !== 'function') {
+      throw new RpRuntimeError(
+        'RP_INVALID_REGISTRATION',
+        'artifact generator requires a non-empty namespace plus generate and validate functions',
+      )
+    }
+    if (definition.order !== undefined && !Number.isFinite(definition.order)) {
+      throw new RpRuntimeError('RP_INVALID_REGISTRATION', `artifact generator "${definition.namespace}" order must be finite`)
+    }
+    if (this.artifactGenerators.has(definition.namespace) || this.artifactExtensions.has(definition.namespace)) {
+      throw new RpRuntimeError('RP_DUPLICATE_REGISTRATION', `artifact namespace "${definition.namespace}" is already registered`)
+    }
+    const normalized = { ...definition, order: definition.order ?? 0 }
+    this.artifactGenerators.set(definition.namespace, normalized)
+    const dispose = this.ctx.effect(() => () => {
+      if (this.artifactGenerators.get(definition.namespace) === normalized) {
+        this.artifactGenerators.delete(definition.namespace)
+      }
+    }, `rpRuntime.register(artifact generator:${definition.namespace})`)
     return () => void dispose()
   }
 
@@ -1551,12 +1607,16 @@ export class RpRuntime extends Service {
       let assistant
       let context
       let draft = args
+      const retryAttempt = isRetryCommitArguments(args)
       try {
-        if (isRetryCommitArguments(args)) {
+        if (retryAttempt) {
           const retry = runtime.prepareCommitRetry(run, args)
           // Validate the current invocation against the Session Event Log even
           // though the durable narrative owner comes from the cached attempt.
           runtime.resolveCommitAssistant(exec.agent, run, callId)
+          // A retry token binds the live context, including State revisions.
+          // Check that boundary before spending work on the patched draft.
+          await runtime.validateLiveContext(exec.agent, run, retry.context)
           draft = retry.draft
           assistant = retry.assistant
           context = retry.context
@@ -1564,7 +1624,7 @@ export class RpRuntime extends Service {
           if (violations.length > 0) {
             let issues = []
             try {
-              await runtime.validateDraft(draft, exec.agent, run, assistant.narrative, context, { live: false })
+              await runtime.validateDraft(draft, exec.agent, run, assistant.narrative, context, { live: false, generate: false })
             } catch (error) {
               issues = commitValidationIssues(normalizeCommitError(error))
             }
@@ -1574,10 +1634,21 @@ export class RpRuntime extends Service {
           assistant = runtime.resolveCommitAssistant(exec.agent, run, callId)
           context = runtime.captureCommitContext(run)
         }
-        artifact = await runtime.validateDraft(draft, exec.agent, run, assistant.narrative, context)
+        artifact = await runtime.validateDraft(draft, exec.agent, run, assistant.narrative, context, { signal: exec.signal })
       } catch (error) {
         run.commitCallId = undefined
-        const failure = normalizeCommitError(error)
+        if (exec.signal?.aborted) {
+          run.failedCommit = undefined
+          exec.signal.throwIfAborted()
+        }
+        let failure = normalizeCommitError(error)
+        if (retryAttempt && failure.code === 'RP_CONTEXT_STALE') {
+          run.failedCommit = undefined
+          failure = new RpRuntimeError(
+            'RP_COMMIT_RETRY_EXPIRED',
+            'The State revision or roleplay context changed after the failed commit. Rebuild and submit one complete rp_commit_turn draft.',
+          )
+        }
         if (isPatchRetryableCommitError(failure) && isRecord(draft) && assistant !== undefined && context !== undefined) {
           runtime.rememberFailedCommit(run, draft, assistant, context)
         } else if (!isPatchRetryableCommitError(failure)) {
@@ -1644,7 +1715,7 @@ export class RpRuntime extends Service {
         },
         retry: {
           type: 'object',
-          description: 'Correction-only retry descriptor returned by a failed rp_commit_turn. Combine it only with extensions that remain required by the live schema, never with summary, effects, or references.',
+          description: 'Correction-only retry descriptor returned by a failed rp_commit_turn. Never combine it with summary, effects, references, or extensions.',
           additionalProperties: true,
         },
       },
@@ -1669,7 +1740,10 @@ export class RpRuntime extends Service {
     })
     tool.execute = async (args, exec) => {
       try {
-        const violations = validateJsonSchemaValue(runtime.commitParametersSchema(), args, '')
+        const violations = [
+          ...validateCommitArgumentsSchema(args),
+          ...(isRetryCommitArguments(args) ? [] : runtime.commitCapabilityArgumentViolations(args)),
+        ]
         if (violations.length > 0) {
           const issues = isRetryCommitArguments(args)
             ? []
@@ -1678,6 +1752,7 @@ export class RpRuntime extends Service {
         }
         return await executeCommit(args, exec)
       } catch (error) {
+        if (exec.signal?.aborted) exec.signal.throwIfAborted()
         const failure = normalizeCommitError(error)
         runtime.recordCommitErrorFeedback(exec.agent, String(exec.callId ?? ''), failure)
         throw failure
@@ -1685,7 +1760,7 @@ export class RpRuntime extends Service {
     }
     Object.defineProperty(tool, 'parameters', {
       enumerable: true,
-      get: () => runtime.commitParametersSchema(),
+      value: runtime.commitParametersSchema(),
     })
     return tool
   }
@@ -1705,7 +1780,7 @@ export class RpRuntime extends Service {
     }
     let issues = []
     try {
-      await this.validateDraft(args, exec.agent, run, assistant.narrative, context, { live: false })
+      await this.validateDraft(args, exec.agent, run, assistant.narrative, context, { live: false, generate: false })
     } catch (error) {
       issues = commitValidationIssues(normalizeCommitError(error))
     }
@@ -1739,8 +1814,8 @@ export class RpRuntime extends Service {
 
   /** Resolve and apply a bounded correction-only retry against the latest failed draft. */
   prepareCommitRetry(run, args) {
-    if (!isRecord(args) || Object.keys(args).some(key => key !== 'retry' && key !== 'extensions') || !isRecord(args.retry)) {
-      throw new RpRuntimeError('RP_COMMIT_RETRY_MIXED_ARGUMENTS', 'A correction retry may contain only retry and any extensions still required by the live tool schema.')
+    if (!isRecord(args) || Object.keys(args).some(key => key !== 'retry') || !isRecord(args.retry)) {
+      throw new RpRuntimeError('RP_COMMIT_RETRY_MIXED_ARGUMENTS', 'A correction retry may contain only retry.token and retry.patches.')
     }
     const cached = run.failedCommit
     if (cached === undefined || typeof args.retry.token !== 'string' || args.retry.token !== cached.token) {
@@ -1757,46 +1832,27 @@ export class RpRuntime extends Service {
     if (!Array.isArray(args.retry.patches)) {
       throw new RpRuntimeError('RP_COMMIT_RETRY_PATCH_REQUIRED', 'retry.patches must be an array of JSON Pointer corrections.')
     }
-    if (args.retry.patches.length === 0 && (!isRecord(args.extensions) || Object.keys(args.extensions).length === 0)) {
-      throw new RpRuntimeError('RP_COMMIT_RETRY_PATCH_REQUIRED', 'retry.patches may be empty only when corrected extensions are supplied beside retry.')
-    }
+    if (args.retry.patches.length === 0) throw new RpRuntimeError('RP_COMMIT_RETRY_PATCH_REQUIRED', 'retry.patches must contain at least one correction.')
     if (args.retry.patches.length > MAX_COMMIT_RETRY_PATCHES) {
       throw new RpRuntimeError('RP_COMMIT_RETRY_PATCH_LIMIT', `retry.patches contains ${args.retry.patches.length} operations; maximum is ${MAX_COMMIT_RETRY_PATCHES}.`)
     }
-    let base = jsonClone(cached.draft)
-    if (args.extensions !== undefined) {
-      if (!isRecord(args.extensions)) {
-        throw new RpRuntimeError('RP_COMMIT_RETRY_MIXED_ARGUMENTS', 'Retry extensions must be an object when the live tool schema requires them.')
-      }
-      base.extensions = {
-        ...(isRecord(base.extensions) ? base.extensions : {}),
-        ...jsonClone(args.extensions),
-      }
-    }
-    const draft = applyCommitPatches(base, args.retry.patches)
+    const draft = applyCommitPatches(cached.draft, args.retry.patches)
     cached.draft = jsonClone(draft)
     return { draft, assistant: cached.assistant, context: cached.context }
   }
 
   /** @param {object} agent @param {object} run @param {string} callId */
   resolveCommitAssistant(agent, run, callId) {
-    if (typeof agent.session?.snapshotEvents !== 'function') {
+    let resolved
+    try {
+      resolved = resolveSessionToolCall(agent.session, { name: RP_COMMIT_TOOL, callId, turn: run.turn })
+    } catch {
       throw new RpRuntimeError('RP_COMMIT_MESSAGE_MISSING', 'The Session Event Log is unavailable for this commit.')
     }
-    const events = agent.session.snapshotEvents()
-    const call = events.findLast(event => event?.type === 'tool/call'
-      && String(event.data?.callId) === callId
-      && event.data?.name === RP_COMMIT_TOOL)
-    if (call === undefined || call.data?.turn !== run.turn) {
+    const { events, call, assistants: candidates } = resolved
+    if (call === undefined) {
       throw new RpRuntimeError('RP_COMMIT_CALL_MISMATCH', 'The commit call does not belong to the active roleplay turn.')
     }
-    const candidates = events.filter(event => Number.isSafeInteger(event?.seq) && event.seq < call.seq
-      && event?.type === 'assistant/message'
-      && event.data?.turn === call.data.turn
-      && event.data?.step === call.data.step
-      && event.data?.message?.source?.kind === 'model'
-      && Array.isArray(event.data?.message?.content)
-      && event.data.message.content.some(block => block?.type === 'tool-call' && String(block.id) === callId))
     if (candidates.length !== 1) throw new RpRuntimeError('RP_COMMIT_MESSAGE_MISSING', 'The commit must correlate to exactly one model assistant message.')
     const event = candidates[0]
     const message = event.data.message
@@ -1830,8 +1886,88 @@ export class RpRuntime extends Service {
       textTransforms: run.textTransforms,
       fragments: run.fragments.map(fragment => jsonClone(fragment)),
       contextBuild: run.contextBuild === null ? null : jsonClone(run.contextBuild),
+      roleplayContextText: run.contextText,
+      commitContextText: run.commitContextText,
       mode: run.profile?.mode ?? 'director',
       writerArtifact: run.writerArtifact === undefined ? undefined : jsonClone(run.writerArtifact),
+    }
+  }
+
+  /** Generate optional extensions without exposing the live Run or Session. */
+  async generateArtifactExtensions(artifact, agent, run, context, signal) {
+    if (this.artifactGenerators.size === 0) return
+    signal?.throwIfAborted?.()
+    const snapshot = deepFreeze(jsonClone({
+      narrative: artifact.narrative,
+      runSummary: artifact.runSummary,
+      effects: artifact.effects,
+      references: artifact.references,
+    }))
+    let route
+    try {
+      route = deepFreeze(jsonClone(this.writerRoute(run, agent)))
+    } catch (error) {
+      if (signal?.aborted) signal.throwIfAborted()
+      for (const definition of ordered(this.artifactGenerators.values())) {
+        appendGeneratedDiagnostic(artifact, generatedFailureDiagnostic(definition, error), this.config.maxArtifactBytes)
+      }
+      return
+    }
+    const generatorContext = Object.freeze({
+      artifact: snapshot,
+      executionMode: context.executionMode,
+      mode: artifact.mode,
+      route,
+      parentContextText: context.roleplayContextText,
+      commitContextText: context.commitContextText,
+      maxPromptCharacters: this.config.maxSubagentPromptCharacters,
+      signal,
+      runStructuredSubagent: async request => {
+        if (!isRecord(request)) throw new TypeError('structured subagent request must be an object')
+        const { timeoutMs, ...childRequest } = request
+        return runFreshStructuredSubagent(this.ctx, this.config.subagentProvider, {
+          ...childRequest,
+          parent: agent,
+          signal,
+          agentOptions: route,
+          toolFilter: { allow: [] },
+          maxDepth: 1,
+        }, { timeoutMs })
+      },
+    })
+    for (const definition of ordered(this.artifactGenerators.values())) {
+      signal?.throwIfAborted?.()
+      let generated
+      try {
+        generated = await definition.generate(generatorContext)
+      } catch (error) {
+        if (signal?.aborted) signal.throwIfAborted()
+        appendGeneratedDiagnostic(artifact, generatedFailureDiagnostic(definition, error), this.config.maxArtifactBytes)
+        continue
+      }
+      let canonical
+      try {
+        canonical = await definition.validate(generated, generatorContext)
+        if (!isRecord(canonical)) throw new TypeError('generated artifact must normalize to an object')
+        canonical = jsonClone(canonical)
+      } catch {
+        appendGeneratedDiagnostic(artifact, {
+          source: definition.namespace,
+          code: 'RP_GENERATED_ARTIFACT_INVALID',
+          severity: 'warning',
+          message: '派生内容格式无效，已忽略；本轮正文和状态仍正常提交。',
+        }, this.config.maxArtifactBytes)
+        continue
+      }
+      artifact.extensions[definition.namespace] = canonical
+      if (artifactPayloadBytes(artifact) <= this.config.maxArtifactBytes) continue
+      delete artifact.extensions[definition.namespace]
+      appendGeneratedDiagnostic(artifact, {
+        source: definition.namespace,
+        code: 'RP_GENERATED_ARTIFACT_LIMIT',
+        severity: 'warning',
+        message: '派生内容超过本轮容量限制，已忽略；本轮正文和状态仍正常提交。',
+      }, this.config.maxArtifactBytes)
     }
   }
 
@@ -1931,9 +2067,12 @@ export class RpRuntime extends Service {
     }
     // v2 transports prose in the native assistant message, so the commit
     // payload byte budget applies only to the tool-owned side-effect record.
-    const bytes = jsonByteLength({ runSummary, effects, references, extensions, diagnostics: artifact.diagnostics, mode })
+    const bytes = artifactPayloadBytes(artifact)
     if (bytes > this.config.maxArtifactBytes) {
       throw new RpRuntimeError('RP_ARTIFACT_LIMIT', `roleplay artifact is ${bytes} bytes; maximum is ${this.config.maxArtifactBytes}`)
+    }
+    if (options.generate !== false) {
+      await this.generateArtifactExtensions(artifact, agent, run, context, options.signal)
     }
     if (options.live !== false) await this.validateLiveContext(agent, run, context)
     if (this.runs.get(agent) !== run || run.status !== 'running') {
@@ -2031,6 +2170,42 @@ function jsonClone(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
+function deepFreeze(value) {
+  if (!isRecord(value) && !Array.isArray(value)) return value
+  for (const child of Object.values(value)) deepFreeze(child)
+  return Object.freeze(value)
+}
+
+function artifactPayloadBytes(artifact) {
+  return jsonByteLength({
+    runSummary: artifact.runSummary,
+    effects: artifact.effects,
+    references: artifact.references,
+    extensions: artifact.extensions,
+    diagnostics: artifact.diagnostics,
+    mode: artifact.mode,
+  })
+}
+
+function appendGeneratedDiagnostic(artifact, diagnostic, maxArtifactBytes) {
+  artifact.diagnostics.push(diagnostic)
+  if (artifactPayloadBytes(artifact) > maxArtifactBytes) artifact.diagnostics.pop()
+}
+
+function generatedFailureDiagnostic(definition, error) {
+  const code = error?.code === 'SUBAGENT_OUTPUT_SCHEMA_UNSUPPORTED'
+    ? 'RP_ARTIFACT_GENERATOR_UNAVAILABLE'
+    : error?.code === 'SUBAGENT_TIMEOUT'
+      ? 'RP_ARTIFACT_GENERATION_TIMEOUT'
+      : 'RP_ARTIFACT_GENERATION_FAILED'
+  const message = code === 'RP_ARTIFACT_GENERATOR_UNAVAILABLE'
+    ? '当前子代理不支持结构化派生内容，已跳过；本轮正文和状态仍正常提交。'
+    : code === 'RP_ARTIFACT_GENERATION_TIMEOUT'
+      ? '派生内容生成超时，已跳过；本轮正文和状态仍正常提交。'
+      : '派生内容暂时无法生成，已跳过；本轮正文和状态仍正常提交。'
+  return { source: definition.namespace, code, severity: 'warning', message }
+}
+
 function safeJsonRecordClone(value) {
   if (!isRecord(value)) return undefined
   try {
@@ -2041,20 +2216,8 @@ function safeJsonRecordClone(value) {
   }
 }
 
-/** Build the closed live rp_commit_turn parameter schema. */
-function commitParametersSchema(effectSchemas, extensionDefinitions) {
-  const effectItems = effectSchemas.length === 0
-    ? undefined
-    : effectSchemas.length === 1
-      ? jsonClone(effectSchemas[0])
-      : { oneOf: effectSchemas.map(jsonClone) }
-  const extensionProperties = Object.fromEntries(extensionDefinitions.map(definition => [
-    definition.namespace,
-    jsonClone(definition.schema),
-  ]))
-  const requiredExtensions = extensionDefinitions
-    .filter(definition => definition.required === true)
-    .map(definition => definition.namespace)
+/** Build the full-draft arm of the static rp_commit_turn protocol. */
+function fullCommitParametersSchema() {
   const schema = {
     type: 'object',
     additionalProperties: false,
@@ -2062,8 +2225,15 @@ function commitParametersSchema(effectSchemas, extensionDefinitions) {
       runSummary: { type: 'string', description: 'Optional concise factual summary of the beat and immediate continuation state. Omit it to use a short excerpt of the visible prose.' },
       effects: {
         type: 'array',
-        description: 'Optional persistent changes. Every item must match one currently registered effect schema; omit the array when nothing changes.',
-        ...(effectItems === undefined ? {} : { items: effectItems }),
+        description: 'Optional persistent changes. Follow the frozen commit context for every registered effect kind and payload.',
+        items: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            kind: { type: 'string', description: 'Registered effect discriminator.' },
+          },
+          required: ['kind'],
+        },
       },
       references: {
         type: 'array',
@@ -2081,19 +2251,38 @@ function commitParametersSchema(effectSchemas, extensionDefinitions) {
       },
       extensions: {
         type: 'object',
-        description: requiredExtensions.length === 0
-          ? 'Optional registered extension results keyed by extension namespace. Omit when none are used.'
-          : `Every complete commit and correction retry must include required extension namespaces: ${requiredExtensions.map(value => JSON.stringify(value)).join(', ')}. During retry, these supplied namespaces replace their cached values while unrelated optional extensions remain cached.`,
-        additionalProperties: false,
-        properties: extensionProperties,
-        ...(requiredExtensions.length === 0 ? {} : { required: requiredExtensions }),
+        description: 'Optional parent-authored extension values keyed by registered namespace. Runtime-generated extensions must not be supplied here.',
+        additionalProperties: true,
       },
-      retry: commitRetryParameterSchema(),
     },
-    ...(requiredExtensions.length === 0 ? {} : { required: ['extensions'] }),
   }
   assertObjectJsonSchema(schema)
   return schema
+}
+
+/** Build the one fixed, exact-one full-or-retry rp_commit_turn schema. */
+function commitParametersSchema() {
+  const schema = {
+    oneOf: [
+      fullCommitParametersSchema(),
+      {
+        type: 'object',
+        additionalProperties: false,
+        properties: { retry: commitRetryParameterSchema() },
+        required: ['retry'],
+      },
+    ],
+  }
+  assertSupportedJsonSchema(schema)
+  return schema
+}
+
+/** Validate the selected static protocol arm while retaining exact field paths. */
+function validateCommitArgumentsSchema(args) {
+  const schema = isRetryCommitArguments(args)
+    ? commitParametersSchema().oneOf[1]
+    : fullCommitParametersSchema()
+  return validateJsonSchemaValue(schema, args, '')
 }
 
 function normalizeCommitError(error) {
@@ -2133,7 +2322,7 @@ function encodeJsonPointerSegment(value) {
 }
 
 /** Convert one thrown commit failure into stable model-correctable JSON fields. */
-function commitErrorFeedback(error, failedCommit, requiredExtensions = []) {
+function commitErrorFeedback(error, failedCommit) {
   const message = error instanceof Error ? error.message : String(error)
   const retry = isPatchRetryableCommitError(error)
     && typeof failedCommit?.token === 'string'
@@ -2142,10 +2331,7 @@ function commitErrorFeedback(error, failedCommit, requiredExtensions = []) {
         mode: 'json_pointer_patch',
         token: failedCommit.token,
         maxPatches: MAX_COMMIT_RETRY_PATCHES,
-        ...(requiredExtensions.length === 0 ? {} : { requiredExtensions: [...requiredExtensions] }),
-        instruction: requiredExtensions.length === 0
-          ? 'Call rp_commit_turn again with only retry.token and retry.patches. Patch every reported path and do not resend unrelated commit fields or prose.'
-          : 'Call rp_commit_turn again with retry.token, retry.patches, and the complete extensions object still required by the live schema. retry.patches may be empty when corrected extensions resolve every issue. Do not resend summary, effects, references, or prose.',
+        instruction: 'Call rp_commit_turn again with only retry.token and retry.patches. Patch every reported path and do not resend unrelated commit fields, extensions, or prose.',
       }
     : undefined
   if (error instanceof ToolArgsError) {

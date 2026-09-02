@@ -71,7 +71,7 @@ const zh = {
   quickRepliesEnableFirst: '启用快捷回复后设置',
   replyOptionsConfigure: '设置回复选项',
   replyOptionsEnableFirst: '启用回复选项后设置',
-  replyOptionsSettingsSaved: '回复条数、字数上限和方向关键词已保存；新建或重新打开对话后生效。',
+  replyOptionsSettingsSaved: '回复条数、长度指导和方向关键词已保存；新建或重新打开对话后生效。',
   skillsTitle: 'Roleplay Skills',
   skillsDescription: '逐项选择 Roleplay 插件向 Agent 提供的工作指南。停用 Skill 不会停用插件，也不会删除资料。',
   skillsScope: '这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。',
@@ -318,7 +318,7 @@ export function ReplyOptionsSettingsOverlay({ controller, connection }) {
       onClose: () => controller.close(),
       title: '设置回复选项',
       closeLabel: '关闭回复选项设置',
-      description: '设置主模型生成的选项数量、每条字数上限和可选方向。',
+      description: '设置提交后生成的选项数量、每条长度指导和可选方向。',
       className: css.replyOptionsDialog,
       footer: failed
         ? h('div', { className: css.replyOptionsSettingsFooter },

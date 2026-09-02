@@ -1188,8 +1188,13 @@ function NativeUserActionsEffect() {
     const host = actionNodeHost(ref.current)
     const message = messageRowForAction(host, 'user')
     if (!(message instanceof HTMLElement)) return undefined
+    const actions = nativeUserActions(message)
     message.setAttribute('data-rp-message-actions-user-native-hidden', '')
-    return () => { message.removeAttribute('data-rp-message-actions-user-native-hidden') }
+    actions?.setAttribute('data-rp-message-actions-native-user-actions', '')
+    return () => {
+      message.removeAttribute('data-rp-message-actions-user-native-hidden')
+      actions?.removeAttribute('data-rp-message-actions-native-user-actions')
+    }
   }, [])
   return h('span', { ref, className: css.nativeUserEffectAnchor, hidden: true, 'aria-hidden': true })
 }
@@ -1291,17 +1296,30 @@ function InlineMessageEditorPortal({ surface, unitLabel, detail, body, setBody, 
     }), target))
 }
 
+/** Resolve the renderer mounted inside the public Chat Node slot outlet. */
+function chatNodeRenderer(messageRow) {
+  const outlet = messageRow?.querySelector?.('[data-slot="conversation.chat.node"]')
+  const renderer = outlet?.firstElementChild
+  return renderer instanceof HTMLElement ? renderer : null
+}
+
 /** Resolve the current Assistant renderer mounted inside the public Chat Node slot anchor. */
 export function assistantMessageContent(messageRow) {
-  const outlet = messageRow?.querySelector?.('[data-slot="conversation.chat.node"]')
-  const content = outlet?.firstElementChild
-  return content instanceof HTMLElement ? content : null
+  return chatNodeRenderer(messageRow)
+}
+
+/** Resolve the resident user time/copy row without relying on DSH CSS-module names. */
+export function nativeUserActions(messageRow) {
+  const renderer = chatNodeRenderer(messageRow)
+  const stack = renderer?.firstElementChild
+  const actions = renderer?.lastElementChild
+  if (!(actions instanceof HTMLElement) || actions === stack) return null
+  return [...actions.children].some(child => child.tagName === 'BUTTON') ? actions : null
 }
 
 /** Resolve the native user stack so editing can replace text without hiding image attachments. */
 export function userMessageContentStack(messageRow) {
-  const userBubble = messageRow?.querySelector?.('[data-actions-reveal]')
-  const stack = userBubble?.firstElementChild
+  const stack = chatNodeRenderer(messageRow)?.firstElementChild
   return stack instanceof HTMLElement ? stack : null
 }
 

@@ -181,7 +181,7 @@ test('settings preview is projected from the same runtime prompt functions', () 
   const chat = preview.profiles.find(profile => profile.kind === 'parent-chat')
   const agent = preview.profiles.find(profile => profile.kind === 'parent-agent')
   const writer = preview.profiles.find(profile => profile.kind === 'writer')
-  assert.equal(ROLEPLAY_PROMPT_PREVIEW_VERSION, 11)
+  assert.equal(ROLEPLAY_PROMPT_PREVIEW_VERSION, 12)
   assert.equal(preview.version, ROLEPLAY_PROMPT_PREVIEW_VERSION)
   assert.deepEqual(chat.layers.find(layer => layer.id === 'harness-identity'), {
     id: 'harness-identity', role: 'system', source: 'dsh-system-prompt', contentKind: 'exact', order: -1000,

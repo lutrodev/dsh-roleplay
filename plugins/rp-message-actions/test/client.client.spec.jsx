@@ -56,6 +56,7 @@ import {
   isFailedCanonicalAssistantAction,
   messageRowForAction,
   nativeAssistantBranchButton,
+  nativeUserActions,
   openingFloorNodeDefinition,
   settledAssistantTraceRows,
   settledTurnTailRow,
@@ -486,11 +487,7 @@ describe('Roleplay message action presentation', () => {
 
     const parent = document.createElement('div')
     const userRow = flowRow('user', parent)
-    const userBubble = document.createElement('div')
-    userBubble.dataset.actionsReveal = 'always'
-    const nativeActions = document.createElement('div')
-    userBubble.append(document.createElement('div'), nativeActions)
-    userRow.append(userBubble)
+    const { nativeActions } = mountNativeUserRenderer(userRow)
     const actionRow = flowRow('rp-floor-user-actions', parent)
     const mount = document.createElement('div')
     actionRow.append(mount)
@@ -523,12 +520,29 @@ describe('Roleplay message action presentation', () => {
     expect(connection.call).not.toHaveBeenCalled()
     expect(screen.queryByText('暂时无法完成这次更改，请稍后再试。')).toBeNull()
     expect(userRow.hasAttribute('data-rp-message-actions-user-native-hidden')).toBe(true)
+    expect(nativeActions.hasAttribute('data-rp-message-actions-native-user-actions')).toBe(true)
     const disposeStyles = ensureStyles()
     expect(getComputedStyle(nativeActions).display).toBe('none')
     disposeStyles()
 
     view.unmount()
     expect(userRow.hasAttribute('data-rp-message-actions-user-native-hidden')).toBe(false)
+    expect(nativeActions.hasAttribute('data-rp-message-actions-native-user-actions')).toBe(false)
+    parent.remove()
+  })
+
+  it('keeps a refreshed native user action row hidden through the owned Chat Node slot', () => {
+    const parent = document.createElement('div')
+    const userRow = flowRow('user', parent)
+    userRow.setAttribute('data-rp-message-actions-user-native-hidden', '')
+    const { nativeActions } = mountNativeUserRenderer(userRow)
+    document.body.append(parent)
+
+    const disposeStyles = ensureStyles()
+    expect(nativeActions.hasAttribute('data-rp-message-actions-native-user-actions')).toBe(false)
+    expect(getComputedStyle(nativeActions).display).toBe('none')
+
+    disposeStyles()
     parent.remove()
   })
 
@@ -561,12 +575,9 @@ describe('Roleplay message action presentation', () => {
 
     const parent = document.createElement('div')
     const userRow = flowRow('user', parent)
-    const userBubble = document.createElement('div')
-    userBubble.dataset.actionsReveal = 'always'
     const content = document.createElement('div')
     content.append(document.createElement('div'))
-    userBubble.append(content, document.createElement('div'))
-    userRow.append(userBubble)
+    mountNativeUserRenderer(userRow, content)
     const actionRow = flowRow('rp-floor-user-actions', parent)
     const mount = document.createElement('div')
     actionRow.append(mount)
@@ -795,17 +806,15 @@ describe('Roleplay message action presentation', () => {
     expect(node?.kind).toBe('rp-floor-user-actions')
 
     const row = document.createElement('div')
-    const userBubble = document.createElement('div')
-    userBubble.dataset.actionsReveal = 'always'
     const stack = document.createElement('div')
     const gallery = document.createElement('div')
     gallery.dataset.testGallery = ''
     stack.append(gallery)
-    userBubble.append(stack, document.createElement('div'))
-    row.append(userBubble)
+    const { nativeActions } = mountNativeUserRenderer(row, stack)
 
     expect(userMessageContentStack(row)).toBe(stack)
     expect(userMessageContentStack(row)?.contains(gallery)).toBe(true)
+    expect(nativeUserActions(row)).toBe(nativeActions)
   })
 
   it('replays an edited non-tail assistant into the fork before opening it', async () => {
@@ -1609,11 +1618,12 @@ describe('Roleplay message action presentation', () => {
     const source = await readFile('src/client.js', 'utf8')
     const stateSource = await readFile('src/client-state.js', 'utf8')
     const styles = await readFile('src/client.module.css', 'utf8')
+    const generatedStyles = await readFile('src/client-styles.generated.js', 'utf8')
     expect(source).toMatch(/function InlineMessageEditorPortal/)
     expect(source).toMatch(/function EditedMessagePortal/)
     expect(source).toMatch(/function userMessageContentStack/)
-    expect(source).toMatch(/querySelector\?\.\('\[data-actions-reveal\]'\)/)
-    expect(source).not.toMatch(/data-time-hover-root/)
+    expect(source).toMatch(/querySelector\?\.\('\[data-slot="conversation\.chat\.node"\]'\)/)
+    expect(source).not.toMatch(/data-(?:actions-reveal|time-hover-root)/)
     expect(source).toMatch(/function assistantMessageContent/)
     expect(source).toMatch(/MarkdownText/)
     expect(source).toMatch(/messageRowForAction/)
@@ -1658,8 +1668,11 @@ describe('Roleplay message action presentation', () => {
     expect(styles).toMatch(/data-rp-message-actions-original-hidden/)
     expect(styles).toMatch(/inactiveActionNodeMarker/)
     expect(styles).toMatch(/rp-message-avatar-user/)
-    expect(styles).toMatch(/data-actions-reveal/)
-    expect(styles).not.toMatch(/data-time-hover-root/)
+    expect(styles).toMatch(/data-slot="conversation\.chat\.node"/)
+    expect(styles).toMatch(/data-rp-message-actions-native-user-actions/)
+    expect(styles).not.toMatch(/data-(?:actions-reveal|time-hover-root)/)
+    expect(generatedStyles).toMatch(/data-slot=\\?"conversation\.chat\.node\\?"/)
+    expect(generatedStyles).not.toMatch(/conversation\.rp-message-actions-chat\.rp-message-actions-node/)
     expect(styles).toMatch(/rp-floor-opening-actions[^}]*inlineEditorPortalAnchor/)
     expect(styles).toMatch(/\.inlineEditor\s*\{[^}]*background:\s*var\(--dsw-specific-tip\)/s)
     expect(styles).toMatch(/\.inlineEditor\[data-surface="user"\]\s*\{[^}]*background:\s*var\(--dsw-specific-bubble\)/s)
@@ -1813,6 +1826,20 @@ function flowRow(kind, parent, key) {
   if (key !== undefined) element.dataset.chatFlowKey = key
   parent.append(element)
   return element
+}
+
+function mountNativeUserRenderer(row, stack = document.createElement('div')) {
+  const outlet = document.createElement('div')
+  outlet.dataset.slot = 'conversation.chat.node'
+  const renderer = document.createElement('div')
+  const nativeActions = document.createElement('div')
+  const copyButton = document.createElement('button')
+  copyButton.type = 'button'
+  nativeActions.append(document.createElement('span'), copyButton)
+  renderer.append(stack, nativeActions)
+  outlet.append(renderer)
+  row.append(outlet)
+  return { outlet, renderer, stack, nativeActions }
 }
 
 function readableAssistantRow(parent, text) {

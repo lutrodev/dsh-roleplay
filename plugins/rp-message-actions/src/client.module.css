@@ -13,6 +13,7 @@
 [data-rp-message-actions-hidden-deleted-assistant],
 [data-rp-message-actions-hidden-commit],
 [data-rp-message-actions-hidden-native-branch],
+[data-rp-message-actions-native-user-actions],
 [data-rp-message-actions-hidden-opening],
 [data-chat-flow-kind="rp-floor-assistant-actions"]:has(.deletedAssistantMarker),
 [data-chat-flow-kind="rp-floor-failed-assistant"]:has(.deletedAssistantMarker),
@@ -121,33 +122,38 @@
   display: none;
 }
 
-/* The Slot outlet inserts a display:contents anchor between the flow item and
-   the user renderer. Current DSH UserStyleBubble exposes data-actions-reveal
-   on its root and keeps the resident time/copy row as the last child. Require
-   a real mounted plugin host before replacing that row; declined standard-
-   session projections keep the native controls. */
+/* The public Chat Node Slot inserts a display:contents outlet between the
+   flow item and DSH's user renderer. The renderer keeps its message stack
+   first and its resident time/copy row last. Require both a direct native
+   button and a mounted plugin host before replacing that row; declined
+   standard-session projections keep the native controls. */
 [data-chat-flow-kind="user"]:has(
   + [data-chat-flow-kind="rp-floor-user-actions"] .userFloorActionHost
 )
-  [data-actions-reveal]
-  > :last-child,
+  > [data-slot="conversation.chat.node"]
+  > :first-child
+  > :last-child:has(> button[type="button"]),
 [data-chat-flow-kind="user"]:has(
   + [data-chat-flow-kind="rp-message-avatar-user"]
   + [data-chat-flow-kind="rp-floor-user-actions"] .userFloorActionHost
 )
-  [data-actions-reveal]
-  > :last-child {
+  > [data-slot="conversation.chat.node"]
+  > :first-child
+  > :last-child:has(> button[type="button"]) {
   display: none;
 }
 
 /* JS ownership covers arbitrary public Conversation Nodes inserted between
-   the native user row and this plugin's projected action row. */
+   the native user row and this plugin's projected action row, including a
+   native renderer refresh after the effect first annotated its action row. */
 [data-chat-flow-kind="user"][data-rp-message-actions-user-native-hidden]
-  [data-actions-reveal]
-  > :last-child,
+  > [data-slot="conversation.chat.node"]
+  > :first-child
+  > :last-child:has(> button[type="button"]),
 [data-chat-flow-kind="steering"][data-rp-message-actions-user-native-hidden]
-  [data-actions-reveal]
-  > :last-child {
+  > [data-slot="conversation.chat.node"]
+  > :first-child
+  > :last-child:has(> button[type="button"]) {
   display: none;
 }
 

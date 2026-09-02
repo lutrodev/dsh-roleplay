@@ -7,6 +7,12 @@ import { validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
 import { createRpMessageActionMetadata } from '../src/conversation.js'
 import { RpRuntime } from '../src/runtime.js'
 
+function commitSchemaBranches(schema) {
+  assert.equal(schema.type, undefined)
+  assert.equal(schema.oneOf.length, 2)
+  return { full: schema.oneOf[0], retry: schema.oneOf[1] }
+}
+
 test('collects ordered context, validates effects and produces the sole commit metadata', async () => {
   const ctx = new Context()
   let commitTool
@@ -19,9 +25,18 @@ test('collects ordered context, validates effects and produces the sole commit m
   } })
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 2, maxArtifactBytes: 4096 })
-  assert.equal(Object.hasOwn(commitTool.parameters.properties, 'narrative'), false)
-  assert.equal(commitTool.parameters.additionalProperties, false)
-  assert.equal(commitTool.parameters.properties.effects.items, undefined)
+  const { full: fullCommitSchema, retry: retryCommitSchema } = commitSchemaBranches(commitTool.parameters)
+  assert.equal(Object.hasOwn(fullCommitSchema.properties, 'narrative'), false)
+  assert.equal(fullCommitSchema.additionalProperties, false)
+  assert.equal(fullCommitSchema.properties.effects.items.additionalProperties, true)
+  assert.deepEqual(fullCommitSchema.properties.effects.items.required, ['kind'])
+  assert.deepEqual(retryCommitSchema.required, ['retry'])
+  assert.deepEqual(retryCommitSchema.properties.retry.required, ['token', 'patches'])
+  assert.notDeepEqual(validateJsonSchemaValue(commitTool.parameters, {
+    runSummary: 'mixed',
+    retry: { token: 'stale', patches: [{ op: 'remove', path: '/effects' }] },
+  }), [])
+  const staticCommitSchema = structuredClone(commitTool.parameters)
   const contractText = runtimeContract.text({ agent: { session: { ...sessionMethods(), header: {} } } })
   assert.match(contractText, /adaptive mode, infer what the user is portraying or directing in each message/i)
   assert.match(contractText, /completed prose is inserted into the next assistant message/i)
@@ -46,10 +61,7 @@ test('collects ordered context, validates effects and produces the sole commit m
     schema: testEffectSchema(),
     validate: effect => ({ kind: effect.kind, target: effect.target, payload: { accepted: true } }),
   })
-  const effectSchema = commitTool.parameters.properties.effects.items
-  assert.equal(effectSchema.additionalProperties, false)
-  assert.equal(effectSchema.properties.kind.const, 'test.effect')
-  assert.deepEqual(effectSchema.required, ['kind', 'target', 'payload'])
+  assert.deepEqual(commitTool.parameters, staticCommitSchema)
   runtime.registerCommitDiagnosticProvider({ id: 'test.diagnostic', inspect: () => [{ code: 'TEST_NOTICE', severity: 'info', message: 'recorded' }] })
   runtime.registerCommitDiagnosticProvider({ id: 'test.failed-diagnostic', inspect: () => { throw new Error('diagnostics must not block') } })
 
@@ -78,7 +90,7 @@ test('collects ordered context, validates effects and produces the sole commit m
   await ctx.fiber.dispose()
 })
 
-test('commit exposes registered effect schemas and returns structured correction feedback', async () => {
+test('commit keeps a static schema while registered effects return structured correction feedback', async () => {
   const ctx = new Context()
   const tools = new Map()
   ctx.provide('systemPrompt', { section() {} })
@@ -118,7 +130,7 @@ test('commit exposes registered effect schemas and returns structured correction
     commit.execute({ effects: [{ kind: 'test.effect', target: 'gate', payload: {}, value: 2 }] }, exec),
     error => {
       failure = error
-      return error.code === 'INVALID_ARGS' && error.violations.some(item => item.includes('effects[0].value'))
+      return error.code === 'INVALID_ARGS' && error.violations.some(item => item.includes('/effects/0.value'))
     },
   )
   const content = commit.finalizeContent(exec, {
@@ -134,7 +146,7 @@ test('commit exposes registered effect schemas and returns structured correction
   assert.deepEqual(feedback.error.corrections, [
     '"effects[0].value" is not accepted by test.effect; remove it.',
   ])
-  assert.ok(feedback.error.violations.some(item => item.includes('effects[0].value')))
+  assert.ok(feedback.error.violations.some(item => item.includes('/effects/0.value')))
   assert.equal(commit.finalizeContent(exec, {
     isError: true,
     error: { message: failure.message },
@@ -143,7 +155,7 @@ test('commit exposes registered effect schemas and returns structured correction
   await ctx.fiber.dispose()
 })
 
-test('commit exposes required artifact extension schemas and persists canonical extension values', async () => {
+test('commit keeps a static schema while parent-authored extensions persist canonical values', async () => {
   const ctx = new Context()
   const tools = new Map()
   let toolChanges = 0
@@ -201,21 +213,21 @@ test('commit exposes required artifact extension schemas and persists canonical 
     validate: value => ({ version: 1, choice: value.choice.trim() }),
   })
   const commit = tools.get('rp_commit_turn')
-  const extensionSchema = commit.parameters.properties.extensions
-  assert.equal(extensionSchema.additionalProperties, false)
-  assert.deepEqual(extensionSchema.required, ['test.options'])
-  assert.deepEqual(commit.parameters.required, ['extensions'])
-  assert.deepEqual(commit.parameters.properties.retry.required, ['token', 'patches'])
-  assert.match(extensionSchema.description, /required extension namespaces/i)
-  assert.equal(extensionSchema.properties['test.options'].properties.choice.description, 'One non-empty choice.')
-  assert.equal(extensionSchema.properties['tolerant.options'].additionalProperties, true)
+  const { full: fullCommitSchema, retry: retryCommitSchema } = commitSchemaBranches(commit.parameters)
+  const extensionSchema = fullCommitSchema.properties.extensions
+  assert.equal(extensionSchema.additionalProperties, true)
+  assert.equal(extensionSchema.required, undefined)
+  assert.equal(fullCommitSchema.required, undefined)
+  assert.deepEqual(retryCommitSchema.properties.retry.required, ['token', 'patches'])
+  assert.match(extensionSchema.description, /parent-authored extension/i)
+  assert.equal(extensionSchema.properties, undefined)
   assert.deepEqual(validateJsonSchemaValue(commit.parameters, {
     extensions: {
       'test.options': { choice: 'continue' },
       'tolerant.options': { options: ['continue'], description: 'model-added annotation' },
     },
   }), [])
-  assert.equal(toolChanges, 2)
+  assert.equal(toolChanges, 0)
 
   const invalidExec = {
     agent: { session: { ...sessionMethods(), events: [] } },
@@ -230,7 +242,13 @@ test('commit exposes required artifact extension schemas and persists canonical 
   )
 
   const events = []
-  const agent = { session: { ...sessionMethods(), events, append() {} } }
+  const agent = {
+    session: {
+      ...sessionMethods(),
+      events,
+      append() {},
+    },
+  }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   seedWriter(run, 'The road continues.')
   appendCommitCall(events, 1, 1, 'missing-extension', 'The road continues.')
@@ -244,7 +262,7 @@ test('commit exposes required artifact extension schemas and persists canonical 
     commit.execute({}, missingExec),
     error => {
       missingFailure = error
-      return error.code === 'INVALID_ARGS'
+      return error.code === 'RP_REQUIRED_EXTENSION_MISSING'
         && error.issues.some(item => item.path === '/extensions/test.options' && item.code === 'RP_REQUIRED_EXTENSION_MISSING')
     },
   )
@@ -257,8 +275,14 @@ test('commit exposes required artifact extension schemas and persists canonical 
   appendCommitCall(events, 1, 2, 'extension-commit', 'The road continues.')
   let concluded = false
   const result = await commit.execute({
-    extensions: { 'test.options': { choice: '  take the eastern road  ' } },
-    retry: { token: missingFeedback.retry.token, patches: [] },
+    retry: {
+      token: missingFeedback.retry.token,
+      patches: [{
+        op: 'add',
+        path: '/extensions',
+        value: { 'test.options': { choice: '  take the eastern road  ' } },
+      }],
+    },
   }, { agent, callId: 'extension-commit', concludeTurn() { concluded = true } })
   assert.equal(concluded, true)
   assert.deepEqual(result.meta.extensions, {
@@ -267,10 +291,196 @@ test('commit exposes required artifact extension schemas and persists canonical 
 
   dispose()
   disposeOpen()
-  assert.equal(toolChanges, 4)
-  assert.equal(commit.parameters.required, undefined)
-  assert.deepEqual(commit.parameters.properties.extensions.properties, {})
-  assert.equal(commit.parameters.properties.extensions.additionalProperties, false)
+  assert.equal(toolChanges, 0)
+  const { full: finalFullCommitSchema } = commitSchemaBranches(commit.parameters)
+  assert.equal(finalFullCommitSchema.required, undefined)
+  assert.equal(finalFullCommitSchema.properties.extensions.properties, undefined)
+  assert.equal(finalFullCommitSchema.properties.extensions.additionalProperties, true)
+  await ctx.fiber.dispose()
+})
+
+test('artifact generators run only after core validation and fail without blocking the commit', async () => {
+  const ctx = new Context()
+  const tools = new Map()
+  ctx.provide('systemPrompt', { section() {} })
+  ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
+  ctx.provide('agents', { get() { return undefined } })
+  const runtime = new RpRuntime(ctx, {
+    chatMaxStepsPerRun: 5, agentMaxStepsPerRun: 8,
+    maxEffectsPerCommit: 4, maxArtifactBytes: 4096,
+  })
+  runtime.registerEffectType({
+    kind: 'blocked.effect',
+    schema: testEffectSchema('blocked.effect'),
+    validate() { throw Object.assign(new Error('blocked effect'), { code: 'BLOCKED_EFFECT' }) },
+  })
+  let generated = 0
+  runtime.registerArtifactGenerator({
+    namespace: 'generated.options',
+    generate(context) {
+      generated += 1
+      assert.equal(Object.isFrozen(context), true)
+      assert.equal(Object.isFrozen(context.artifact), true)
+      assert.equal(Object.isFrozen(context.route), true)
+      assert.deepEqual(context.route, { provider: 'mock', model: 'mock' })
+      assert.equal(Object.hasOwn(context, 'agent'), false)
+      assert.equal(Object.hasOwn(context, 'run'), false)
+      assert.equal(Object.hasOwn(context, 'session'), false)
+      assert.equal(context.artifact.narrative, 'The gate opens.')
+      assert.match(context.parentContextText, /Open the gate/)
+      return { options: ['continue'] }
+    },
+    validate: value => ({ version: 1, options: value.options }),
+  })
+  runtime.registerArtifactGenerator({
+    namespace: 'unavailable.options',
+    order: 20,
+    generate() {
+      throw Object.assign(new Error('unsupported'), { code: 'SUBAGENT_OUTPUT_SCHEMA_UNSUPPORTED' })
+    },
+    validate: value => value,
+  })
+  runtime.registerArtifactGenerator({
+    namespace: 'timeout.options',
+    order: 25,
+    generate() {
+      throw Object.assign(new Error('timed out'), { code: 'SUBAGENT_TIMEOUT' })
+    },
+    validate: value => value,
+  })
+  runtime.registerArtifactGenerator({
+    namespace: 'failed.options',
+    order: 27,
+    generate() { throw new Error('provider failed') },
+    validate: value => value,
+  })
+  runtime.registerArtifactGenerator({
+    namespace: 'invalid.options',
+    order: 30,
+    generate: () => ({ options: [] }),
+    validate() { throw new Error('invalid generated value') },
+  })
+  runtime.registerArtifactGenerator({
+    namespace: 'large.options',
+    order: 40,
+    generate: () => ({ text: 'x'.repeat(10000) }),
+    validate: value => value,
+  })
+  assert.throws(() => runtime.registerArtifactExtension({
+    namespace: 'generated.options',
+    schema: { type: 'object', additionalProperties: false, properties: {} },
+    validate: value => value,
+  }), /already registered/)
+
+  const commit = tools.get('rp_commit_turn')
+  const failedEvents = []
+  const failedAgent = { session: { ...sessionMethods(), events: failedEvents, append() {} } }
+  const failedRun = await runtime.prepareRun(failedAgent, 1, [currentInput()])
+  seedWriter(failedRun, 'Blocked prose.')
+  appendCommitCall(failedEvents, 1, 1, 'blocked-generator', 'Blocked prose.')
+  await assert.rejects(commit.execute({
+    effects: [{ kind: 'blocked.effect', target: 'gate', payload: {} }],
+  }, { agent: failedAgent, callId: 'blocked-generator', signal: new AbortController().signal, concludeTurn() {} }), /blocked effect/)
+  assert.equal(generated, 0)
+
+  const events = []
+  const agent = {
+    session: {
+      ...sessionMethods(),
+      events,
+      append() {},
+      requestHeader: () => ({ config: { provider: 'mock', model: 'mock' } }),
+    },
+  }
+  const run = await runtime.prepareRun(agent, 1, [currentInput('Open the gate.')])
+  seedWriter(run, 'The gate opens.')
+  appendCommitCall(events, 1, 1, 'generated-commit', 'The gate opens.')
+  const result = await commit.execute({}, {
+    agent,
+    callId: 'generated-commit',
+    signal: new AbortController().signal,
+    concludeTurn() {},
+  })
+  assert.equal(generated, 1)
+  assert.deepEqual(result.meta.extensions, {
+    'generated.options': { version: 1, options: ['continue'] },
+  })
+  assert.deepEqual(result.meta.diagnostics.map(item => item.code), [
+    'RP_ARTIFACT_GENERATOR_UNAVAILABLE',
+    'RP_ARTIFACT_GENERATION_TIMEOUT',
+    'RP_ARTIFACT_GENERATION_FAILED',
+    'RP_GENERATED_ARTIFACT_INVALID',
+    'RP_GENERATED_ARTIFACT_LIMIT',
+  ])
+
+  const noRouteEvents = []
+  const noRouteAgent = { session: { ...sessionMethods(), events: noRouteEvents, append() {} } }
+  const noRouteRun = await runtime.prepareRun(noRouteAgent, 1, [currentInput('Open the other gate.')])
+  seedWriter(noRouteRun, 'The other gate opens.')
+  appendCommitCall(noRouteEvents, 1, 1, 'no-route-commit', 'The other gate opens.')
+  const noRouteResult = await commit.execute({}, {
+    agent: noRouteAgent,
+    callId: 'no-route-commit',
+    signal: new AbortController().signal,
+    concludeTurn() {},
+  })
+  assert.deepEqual(noRouteResult.meta.extensions, {})
+  assert.equal(generated, 1)
+  assert.ok(noRouteResult.meta.diagnostics.length > 0)
+  assert.ok(noRouteResult.meta.diagnostics.every(item => item.code === 'RP_ARTIFACT_GENERATION_FAILED'))
+  await ctx.fiber.dispose()
+})
+
+test('parent cancellation aborts artifact generation and the complete commit', async () => {
+  const ctx = new Context()
+  const tools = new Map()
+  ctx.provide('systemPrompt', { section() {} })
+  ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
+  ctx.provide('agents', { get() { return undefined } })
+  const runtime = new RpRuntime(ctx, {
+    chatMaxStepsPerRun: 5, agentMaxStepsPerRun: 8,
+    maxEffectsPerCommit: 4, maxArtifactBytes: 4096,
+  })
+  let generationStarted
+  const started = new Promise(resolve => { generationStarted = resolve })
+  runtime.registerArtifactGenerator({
+    namespace: 'cancelled.options',
+    generate(context) {
+      generationStarted()
+      return new Promise((_resolve, reject) => {
+        context.signal.addEventListener('abort', () => reject(context.signal.reason), { once: true })
+      })
+    },
+    validate: value => value,
+  })
+
+  const events = []
+  const agent = {
+    session: {
+      ...sessionMethods(),
+      events,
+      append() {},
+      requestHeader: () => ({ config: { provider: 'mock', model: 'mock' } }),
+    },
+  }
+  const run = await runtime.prepareRun(agent, 1, [currentInput()])
+  seedWriter(run, 'The gate remains open.')
+  appendCommitCall(events, 1, 1, 'cancelled-commit', 'The gate remains open.')
+  const controller = new AbortController()
+  let concluded = false
+  const execution = tools.get('rp_commit_turn').execute({}, {
+    agent,
+    callId: 'cancelled-commit',
+    signal: controller.signal,
+    concludeTurn() { concluded = true },
+  })
+  await started
+  const reason = new Error('parent cancelled')
+  controller.abort(reason)
+  await assert.rejects(execution, error => error === reason)
+  assert.equal(concluded, false)
+  assert.equal(run.commitCallId, undefined)
+  assert.equal(run.failedCommit, undefined)
   await ctx.fiber.dispose()
 })
 
@@ -306,6 +516,12 @@ test('commit reports independent capability failures together and repairs the ca
         throw Object.assign(new Error('repair.effect requires an approved payload.'), {
           code: 'REPAIR_EFFECT_NOT_APPROVED',
           feedback: { field: 'payload.approved', expected: true },
+          issues: [{
+            path: '/payload/approved',
+            code: 'REPAIR_EFFECT_NOT_APPROVED',
+            message: 'repair.effect requires an approved payload.',
+            details: { expected: true },
+          }],
         })
       }
       return effect
@@ -352,7 +568,7 @@ test('commit reports independent capability failures together and repairs the ca
     failure = error
     return error.code === 'INVALID_ARGS'
       && error.violations.some(item => item.includes('repair.options.type'))
-      && error.issues.some(item => item.path === '/effects/0' && item.code === 'REPAIR_EFFECT_NOT_APPROVED')
+      && error.issues.some(item => item.path === '/effects/0/payload/approved' && item.code === 'REPAIR_EFFECT_NOT_APPROVED')
       && error.issues.some(item => item.path === '/extensions/repair.options' && item.code === 'REPAIR_OPTION_INVALID')
   })
   const failureContent = commit.finalizeContent(fullExec, {
@@ -363,9 +579,13 @@ test('commit reports independent capability failures together and repairs the ca
   const feedback = JSON.parse(failureContent[0].text).error
   assert.equal(feedback.retry.tool, 'rp_commit_turn')
   assert.equal(feedback.retry.mode, 'json_pointer_patch')
-  assert.deepEqual(feedback.retry.requiredExtensions, ['repair.options'])
+  assert.equal(feedback.retry.requiredExtensions, undefined)
   assert.equal(feedback.issues.length, 2)
-  assert.match(feedback.retry.instruction, /complete extensions object/i)
+  assert.match(feedback.retry.instruction, /only retry\.token and retry\.patches/i)
+  assert.throws(() => runtime.prepareCommitRetry(run, {
+    retry: { token: feedback.retry.token, patches: [{ op: 'replace', path: '/runSummary', value: 'mixed' }] },
+    extensions: { 'repair.options': { choice: 'continue' } },
+  }), error => error.code === 'RP_COMMIT_RETRY_MIXED_ARGUMENTS')
 
   events.push({
     seq: events.length,
@@ -389,7 +609,6 @@ test('commit reports independent capability failures together and repairs the ca
   }
   let invalidPatchFailure
   await assert.rejects(commit.execute({
-    extensions: { 'repair.options': { choice: 'continue' } },
     retry: {
       token: feedback.retry.token,
       patches: [{ op: 'add', path: '/unexpected', value: true }],
@@ -411,11 +630,12 @@ test('commit reports independent capability failures together and repairs the ca
   appendCommitCall(events, 1, 3, 'repair-patch', '')
   let concluded = false
   const result = await commit.execute({
-    extensions: { 'repair.options': { choice: 'continue' } },
     retry: {
       token: feedback.retry.token,
       patches: [
         { op: 'replace', path: '/effects/0/payload/approved', value: true },
+        { op: 'replace', path: '/extensions/repair.options/choice', value: 'continue' },
+        { op: 'remove', path: '/extensions/repair.options/type' },
         { op: 'remove', path: '/unexpected' },
       ],
     },
@@ -921,6 +1141,86 @@ test('commit rejects a selected live source whose revision changed after context
     ),
     error => error.code === 'RP_CONTEXT_STALE',
   )
+  await ctx.fiber.dispose()
+})
+
+test('retry token expires when a live State or context revision changes', async () => {
+  const ctx = new Context()
+  const tools = new Map()
+  ctx.provide('systemPrompt', { section() {} })
+  ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
+  ctx.provide('agents', { get() { return undefined } })
+  const runtime = new RpRuntime(ctx, {
+    chatMaxStepsPerRun: 5, agentMaxStepsPerRun: 8,
+    maxEffectsPerCommit: 1, maxArtifactBytes: 2048,
+  })
+  let revision = 1
+  runtime.registerContextSource({
+    id: 'rp.state', label: 'State', parentDelivery: 'commit', defaultSlot: { id: 'state', label: 'State' },
+    prepare: () => ({ revision, text: `state ${revision}`, parentText: `state contract ${revision}` }),
+  })
+  runtime.registerEffectType({
+    kind: 'test.effect',
+    schema: testEffectSchema(),
+    validate(effect) {
+      if (effect.payload.approved !== true) {
+        throw Object.assign(new Error('approval is required'), { code: 'TEST_APPROVAL_REQUIRED' })
+      }
+      return effect
+    },
+  })
+  const events = []
+  const agent = { session: { ...sessionMethods(), events, append() {} } }
+  const run = await runtime.prepareRun(agent, 1, [currentInput()])
+  seedWriter(run, 'The state remains stable.')
+  appendCommitCall(events, 1, 1, 'revision-full', 'The state remains stable.')
+  const commit = tools.get('rp_commit_turn')
+  const firstExec = {
+    agent,
+    callId: 'revision-full',
+    concludeTurn() { throw new Error('failed commit must not conclude') },
+  }
+  let firstFailure
+  await assert.rejects(commit.execute({
+    effects: [{ kind: 'test.effect', target: 'state', payload: { approved: false } }],
+  }, firstExec), error => {
+    firstFailure = error
+    return error.code === 'TEST_APPROVAL_REQUIRED'
+  })
+  const failureContent = commit.finalizeContent(firstExec, {
+    isError: true,
+    error: { message: firstFailure.message, info: { name: firstFailure.name, code: firstFailure.code } },
+    content: [{ type: 'text', text: firstFailure.message }],
+  })
+  const token = JSON.parse(failureContent[0].text).error.retry.token
+  events.push({
+    seq: events.length,
+    type: 'tool/result',
+    surfaceOp: 'append',
+    data: {
+      turn: 1,
+      step: 1,
+      message: createToolResultMessage({
+        callId: ToolCallId('revision-full'),
+        content: failureContent,
+        isError: true,
+      }),
+    },
+  })
+
+  revision = 2
+  appendCommitCall(events, 1, 2, 'revision-retry', '')
+  await assert.rejects(commit.execute({
+    retry: {
+      token,
+      patches: [{ op: 'replace', path: '/effects/0/payload/approved', value: true }],
+    },
+  }, {
+    agent,
+    callId: 'revision-retry',
+    concludeTurn() { throw new Error('expired retry must not conclude') },
+  }), error => error.code === 'RP_COMMIT_RETRY_EXPIRED')
+  assert.equal(run.failedCommit, undefined)
   await ctx.fiber.dispose()
 })
 

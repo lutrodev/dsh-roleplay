@@ -199,11 +199,12 @@ function normalizeEntry(value, index) {
   const explicitLevel = loreLevel(rawLevel)
   if (rawLevel !== undefined && explicitLevel === undefined) throw new Error(`lorebook entry ${String(field('id', 'uid') ?? index)} has invalid level ${String(rawLevel)}`)
   const insertionPosition = normalizeInsertionPosition(rawPosition)
+  const semanticKey = string(field('semantic_key', 'semanticKey'))
   const condition = stateCondition(field('state_condition', 'stateCondition'), field('id', 'uid') ?? index)
   return {
     id: String(field('id', 'uid') ?? index),
     name: string(field('name', 'comment')) ?? `Entry ${index + 1}`,
-    semanticKey: string(field('semantic_key', 'semanticKey')),
+    ...(semanticKey === undefined ? {} : { semanticKey }),
     level: explicitLevel ?? classified.level,
     keys,
     secondaryKeys,

@@ -43,6 +43,59 @@ export function replyOptionsExtensionSchema(
   }
 }
 
+/** Closed structured-output schema used only by the internal generator. */
+export function replyOptionsOutputSchema(
+  count = DEFAULT_REPLY_OPTIONS_COUNT,
+  keywords = DEFAULT_REPLY_OPTION_KEYWORDS,
+  maxCharacters = DEFAULT_REPLY_OPTION_MAX_CHARACTERS,
+) {
+  return { ...replyOptionsExtensionSchema(count, keywords, maxCharacters), additionalProperties: false }
+}
+
+/** Render one bounded, final-narrative-first generator request. */
+export function renderReplyOptionsPrompt({
+  narrative,
+  roleplayContext = '',
+  count = DEFAULT_REPLY_OPTIONS_COUNT,
+  keywords = DEFAULT_REPLY_OPTION_KEYWORDS,
+  maxCharacters = DEFAULT_REPLY_OPTION_MAX_CHARACTERS,
+  maxPromptCharacters = 20000,
+}) {
+  const normalizedCount = normalizeReplyOptionsCount(count)
+  const normalizedKeywords = normalizeReplyOptionKeywords(keywords, normalizedCount)
+  const normalizedMaxCharacters = normalizeReplyOptionMaxCharacters(maxCharacters)
+  if (typeof narrative !== 'string' || narrative.trim().length === 0) throw new TypeError('reply options narrative must be non-empty')
+  if (typeof roleplayContext !== 'string') throw new TypeError('reply options roleplayContext must be a string')
+  if (!Number.isSafeInteger(maxPromptCharacters) || maxPromptCharacters < 1) throw new TypeError('reply options maxPromptCharacters must be positive')
+  const keywordGuidance = normalizedKeywords.flatMap((keyword, index) => keyword.length === 0
+    ? []
+    : [`Option ${index + 1} direction: ${keyword}`]).join('\n')
+  const prefix = `${[
+    `Generate preferably exactly ${normalizedCount} distinct quick replies the user could send next.`,
+    `Treat ${normalizedMaxCharacters} Unicode characters per option as a concise length target, not a hard limit.`,
+    'Each option must describe only the user-controlled protagonist\'s next speech and/or action in third-person narration, using that protagonist\'s established name or pronoun as the subject. First-person wording is allowed only inside quoted dialogue.',
+    'Do not include numbering, labels, analysis, director instructions, other characters\' reactions, or guaranteed outcomes.',
+    keywordGuidance.length === 0 ? undefined : keywordGuidance,
+    '<final_narrative>',
+    narrative.trim(),
+    '</final_narrative>',
+    '<roleplay_context>',
+  ].filter(Boolean).join('\n')}\n`
+  const suffix = '\n</roleplay_context>\nUse the context only to identify the protagonist, continuity, and plausible next moves. Return the structured options object.'
+  const fixedCharacters = [...prefix].length + [...suffix].length
+  if (fixedCharacters > maxPromptCharacters) {
+    const error = new RangeError(`reply options fixed prompt exceeds ${maxPromptCharacters} characters`)
+    error.code = 'RP_REPLY_OPTIONS_PROMPT_LIMIT'
+    throw error
+  }
+  const contextBudget = maxPromptCharacters - fixedCharacters
+  const contextCharacters = [...roleplayContext]
+  const selectedContext = contextCharacters.length <= contextBudget
+    ? roleplayContext
+    : contextCharacters.slice(contextCharacters.length - contextBudget).join('')
+  return `${prefix}${selectedContext}${suffix}`
+}
+
 /**
  * Normalize optional per-option direction keywords for runtime configuration.
  * Older settings may have fewer or more slots than the current count, so this

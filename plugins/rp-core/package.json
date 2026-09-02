@@ -11,6 +11,7 @@
     "./protocol": "./src/protocol.js",
     "./entity-projection": "./src/entity-projection.js",
     "./conversation": "./src/conversation.js",
+    "./session-runtime": "./src/session-runtime.js",
     "./runtime": "./src/runtime.js",
     "./prompts": "./src/prompts.js",
     "./context-build": "./src/context-build.js",
@@ -22,7 +23,7 @@
     "README.md"
   ],
   "scripts": {
-    "check": "node --check src/index.js && node --check src/protocol.js && node --check src/entity-projection.js && node --check src/context-build.js && node --check src/conversation.js && node --check src/subagent-run.js && node --check src/commit-retry.js && node --check src/prompts.js && node --check src/runtime.js",
+    "check": "node --check src/index.js && node --check src/protocol.js && node --check src/entity-projection.js && node --check src/context-build.js && node --check src/conversation.js && node --check src/session-runtime.js && node --check src/subagent-run.js && node --check src/commit-retry.js && node --check src/prompts.js && node --check src/runtime.js",
     "test": "node --test",
     "verify": "pnpm run check && pnpm test"
   },
@@ -36,11 +37,11 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-agent": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-llm": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-session": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.4"
+    "@deepseek-ai/dsh-agent": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-llm": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-session": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-system-prompt": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-tools": "0.1.2-alpha.4"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-agent": "0.1.2-alpha.4",

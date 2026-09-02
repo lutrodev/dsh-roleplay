@@ -208,6 +208,56 @@ test('enforces rules-required targets, operations, increment ranges, and machine
   ]) assert.throws(() => applyStateChanges({ state, namespace: 'story', snapshot, changes }), StateUpdateError)
 })
 
+test('reports all independent static rule failures at exact change paths', () => {
+  const properties = Object.fromEntries(['a', 'b', 'c', 'd', 'e'].map(key => [key, { type: 'integer' }]))
+  const rules = Object.keys(properties).map(key => ({
+    id: `raise-${key}`,
+    target: `/${key}`,
+    when: `raise ${key}`,
+    effect: { op: 'increment', minimum: 1, maximum: 3 },
+    guidance: [],
+    cadence: 'when-applicable',
+  }))
+  const snapshot = makeSnapshot(
+    { a: 0, b: 0, c: 0, d: 0, e: 0 },
+    { type: 'object', properties, required: Object.keys(properties), additionalProperties: false },
+    'rules-required',
+    rules,
+  )
+  const changes = Object.keys(properties).map((key, index) => ({
+    op: 'increment',
+    path: `/${key}`,
+    by: index === 1 || index === 4 ? 9 : 1,
+    ruleId: `raise-${key}`,
+    reason: `raise ${key}`,
+  }))
+  assert.throws(() => applyStateChanges({
+    state: stateOf(snapshot), namespace: 'story', snapshot, changes,
+  }), error => {
+    assert.equal(error.code, 'STATE_UPDATE_VALIDATION_FAILED')
+    assert.deepEqual(error.issues.map(issue => issue.path), [
+      '/payload/changes/1/by',
+      '/payload/changes/4/by',
+    ])
+    assert.deepEqual(error.issues.map(issue => ({
+      namespace: issue.namespace,
+      changeIndex: issue.changeIndex,
+      ruleId: issue.ruleId,
+    })), [
+      { namespace: 'story', changeIndex: 1, ruleId: 'raise-b' },
+      { namespace: 'story', changeIndex: 4, ruleId: 'raise-e' },
+    ])
+    assert.deepEqual(error.issues[1].details, {
+      namespace: 'story',
+      changeIndex: 4,
+      ruleId: 'raise-e',
+      value: 9,
+      maximum: 3,
+    })
+    return true
+  })
+})
+
 test('schema-only permits ruleless changes while disabled rejects every model change', () => {
   const schema = { type: 'object', properties: { hp: { type: 'integer' } }, required: ['hp'], additionalProperties: false }
   const enabled = makeSnapshot({ hp: 1 }, schema)

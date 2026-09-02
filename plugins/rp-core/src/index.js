@@ -6,6 +6,7 @@ export { RpRuntime, RpRuntimeError } from './runtime.js'
 export * from './protocol.js'
 export * from './context-build.js'
 export * from './conversation.js'
+export * from './session-runtime.js'
 export * from './subagent-run.js'
 export * from './prompts.js'
 

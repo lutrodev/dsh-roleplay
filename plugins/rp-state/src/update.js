@@ -1,6 +1,6 @@
 import { compileStateCondition, evaluateStateCondition } from './condition.js'
 import { jsonPointersConflict, parseJsonPointer, readJsonPointer, requiredArrayIndex, resolveJsonPointerParent } from './json-pointer.js'
-import { cloneJson, normalizeJson, validateStateValue } from './schema.js'
+import { cloneJson, normalizeJson, stateSchemaAtPointer, validateStateValue } from './schema.js'
 
 const CHANGE_BASE_FIELDS = Object.freeze(['op', 'path', 'reason', 'ruleId'])
 const OPERATION_SPECS = Object.freeze({
@@ -99,25 +99,112 @@ export function stateUpdateArgumentCorrections(effect, context = {}) {
 
 /** Apply one complete semantic change list without mutating the source projection. */
 export function applyStateChanges({ state, namespace, snapshot, changes }) {
-  if (!Array.isArray(changes) || changes.length === 0) throw new StateUpdateError('state.update changes must be a non-empty array.')
-  const normalized = changes.map((change, index) => normalizeChange(change, index))
+  if (!Array.isArray(changes) || changes.length === 0) {
+    throwStateIssues([stateIssue({
+      path: '/payload/changes',
+      code: 'STATE_CHANGES_REQUIRED',
+      message: 'state.update changes must be a non-empty array.',
+      details: { namespace },
+    })])
+  }
+  const issues = []
+  const normalized = changes.map((change, index) => {
+    try {
+      return normalizeChange(change, index)
+    } catch (error) {
+      issues.push(normalizationIssue(error, index, namespace))
+      return undefined
+    }
+  })
   for (let left = 0; left < normalized.length; left += 1) {
+    if (normalized[left] === undefined) continue
     for (let right = left + 1; right < normalized.length; right += 1) {
-      if (jsonPointersConflict(normalized[left].segments, normalized[right].segments)) {
-        throw new StateUpdateError(`State paths "${normalized[left].path}" and "${normalized[right].path}" conflict in one update.`)
-      }
+      if (normalized[right] === undefined || !jsonPointersConflict(normalized[left].segments, normalized[right].segments)) continue
+      issues.push(stateIssue({
+        path: `/payload/changes/${right}/path`,
+        code: 'STATE_CHANGE_PATH_CONFLICT',
+        message: `State paths "${normalized[left].path}" and "${normalized[right].path}" conflict in one update.`,
+        details: {
+          namespace,
+          changeIndex: right,
+          conflictingChangeIndex: left,
+          path: normalized[right].path,
+          conflictingPath: normalized[left].path,
+        },
+      }))
     }
   }
-  if (snapshot.definition.updateMode === 'disabled') throw new StateUpdateError(`State namespace "${namespace}" does not allow model updates.`)
+  if (snapshot.definition.updateMode === 'disabled') {
+    issues.push(stateIssue({
+      path: '/namespace',
+      code: 'STATE_NAMESPACE_UPDATE_DISABLED',
+      message: `State namespace "${namespace}" does not allow model updates.`,
+      details: { namespace },
+    }))
+  } else {
+    for (const [index, change] of normalized.entries()) {
+      if (change !== undefined) issues.push(...staticChangeIssues(snapshot.definition, change, index, namespace))
+    }
+  }
+  if (issues.length > 0) throwStateIssues(issues)
+
   let value = cloneJson(snapshot.value)
   const workingState = cloneJson(state)
   workingState.namespaces[namespace] = { ...cloneJson(snapshot), value }
-  for (const change of normalized) {
-    validateRule(snapshot.definition, change, workingState)
-    value = applyChange(value, change)
+  for (const [index, change] of normalized.entries()) {
+    const rule = change.ruleId === undefined
+      ? undefined
+      : snapshot.definition.rules.find(candidate => candidate.id === change.ruleId)
+    if (rule?.condition !== undefined) {
+      const evaluated = evaluateStateCondition(compileStateCondition(rule.condition), workingState)
+      if (!evaluated.value) {
+        throwStateIssues([stateIssue({
+          path: `/payload/changes/${index}/ruleId`,
+          code: 'STATE_RULE_CONDITION_UNSATISFIED',
+          message: `State rule "${rule.id}" condition is not satisfied: ${evaluated.diagnostics[0]?.message ?? rule.condition}`,
+          details: { namespace, changeIndex: index, ruleId: rule.id, condition: rule.condition },
+        })])
+      }
+    }
+    try {
+      value = applyChange(value, change)
+    } catch (error) {
+      throwStateIssues([stateIssue({
+        path: `/payload/changes/${index}/path`,
+        code: typeof error?.code === 'string' ? error.code : 'STATE_CHANGE_APPLICATION_FAILED',
+        message: error instanceof Error ? error.message : String(error),
+        details: {
+          namespace,
+          changeIndex: index,
+          ...(change.ruleId === undefined ? {} : { ruleId: change.ruleId }),
+          path: change.path,
+          operation: change.op,
+        },
+      })])
+    }
     workingState.namespaces[namespace] = { ...workingState.namespaces[namespace], value }
   }
-  const canonical = validateStateValue(snapshot.definition.schema, value, `${namespace}.value`)
+  let canonical
+  try {
+    canonical = validateStateValue(snapshot.definition.schema, value, `${namespace}.value`)
+  } catch (error) {
+    const statePath = typeof error?.path === 'string' ? error.path : ''
+    const changeIndex = findResponsibleChange(normalized, statePath)
+    const change = changeIndex === undefined ? undefined : normalized[changeIndex]
+    throwStateIssues([stateIssue({
+      path: change === undefined
+        ? '/payload'
+        : `/payload/changes/${changeIndex}/${changeArgumentField(change)}`,
+      code: 'STATE_RESULT_SCHEMA_INVALID',
+      message: error instanceof Error ? error.message : String(error),
+      details: {
+        namespace,
+        statePath,
+        ...(changeIndex === undefined ? {} : { changeIndex }),
+        ...(change?.ruleId === undefined ? {} : { ruleId: change.ruleId }),
+      },
+    })])
+  }
   return {
     changes: normalized.map(({ segments: _segments, ...change }) => change),
     result: {
@@ -168,7 +255,16 @@ function normalizeChange(input, index) {
       field: 'ruleId',
     })
   }
-  const segments = parseJsonPointer(input.path, { allowRoot: input.op !== 'remove' })
+  let segments
+  try {
+    segments = parseJsonPointer(input.path, { allowRoot: input.op !== 'remove' })
+  } catch (error) {
+    throw new StateUpdateError('STATE_CHANGE_PATH_INVALID', error instanceof Error ? error.message : String(error), {
+      changeIndex: index,
+      operation: input.op,
+      field: 'path',
+    })
+  }
   const output = {
     op: input.op,
     path: input.path,
@@ -186,25 +282,172 @@ function normalizeChange(input, index) {
     }
     output.by = input.by
   }
-  if (input.op === 'set' || input.op === 'append') output.value = normalizeJson(input.value, `changes[${index}].value`)
+  if (input.op === 'set' || input.op === 'append') {
+    try {
+      output.value = normalizeJson(input.value, `changes[${index}].value`)
+    } catch (error) {
+      throw new StateUpdateError('STATE_CHANGE_VALUE_INVALID', error instanceof Error ? error.message : String(error), {
+        changeIndex: index,
+        operation: input.op,
+        field: 'value',
+      })
+    }
+  }
   return output
 }
 
-function validateRule(definition, change, state) {
-  if (definition.updateMode === 'schema-only' && change.ruleId === undefined) return
-  if (change.ruleId === undefined) throw new StateUpdateError(`State change at "${change.path}" requires ruleId.`)
-  const rule = definition.rules.find(candidate => candidate.id === change.ruleId)
-  if (rule === undefined) throw new StateUpdateError(`Unknown State rule "${change.ruleId}".`)
-  if (rule.target !== change.path) throw new StateUpdateError(`State rule "${rule.id}" targets "${rule.target}", not "${change.path}".`)
-  if (rule.effect.op !== change.op) throw new StateUpdateError(`State rule "${rule.id}" requires ${rule.effect.op}, not ${change.op}.`)
-  if (change.op === 'increment') {
-    if (rule.effect.minimum !== undefined && change.by < rule.effect.minimum) throw new StateUpdateError(`State change by ${change.by} is below rule "${rule.id}" minimum ${rule.effect.minimum}.`)
-    if (rule.effect.maximum !== undefined && change.by > rule.effect.maximum) throw new StateUpdateError(`State change by ${change.by} exceeds rule "${rule.id}" maximum ${rule.effect.maximum}.`)
+function staticChangeIssues(definition, change, index, namespace) {
+  const issues = []
+  const ruleRequired = definition.updateMode === 'rules-required'
+  if (change.ruleId === undefined && ruleRequired) {
+    issues.push(stateIssue({
+      path: `/payload/changes/${index}/ruleId`,
+      code: 'STATE_RULE_ID_REQUIRED',
+      message: `State change at "${change.path}" requires ruleId.`,
+      details: { namespace, changeIndex: index, path: change.path, allowedRuleIds: definition.rules.map(rule => rule.id) },
+    }))
+    return issues
   }
-  if (rule.condition !== undefined) {
-    const evaluated = evaluateStateCondition(compileStateCondition(rule.condition), state)
-    if (!evaluated.value) throw new StateUpdateError(`State rule "${rule.id}" condition is not satisfied: ${evaluated.diagnostics[0]?.message ?? rule.condition}`)
+  const rule = change.ruleId === undefined
+    ? undefined
+    : definition.rules.find(candidate => candidate.id === change.ruleId)
+  if (change.ruleId !== undefined && rule === undefined) {
+    issues.push(stateIssue({
+      path: `/payload/changes/${index}/ruleId`,
+      code: 'STATE_RULE_UNKNOWN',
+      message: `Unknown State rule "${change.ruleId}".`,
+      details: { namespace, changeIndex: index, ruleId: change.ruleId, allowedRuleIds: definition.rules.map(candidate => candidate.id) },
+    }))
+    return issues
   }
+  if (rule !== undefined && rule.target !== change.path) {
+    issues.push(stateIssue({
+      path: `/payload/changes/${index}/path`,
+      code: 'STATE_RULE_TARGET_MISMATCH',
+      message: `State rule "${rule.id}" targets "${rule.target}", not "${change.path}".`,
+      details: { namespace, changeIndex: index, ruleId: rule.id, path: change.path, expectedPath: rule.target },
+    }))
+  }
+  if (rule !== undefined && rule.effect.op !== change.op) {
+    issues.push(stateIssue({
+      path: `/payload/changes/${index}/op`,
+      code: 'STATE_RULE_OPERATION_MISMATCH',
+      message: `State rule "${rule.id}" requires ${rule.effect.op}, not ${change.op}.`,
+      details: { namespace, changeIndex: index, ruleId: rule.id, operation: change.op, expectedOperation: rule.effect.op },
+    }))
+  }
+  if (rule !== undefined && change.op === 'increment' && rule.effect.op === 'increment') {
+    if (rule.effect.minimum !== undefined && change.by < rule.effect.minimum) {
+      issues.push(stateIssue({
+        path: `/payload/changes/${index}/by`,
+        code: 'STATE_RULE_INCREMENT_BELOW_MINIMUM',
+        message: `State change by ${change.by} is below rule "${rule.id}" minimum ${rule.effect.minimum}.`,
+        details: { namespace, changeIndex: index, ruleId: rule.id, value: change.by, minimum: rule.effect.minimum },
+      }))
+    }
+    if (rule.effect.maximum !== undefined && change.by > rule.effect.maximum) {
+      issues.push(stateIssue({
+        path: `/payload/changes/${index}/by`,
+        code: 'STATE_RULE_INCREMENT_ABOVE_MAXIMUM',
+        message: `State change by ${change.by} exceeds rule "${rule.id}" maximum ${rule.effect.maximum}.`,
+        details: { namespace, changeIndex: index, ruleId: rule.id, value: change.by, maximum: rule.effect.maximum },
+      }))
+    }
+  }
+  if (issues.length > 0) return issues
+  const valueSchema = change.op === 'set'
+    ? stateSchemaAtPointer(definition.schema, change.segments)
+    : change.op === 'append'
+      ? stateSchemaAtPointer(definition.schema, change.segments)?.items
+      : undefined
+  if (valueSchema !== undefined) {
+    try {
+      validateStateValue(valueSchema, change.value, `changes[${index}].value`)
+    } catch (error) {
+      issues.push(stateIssue({
+        path: `/payload/changes/${index}/value`,
+        code: 'STATE_CHANGE_VALUE_SCHEMA_INVALID',
+        message: error instanceof Error ? error.message : String(error),
+        details: {
+          namespace,
+          changeIndex: index,
+          ...(change.ruleId === undefined ? {} : { ruleId: change.ruleId }),
+          statePath: change.path,
+        },
+      }))
+    }
+  }
+  return issues
+}
+
+function normalizationIssue(error, index, namespace) {
+  const feedback = object(error?.feedback) ? error.feedback : {}
+  const field = feedback.field
+    ?? feedback.requiredField
+    ?? feedback.unexpectedField
+    ?? (error?.code === 'STATE_CHANGE_UNSUPPORTED_OPERATION' ? 'op' : undefined)
+  return stateIssue({
+    path: field === undefined ? `/payload/changes/${index}` : `/payload/changes/${index}/${encodePointerSegment(field)}`,
+    code: typeof error?.code === 'string' ? error.code : 'STATE_CHANGE_INVALID',
+    message: error instanceof Error ? error.message : String(error),
+    details: {
+      namespace,
+      changeIndex: index,
+      ...feedback,
+    },
+  })
+}
+
+function stateIssue({ path, code, message, details }) {
+  const source = object(details) ? details : {}
+  const namespace = typeof source.namespace === 'string' ? source.namespace : null
+  const changeIndex = Number.isSafeInteger(source.changeIndex) ? source.changeIndex : null
+  const ruleId = typeof source.ruleId === 'string' ? source.ruleId : null
+  return {
+    path,
+    code,
+    message,
+    namespace,
+    changeIndex,
+    ruleId,
+    details: { ...source, namespace, changeIndex, ruleId },
+  }
+}
+
+function throwStateIssues(issues) {
+  const bounded = issues.slice(0, 64)
+  const error = new StateUpdateError(
+    bounded.length === 1 ? bounded[0].code : 'STATE_UPDATE_VALIDATION_FAILED',
+    bounded.length === 1
+      ? bounded[0].message
+      : `state.update has ${bounded.length} independently correctable errors.`,
+    bounded.length === 1 ? bounded[0].details : {},
+    bounded,
+  )
+  throw error
+}
+
+function findResponsibleChange(changes, statePath) {
+  let segments
+  try {
+    segments = parseJsonPointer(statePath, { allowRoot: true })
+  } catch {
+    return undefined
+  }
+  for (let index = changes.length - 1; index >= 0; index -= 1) {
+    if (changes[index] !== undefined && jsonPointersConflict(changes[index].segments, segments)) return index
+  }
+  return undefined
+}
+
+function changeArgumentField(change) {
+  if (change.op === 'set' || change.op === 'append') return 'value'
+  if (change.op === 'increment') return 'by'
+  return 'path'
+}
+
+function encodePointerSegment(value) {
+  return String(value).replaceAll('~', '~0').replaceAll('/', '~1')
 }
 
 function applyChange(source, change) {
@@ -252,7 +495,7 @@ function applyChange(source, change) {
 }
 
 export class StateUpdateError extends Error {
-  constructor(code, message, feedback = {}) {
+  constructor(code, message, feedback = {}, issues) {
     if (message === undefined) {
       message = code
       code = 'STATE_UPDATE_INVALID'
@@ -261,6 +504,7 @@ export class StateUpdateError extends Error {
     this.name = 'StateUpdateError'
     this.code = code
     this.feedback = feedback
+    if (Array.isArray(issues)) this.issues = issues
   }
 }
 

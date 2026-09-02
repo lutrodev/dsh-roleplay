@@ -16,7 +16,9 @@ import {
   REPLY_OPTION_KEYWORD_MAX_CHARACTERS,
   REPLY_OPTION_MAX_CHARACTERS,
   REPLY_OPTIONS_EXTENSION_NAMESPACE,
+  renderReplyOptionsPrompt,
   replyOptionsExtensionSchema,
+  replyOptionsOutputSchema,
 } from '../src/protocol.js'
 
 const three = ['林岚靠近门边，低声问：“外面是谁？”', '林岚走到窗边，俯身检查留下的脚印。', '她退回走廊，快步去找同伴。']
@@ -124,6 +126,26 @@ test('decodes only canonical versioned event values and exposes model-facing gui
   assert.match(schema.properties.options.description, /distinct third-person protagonist messages/)
   assert.match(schema.properties.options.description, /no longer than 48 Unicode characters/)
   assert.match(schema.properties.options.items.description, /established name or pronoun/)
+  const outputSchema = replyOptionsOutputSchema(5, ['试探', '直接反抗', '', '寻求帮助', ''], 48)
+  assert.equal(outputSchema.additionalProperties, false)
+  assert.deepEqual(outputSchema.required, ['options'])
+})
+
+test('builds a bounded final-narrative-first structured generation prompt', () => {
+  const prompt = renderReplyOptionsPrompt({
+    narrative: '林岚推开门，发现走廊空无一人。',
+    roleplayContext: `旧上下文${'界'.repeat(5000)}最近上下文`,
+    count: 3,
+    keywords: ['试探', '', '离开'],
+    maxCharacters: 40,
+    maxPromptCharacters: 1800,
+  })
+  assert.ok([...prompt].length <= 1800)
+  assert.match(prompt, /<final_narrative>\n林岚推开门/)
+  assert.match(prompt, /Option 1 direction: 试探/)
+  assert.match(prompt, /Option 3 direction: 离开/)
+  assert.doesNotMatch(prompt, /旧上下文/)
+  assert.match(prompt, /最近上下文/)
 })
 
 test('returns concise third-person correction guidance when model input is invalid', () => {
@@ -139,12 +161,12 @@ test('returns concise third-person correction guidance when model input is inval
   )
 })
 
-test('registers the required runtime extension only for the preset instance', () => {
+test('registers one optional runtime generator only for the preset instance', async () => {
   const definitions = []
   const ctx = {
     inject(dependencies, callback) {
       assert.deepEqual(dependencies, ['rpRuntime'])
-      return callback({ rpRuntime: { registerArtifactExtension(definition) { definitions.push(definition); return () => {} } } })
+      return callback({ rpRuntime: { registerArtifactGenerator(definition) { definitions.push(definition); return () => {} } } })
     },
   }
   ReplyOptionsPlugin.apply(ctx, { registerRuntime: false })
@@ -157,11 +179,24 @@ test('registers the required runtime extension only for the preset instance', ()
   })
   assert.equal(definitions.length, 1)
   assert.equal(definitions[0].namespace, REPLY_OPTIONS_EXTENSION_NAMESPACE)
-  assert.equal(definitions[0].required, true)
-  assert.equal(definitions[0].acceptAdditionalProperties, true)
-  assert.match(definitions[0].schema.description, /exactly 5/)
-  assert.match(definitions[0].schema.description, /option 2: "反抗"/)
-  assert.match(definitions[0].schema.properties.options.description, /no longer than 30 Unicode characters/)
+  assert.equal(definitions[0].order, 100)
+  let request
+  const generated = await definitions[0].generate({
+    artifact: { narrative: '林岚推开门。' },
+    parentContextText: '林岚是用户控制的主角。',
+    maxPromptCharacters: 5000,
+    async runStructuredSubagent(value) {
+      request = value
+      return { id: 'reply-child', result: { stopReason: 'completed', structured: { options: five } } }
+    },
+  })
+  assert.deepEqual(generated, { options: five })
+  assert.equal(request.timeoutMs, 30000)
+  assert.equal(request.outputSchema.additionalProperties, false)
+  assert.match(request.outputSchema.description, /exactly 5/)
+  assert.match(request.outputSchema.description, /option 2: "反抗"/)
+  assert.match(request.outputSchema.properties.options.description, /no longer than 30 Unicode characters/)
+  assert.match(request.prompt[0].text, /林岚推开门/)
   assert.deepEqual(definitions[0].validate({ options: five }), { version: 1, options: five })
   const aboveGuidance = ['界'.repeat(31), ...five.slice(1)]
   assert.deepEqual(definitions[0].validate({ options: aboveGuidance }).options, aboveGuidance)
@@ -194,23 +229,18 @@ test('registers through real Cordis and RpRuntime schema validation', async () =
       keywords: ['试探', '', '正面应对'],
     })
 
-    const registered = runtime.artifactExtensions.get(REPLY_OPTIONS_EXTENSION_NAMESPACE)
+    const registered = runtime.artifactGenerators.get(REPLY_OPTIONS_EXTENSION_NAMESPACE)
     assert.ok(registered)
-    assert.equal(registered.required, true)
-    assert.equal(registered.acceptAdditionalProperties, true)
+    assert.equal(runtime.artifactExtensions.has(REPLY_OPTIONS_EXTENSION_NAMESPACE), false)
+    assert.equal(registered.order, 100)
 
     const commitSchema = tools.get('rp_commit_turn').parameters
-    assert.deepEqual(commitSchema.required, ['extensions'])
-    assert.equal(commitSchema.properties.extensions.additionalProperties, false)
-    assert.deepEqual(commitSchema.properties.extensions.required, [REPLY_OPTIONS_EXTENSION_NAMESPACE])
-    assert.deepEqual(commitSchema.properties.retry.required, ['token', 'patches'])
-
-    const extensionSchema =
-      commitSchema.properties.extensions.properties[REPLY_OPTIONS_EXTENSION_NAMESPACE]
-    assert.ok(extensionSchema)
-    assert.equal(extensionSchema.additionalProperties, true)
-    assert.equal(Object.hasOwn(extensionSchema.properties.options, 'minItems'), false)
-    assert.equal(Object.hasOwn(extensionSchema.properties.options, 'maxItems'), false)
+    assert.equal(commitSchema.oneOf.length, 2)
+    const [fullCommitSchema, retryCommitSchema] = commitSchema.oneOf
+    assert.equal(fullCommitSchema.required, undefined)
+    assert.equal(fullCommitSchema.properties.extensions.additionalProperties, true)
+    assert.equal(fullCommitSchema.properties.extensions.properties, undefined)
+    assert.deepEqual(retryCommitSchema.properties.retry.required, ['token', 'patches'])
     assert.deepEqual(registered.validate({ options }), { version: 1, options })
     const aboveGuidance = ['界'.repeat(31), ...options.slice(1)]
     assert.deepEqual(registered.validate({ options: aboveGuidance }).options, aboveGuidance)

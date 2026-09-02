@@ -76,7 +76,7 @@ export function normalizeStateSchema(input, path = '$') {
 /** Validate one complete JSON value against a normalized restricted schema. */
 export function validateStateValue(schema, value, path = '$') {
   normalizeJson(value, path)
-  validateNode(schema, value, path)
+  validateNode(schema, value, path, '')
   return cloneJson(value)
 }
 
@@ -102,51 +102,82 @@ export function cloneJson(value) {
   return structuredClone(value)
 }
 
-function validateNode(schema, value, path) {
-  const types = schema.type === undefined ? [] : Array.isArray(schema.type) ? schema.type : [schema.type]
-  if (types.length > 0 && !types.some(type => matchesType(type, value))) {
-    throw new StateSchemaError(`${path} must match type ${types.join(' or ')}.`)
+/** Resolve the restricted schema that governs one parsed JSON Pointer path. */
+export function stateSchemaAtPointer(rootSchema, segments) {
+  let current = rootSchema
+  for (const segment of segments) {
+    if (!record(current)) return undefined
+    if (record(current.properties) && Object.hasOwn(current.properties, segment)) {
+      current = current.properties[segment]
+      continue
+    }
+    if (record(current.additionalProperties)) {
+      current = current.additionalProperties
+      continue
+    }
+    if (record(current.items) && /^(?:0|[1-9][0-9]*)$/u.test(segment)) {
+      current = current.items
+      continue
+    }
+    return undefined
   }
-  if (schema.enum !== undefined && !schema.enum.some(candidate => stableJson(candidate) === stableJson(value))) {
-    throw new StateSchemaError(`${path} is not one of the allowed values.`)
-  }
-  if (Object.prototype.hasOwnProperty.call(schema, 'const') && stableJson(schema.const) !== stableJson(value)) {
-    throw new StateSchemaError(`${path} must equal the configured constant.`)
-  }
-  if (record(value)) validateObject(schema, value, path)
-  if (Array.isArray(value)) validateArray(schema, value, path)
-  if (typeof value === 'string') validateString(schema, value, path)
-  if (typeof value === 'number') validateNumber(schema, value, path)
+  return record(current) ? cloneJson(current) : undefined
 }
 
-function validateObject(schema, value, path) {
+function validateNode(schema, value, path, pointer) {
+  const types = schema.type === undefined ? [] : Array.isArray(schema.type) ? schema.type : [schema.type]
+  if (types.length > 0 && !types.some(type => matchesType(type, value))) {
+    throw new StateSchemaError(`${path} must match type ${types.join(' or ')}.`, pointer)
+  }
+  if (schema.enum !== undefined && !schema.enum.some(candidate => stableJson(candidate) === stableJson(value))) {
+    throw new StateSchemaError(`${path} is not one of the allowed values.`, pointer)
+  }
+  if (Object.prototype.hasOwnProperty.call(schema, 'const') && stableJson(schema.const) !== stableJson(value)) {
+    throw new StateSchemaError(`${path} must equal the configured constant.`, pointer)
+  }
+  if (record(value)) validateObject(schema, value, path, pointer)
+  if (Array.isArray(value)) validateArray(schema, value, path, pointer)
+  if (typeof value === 'string') validateString(schema, value, path, pointer)
+  if (typeof value === 'number') validateNumber(schema, value, path, pointer)
+}
+
+function validateObject(schema, value, path, pointer) {
   const properties = schema.properties ?? {}
   for (const key of schema.required ?? []) {
-    if (!Object.prototype.hasOwnProperty.call(value, key)) throw new StateSchemaError(`${path} is missing required property "${key}".`)
+    if (!Object.prototype.hasOwnProperty.call(value, key)) {
+      throw new StateSchemaError(`${path} is missing required property "${key}".`, appendPointer(pointer, key))
+    }
   }
   for (const [key, child] of Object.entries(value)) {
     const childSchema = properties[key]
-    if (childSchema !== undefined) validateNode(childSchema, child, `${path}.${key}`)
-    else if (schema.additionalProperties === false) throw new StateSchemaError(`${path} contains unknown property "${key}".`)
-    else if (record(schema.additionalProperties)) validateNode(schema.additionalProperties, child, `${path}.${key}`)
+    const childPointer = appendPointer(pointer, key)
+    if (childSchema !== undefined) validateNode(childSchema, child, `${path}.${key}`, childPointer)
+    else if (schema.additionalProperties === false) throw new StateSchemaError(`${path} contains unknown property "${key}".`, childPointer)
+    else if (record(schema.additionalProperties)) validateNode(schema.additionalProperties, child, `${path}.${key}`, childPointer)
   }
 }
 
-function validateArray(schema, value, path) {
-  if (schema.minItems !== undefined && value.length < schema.minItems) throw new StateSchemaError(`${path} contains fewer than ${schema.minItems} items.`)
-  if (schema.maxItems !== undefined && value.length > schema.maxItems) throw new StateSchemaError(`${path} contains more than ${schema.maxItems} items.`)
-  if (schema.items !== undefined) for (const [index, child] of value.entries()) validateNode(schema.items, child, `${path}[${index}]`)
+function validateArray(schema, value, path, pointer) {
+  if (schema.minItems !== undefined && value.length < schema.minItems) throw new StateSchemaError(`${path} contains fewer than ${schema.minItems} items.`, pointer)
+  if (schema.maxItems !== undefined && value.length > schema.maxItems) throw new StateSchemaError(`${path} contains more than ${schema.maxItems} items.`, pointer)
+  if (schema.items !== undefined) {
+    for (const [index, child] of value.entries()) validateNode(schema.items, child, `${path}[${index}]`, appendPointer(pointer, index))
+  }
 }
 
-function validateString(schema, value, path) {
+function validateString(schema, value, path, pointer) {
   const length = [...value].length
-  if (schema.minLength !== undefined && length < schema.minLength) throw new StateSchemaError(`${path} is shorter than ${schema.minLength} characters.`)
-  if (schema.maxLength !== undefined && length > schema.maxLength) throw new StateSchemaError(`${path} is longer than ${schema.maxLength} characters.`)
+  if (schema.minLength !== undefined && length < schema.minLength) throw new StateSchemaError(`${path} is shorter than ${schema.minLength} characters.`, pointer)
+  if (schema.maxLength !== undefined && length > schema.maxLength) throw new StateSchemaError(`${path} is longer than ${schema.maxLength} characters.`, pointer)
 }
 
-function validateNumber(schema, value, path) {
-  if (schema.minimum !== undefined && value < schema.minimum) throw new StateSchemaError(`${path} is below ${schema.minimum}.`)
-  if (schema.maximum !== undefined && value > schema.maximum) throw new StateSchemaError(`${path} is above ${schema.maximum}.`)
+function validateNumber(schema, value, path, pointer) {
+  if (schema.minimum !== undefined && value < schema.minimum) throw new StateSchemaError(`${path} is below ${schema.minimum}.`, pointer)
+  if (schema.maximum !== undefined && value > schema.maximum) throw new StateSchemaError(`${path} is above ${schema.maximum}.`, pointer)
+}
+
+function appendPointer(pointer, segment) {
+  return `${pointer}/${String(segment).replaceAll('~', '~0').replaceAll('/', '~1')}`
 }
 
 function normalizeTypes(value, path) {
@@ -178,8 +209,9 @@ function record(value) {
 }
 
 export class StateSchemaError extends Error {
-  constructor(message) {
+  constructor(message, path) {
     super(message)
     this.name = 'StateSchemaError'
+    if (typeof path === 'string') this.path = path
   }
 }

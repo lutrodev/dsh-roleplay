@@ -66,20 +66,26 @@ test('registers State v2 context, semantic effect, diagnostics, and Chat-readabl
   assert.equal(Object.hasOwn(visible, 'updateProtocol'), false)
 
   const commitVisible = JSON.parse(prepared.parentText)
-  assert.equal(commitVisible.version, 1)
-  assert.equal(commitVisible.stateProtocolVersion, 2)
-  assert.equal(commitVisible.contract.effectKind, 'state.update')
-  assert.equal(commitVisible.contract.namespaces[0].namespace, 'story')
-  assert.equal(commitVisible.contract.namespaces[0].updateMode, 'rules-required')
-  assert.deepEqual(commitVisible.contract.namespaces[0].rules, rules)
-  assert.equal(commitVisible.snapshot.stateRevision, 1)
-  assert.equal(commitVisible.snapshot.namespaces[0].namespace, 'story')
-  assert.equal(commitVisible.snapshot.namespaces[0].expectedRevision, 1)
-  assert.deepEqual(commitVisible.snapshot.namespaces[0].value, { hp: 10 })
-  assert.equal(Object.hasOwn(commitVisible.snapshot.namespaces[0], 'initialValue'), false)
-  assert.equal(Object.hasOwn(commitVisible.snapshot.namespaces[0], 'diagnostics'), false)
-  assert.match(commitVisible.contract.constraints.join('\n'), /increment uses by/)
-  assert.match(commitVisible.contract.updateModes['rules-required'], /ruleId/)
+  const contract = commitVisible.state_commit_contract
+  assert.equal(contract.version, 1)
+  assert.equal(contract.stateProtocolVersion, 2)
+  assert.equal(contract.effectKind, 'state.update')
+  assert.equal(contract.namespaces[0].namespace, 'story')
+  assert.equal(contract.namespaces[0].updateMode, 'rules-required')
+  assert.equal(contract.namespaces[0].expectedRevision, 1)
+  assert.deepEqual(contract.namespaces[0].currentValue, { hp: 10 })
+  assert.deepEqual(contract.namespaces[0].rules, [{
+    ruleId: 'hp-turn',
+    target: '/hp',
+    op: 'set',
+    when: '每回合核对生命值',
+    cadence: 'every-turn',
+    valueSchema: { type: 'integer', minimum: 0, maximum: 100 },
+  }])
+  assert.equal(Object.hasOwn(contract.namespaces[0], 'schema'), false)
+  assert.equal(Object.hasOwn(contract.namespaces[0], 'initialValue'), false)
+  assert.equal(Object.hasOwn(contract.namespaces[0], 'diagnostics'), false)
+  assert.match(contract.constraints.join('\n'), /increment uses by/)
   assert.equal(/\n\s+"/.test(prepared.parentText), false)
   assert.ok([...prepared.text].length < [...prepared.parentText].length)
   assert.deepEqual(harness.effectType.diagnoseArguments({
@@ -110,14 +116,15 @@ test('commit context omits unwritable State payloads and non-actionable diagnost
   await new Promise(resolve => setImmediate(resolve))
 
   const commitVisible = JSON.parse(harness.contextSource.prepare({ agent }).parentText)
-  assert.deepEqual(commitVisible.contract.namespaces, [{
-    namespace: 'story', updateMode: 'disabled', title: '故事状态',
-  }])
-  assert.deepEqual(commitVisible.snapshot.namespaces, [{
+  assert.deepEqual(commitVisible.state_commit_contract.namespaces, [{
     namespace: 'story',
+    expectedRevision: 1,
+    updateMode: 'disabled',
+    title: '故事状态',
+    currentValue: { hp: 10 },
     diagnostics: { setup: [{ code: 'STATE_DISABLED', severity: 'error', message: '此命名空间不能安全更新。' }] },
   }])
-  assert.doesNotMatch(JSON.stringify(commitVisible), /仅供界面展示|"schema"|"rules"|"value"|expectedRevision/)
+  assert.doesNotMatch(JSON.stringify(commitVisible), /仅供界面展示|"schema"|"rules"/)
   await harness.ctx.fiber.dispose()
 })
 
@@ -136,15 +143,24 @@ test('validates semantic effects with CAS and returns canonical full result snap
   assert.throws(() => harness.effectType.validate({
     kind: 'state.update', namespace: 'story', expectedRevision: 0,
     payload: { changes: [{ op: 'set', path: '/hp', value: 8, reason: 'wrong revision' }] },
-  }, { agent, acceptedEffects: [] }), error => error.code === 'REVISION_CONFLICT')
+  }, { agent, acceptedEffects: [] }), error => error.code === 'REVISION_CONFLICT'
+    && error.issues[0].path === '/expectedRevision'
+    && error.issues[0].namespace === 'story'
+    && error.issues[0].changeIndex === null
+    && error.issues[0].ruleId === null)
   assert.throws(() => harness.effectType.validate({
     kind: 'state.update', namespace: 'story', expectedRevision: 1,
     payload: { changes: [{ op: 'set', path: '/hp', value: 8, reason: 'duplicate namespace' }] },
-  }, { agent, acceptedEffects: [accepted] }), /Only one/)
+  }, { agent, acceptedEffects: [accepted] }), error => /Only one/.test(error.message)
+    && error.issues[0].path === '/namespace')
   assert.throws(() => harness.effectType.validate({
     kind: 'state.update', target: 'story', expectedRevision: 1,
     payload: { changes: [{ op: 'set', path: '/hp', value: 8, reason: 'wrong field' }] },
-  }, { agent, acceptedEffects: [] }), /unknown field|requires namespace/)
+  }, { agent, acceptedEffects: [] }), error => /unknown field|requires namespace/.test(error.message)
+    && error.issues[0].path === '/target'
+    && error.issues[0].namespace === null
+    && error.issues[0].changeIndex === null
+    && error.issues[0].ruleId === null)
   assert.deepEqual(state.get(agent).namespaces.story.value, { hp: 10 })
   await harness.ctx.fiber.dispose()
 })

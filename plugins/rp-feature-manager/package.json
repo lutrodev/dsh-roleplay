@@ -78,11 +78,11 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
     "@deepseek-ai/cordis-plugin-loader": "^1.0.3",
-    "@deepseek-ai/dsh-settings": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.4",
-    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-settings": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-system-prompt": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.4",
     "dsh-roleplay-rp-remote": "^0.1.8"
   },
   "devDependencies": {

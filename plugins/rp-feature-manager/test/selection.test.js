@@ -34,7 +34,7 @@ test('the reply variable card is known, requires State, and is on by default', (
   assert.deepEqual(toggleSideEffects(['state', 'state-display'], 'state', false), ['state-display'])
 })
 
-test('main-model reply options are independent, on for fresh installs, and off for saved old selections', () => {
+test('post-commit reply options are independent, on for fresh installs, and off for saved old selections', () => {
   assert.equal(FEATURE_IDS.includes('reply-options'), true)
   assert.equal(DEFAULT_ENABLED_FEATURES.includes('reply-options'), true)
   assert.deepEqual(normalizeFeatureSelection(['reply-options']), ['reply-options'])

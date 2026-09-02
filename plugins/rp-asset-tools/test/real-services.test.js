@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
+import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { RpCharacterCards } from 'dsh-roleplay-rp-character-card'
 import { RpLoreBooks } from 'dsh-roleplay-rp-lore-book'
 import { RpPersonas } from 'dsh-roleplay-rp-persona'
@@ -98,6 +99,56 @@ test('rp_asset_read and rp_asset use all five real owning services', async () =>
     }
     assert.equal(outcomes.length, CASES.length * 2)
     assert.equal(outcomes.every(outcome => outcome.meta?.kind === 'rp-agent/asset-mutation'), true)
+  } finally {
+    await ctx.fiber.dispose()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('canonical tools return lorebook entries with omitted optional fields as lossless JSON', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rp-asset-canonical-lorebook-'))
+  const ctx = new Context()
+  try {
+    ctx.provide('systemPrompt', { tools() {}, section() {} })
+    await ctx.plugin(ToolRuntime)
+    ctx.provide('rpRuntime', {
+      registerContextSource() { return () => {} },
+      async refreshRunContext() { return { refreshed: true, contextEpoch: 1, contextText: '最新资料上下文' } },
+      recordAssetMutationOutcome() {},
+    })
+    ctx.provide('rpSessions', {
+      get() { return { revision: 0, runtime: { executionMode: 'agent' }, scene: {}, resources: { lorebooks: [], writingStyles: [] } } },
+    })
+    new RpLoreBooks(ctx, { libraryDir: join(root, 'lorebooks'), maxInputBytes: 1048576, maxTokens: 512, maxEntries: 32, maxRecursiveDepth: 2 })
+    apply(ctx)
+
+    const agent = { id: 'agent' }
+    const created = await ctx.tools.execute({
+      signal: new AbortController().signal,
+      callId: 'canonical-lorebook-create',
+      name: 'rp_asset',
+      arguments: {
+        action: 'create',
+        kind: 'lorebook',
+        value: {
+          name: '雾港',
+          entries: [{ id: 'harbor', name: '港口', level: 'worldDescription', content: '港口终年有雾。', constant: true }],
+        },
+      },
+      agent,
+    })
+    assert.equal(created.isError, false)
+    assert.equal(Object.hasOwn(created.value.asset.entries[0], 'semanticKey'), false)
+
+    const read = await ctx.tools.execute({
+      signal: new AbortController().signal,
+      callId: 'canonical-lorebook-read',
+      name: 'rp_asset_read',
+      arguments: { action: 'get', kind: 'lorebook', id: created.value.asset.id },
+      agent,
+    })
+    assert.equal(read.isError, false)
+    assert.equal(Object.hasOwn(read.value.asset.entries[0], 'semanticKey'), false)
   } finally {
     await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })

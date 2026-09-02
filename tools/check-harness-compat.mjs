@@ -25,7 +25,6 @@ function runCompatibilityCheck() {
   const exactDshVersion = typeof requiredDshVersion === 'string' && /^\d+\.\d+\.\d+-[0-9A-Za-z.-]+$/.test(requiredDshVersion)
     ? requiredDshVersion
     : undefined
-  const compatibleDependencyRange = exactDshVersion === undefined ? undefined : `^${exactDshVersion}`
   const lockfilePath = join(projectRoot, 'pnpm-lock.yaml')
 
   const problems = []
@@ -82,8 +81,8 @@ function runCompatibilityCheck() {
           }
           if (!name.startsWith('@deepseek-ai/dsh-')) continue
           dshDependencyCount += 1
-          if (specifier !== compatibleDependencyRange && specifier !== exactDshVersion) {
-            problems.push(`${label}: ${field}.${name} 应为 ${compatibleDependencyRange} 或 ${exactDshVersion}，当前为 ${String(specifier)}`)
+          if (specifier !== exactDshVersion) {
+            problems.push(`${label}: ${field}.${name} 应精确锁定为 ${exactDshVersion}，当前为 ${String(specifier)}`)
           }
         }
       }

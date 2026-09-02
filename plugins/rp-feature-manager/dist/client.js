@@ -6450,7 +6450,7 @@ window.__ModuleLoader__.load({
 			const deprecatedFactoryFunction = (Component, options) => {
 				return factory(Component, options);
 			};
-			return new Proxy(deprecatedFactoryFunction, { 
+			return new Proxy(deprecatedFactoryFunction, {
 			/**
 			* Called when `motion` is referenced with a prop: `motion.div`, `motion.input` etc.
 			* The prop name is passed through as `key` and we can use that to generate a `motion`
@@ -6972,7 +6972,7 @@ get: (_target, key) => {
 				id: "reply-options",
 				category: "conversation",
 				label: "回复选项",
-				description: "在成功的剧情回复后提供由主模型生成的主角对白与行动，点击后直接发送。",
+				description: "在成功的剧情回复后非阻断生成主角对白与行动选项，点击后直接发送。",
 				packageName: "dsh-roleplay-rp-reply-options",
 				hostEntryIds: ["rp-reply-options"],
 				runtimeKey: "replyOptions"
@@ -7827,7 +7827,7 @@ get: (_target, key) => {
 				onClose: saving ? () => {} : onClose,
 				title: "设置回复选项",
 				closeLabel: "关闭回复选项设置",
-				description: "设置主模型生成的选项数量、每条字数上限和可选方向。",
+				description: "设置提交后生成的选项数量、每条长度指导和可选方向。",
 				className: css.replyOptionsDialog,
 				contentClassName: css.replyOptionsDialogContent,
 				footer
@@ -7853,7 +7853,7 @@ get: (_target, key) => {
 					setCountDraft(event.currentTarget.value);
 					setSaveError("");
 				}
-			}), h$1("span", { "aria-hidden": true }, "条"))), h$1("label", { className: css.replyOptionsBasicField }, h$1("span", null, "每条最多字数"), h$1("span", { className: css.replyOptionsNumberInput }, h$1("input", {
+			}), h$1("span", { "aria-hidden": true }, "条"))), h$1("label", { className: css.replyOptionsBasicField }, h$1("span", null, "每条长度指导"), h$1("span", { className: css.replyOptionsNumberInput }, h$1("input", {
 				type: "number",
 				inputMode: "numeric",
 				min: 1,
@@ -7861,7 +7861,7 @@ get: (_target, key) => {
 				step: 1,
 				value: maxCharactersDraft,
 				disabled: saving,
-				"aria-label": "每条最多字数",
+				"aria-label": "每条长度指导",
 				"aria-invalid": parsedMaxCharacters === void 0 ? "true" : "false",
 				"aria-describedby": `${basicsHelpId} ${errorId}`,
 				onInput: (event) => {
@@ -7871,7 +7871,7 @@ get: (_target, key) => {
 			}), h$1("span", { "aria-hidden": true }, "字")))), h$1("p", {
 				id: basicsHelpId,
 				className: css.replyOptionsSettingsHint
-			}, `回复条数可填写 1–5；每条最多字数可填写 1–200，默认 50 字以内。`)), h$1("section", {
+			}, `回复条数可填写 1–5；每条长度指导可填写 1–200，默认目标为 50 字以内。生成结果不会按该值硬性拒绝。`)), h$1("section", {
 				className: css.replyOptionsKeywordSection,
 				"aria-labelledby": "rp-reply-options-keywords-title"
 			}, h$1("header", { className: css.replyOptionsKeywordHeader }, h$1("div", null, h$1("h3", { id: "rp-reply-options-keywords-title" }, "方向关键词"), h$1("p", { id: directionHelpId }, "每条选项对应一个方向；留空时由模型自行决定。")), h$1("span", null, "可选")), h$1("div", { className: css.replyOptionsKeywordList }, ...Array.from({ length: visibleCount }, (_, index) => {
@@ -7984,7 +7984,7 @@ get: (_target, key) => {
 			quickRepliesEnableFirst: "启用快捷回复后设置",
 			replyOptionsConfigure: "设置回复选项",
 			replyOptionsEnableFirst: "启用回复选项后设置",
-			replyOptionsSettingsSaved: "回复条数、字数上限和方向关键词已保存；新建或重新打开对话后生效。",
+			replyOptionsSettingsSaved: "回复条数、长度指导和方向关键词已保存；新建或重新打开对话后生效。",
 			skillsTitle: "Roleplay Skills",
 			skillsDescription: "逐项选择 Roleplay 插件向 Agent 提供的工作指南。停用 Skill 不会停用插件，也不会删除资料。",
 			skillsScope: "这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。",
@@ -8318,7 +8318,7 @@ get: (_target, key) => {
 					onClose: () => controller.close(),
 					title: "设置回复选项",
 					closeLabel: "关闭回复选项设置",
-					description: "设置主模型生成的选项数量、每条字数上限和可选方向。",
+					description: "设置提交后生成的选项数量、每条长度指导和可选方向。",
 					className: css.replyOptionsDialog,
 					footer: failed ? h("div", { className: css.replyOptionsSettingsFooter }, h(_deepseek_ai_dsh_client_ui_primitives.Button, {
 						type: "button",

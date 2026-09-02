@@ -85,6 +85,12 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
   const ctx = new Context()
   const tools = new Map()
   const projections = new Map()
+  const generatedReplyOptions = [
+    'The hero listens at the door and asks who is outside.',
+    'She steps back toward the window and looks for another way out.',
+    'The hero opens the door and faces whoever is waiting there.',
+  ]
+  let generatedReplyOptionCalls = 0
   const sourceCard = Buffer.from(JSON.stringify({
     spec: 'chara_card_v3', spec_version: '3.0', data: {
       name: 'Harbor Hero', description: 'A cautious traveler.',
@@ -110,7 +116,22 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     async readBytes() { return sourceCard },
   })
   ctx.provide('agents', { get() { return undefined }, list() { return [] } })
-  ctx.provide('subagents', { async start() { throw new Error('subagent execution is outside this composition test') } })
+  ctx.provide('subagents', {
+    getProvider(provider) {
+      return provider === 'spawn' ? { capabilities: { outputSchema: true } } : undefined
+    },
+    async start(provider, request) {
+      assert.equal(provider, 'spawn')
+      assert.deepEqual(request.toolFilter, { allow: [] })
+      assert.match(request.prompt[0].text, /The dawn bell rolls across the water/)
+      generatedReplyOptionCalls += 1
+      return {
+        id: 'reply-options-child',
+        result: Promise.resolve({ stopReason: 'completed', structured: { options: generatedReplyOptions } }),
+        async dispose() {},
+      }
+    },
+  })
   ctx.provide('rpFeatures', { harnessIdentity: () => 'You are the Roleplay test identity.' })
   ctx.provide('sessionProjections', {
     register(definition) { projections.set(definition.key, definition) },
@@ -164,28 +185,18 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     assert.ok(tools.has('rp_asset'))
     assert.equal(tools.has('rp_build_context'), false)
     const commitSchema = tools.get('rp_commit_turn').parameters
-    assert.deepEqual(commitSchema.required, ['extensions'])
-    assert.equal(commitSchema.properties.extensions.additionalProperties, false)
-    assert.deepEqual(commitSchema.properties.extensions.required, ['rp.reply-options'])
-    assert.deepEqual(commitSchema.properties.retry.required, ['token', 'patches'])
-    const replyOptionsSchema = commitSchema.properties.extensions.properties['rp.reply-options']
-    assert.ok(replyOptionsSchema)
-    assert.equal(replyOptionsSchema.additionalProperties, true)
-    assert.match(replyOptionsSchema.description, /option 1: "调查线索"/)
-    assert.match(replyOptionsSchema.description, /option 3: "离开现场"/)
-    assert.equal(Object.hasOwn(replyOptionsSchema.properties.options, 'minItems'), false)
-    assert.equal(Object.hasOwn(replyOptionsSchema.properties.options, 'maxItems'), false)
-    assert.match(replyOptionsSchema.properties.options.description, /no longer than 80 Unicode characters/)
-
-    const stateEffectSchema = commitSchema.properties.effects.items
-    assert.equal(stateEffectSchema.properties.kind.const, 'state.update')
-    assert.equal(stateEffectSchema.additionalProperties, false)
-    assert.equal(stateEffectSchema.properties.payload.additionalProperties, false)
-    const stateChanges = stateEffectSchema.properties.payload.properties.changes.items.oneOf
-    const incrementChange = stateChanges.find(branch => branch.properties.op.const === 'increment')
-    assert.deepEqual(incrementChange.required, ['op', 'path', 'by', 'reason'])
-    assert.equal(Object.hasOwn(incrementChange.properties, 'value'), false)
-    assert.equal(incrementChange.additionalProperties, false)
+    assert.equal(commitSchema.oneOf.length, 2)
+    const [fullCommitSchema, retryCommitSchema] = commitSchema.oneOf
+    assert.equal(fullCommitSchema.additionalProperties, false)
+    assert.equal(fullCommitSchema.properties.extensions.additionalProperties, true)
+    assert.equal(fullCommitSchema.properties.extensions.properties, undefined)
+    assert.equal(fullCommitSchema.properties.effects.items.additionalProperties, true)
+    assert.deepEqual(fullCommitSchema.properties.effects.items.required, ['kind'])
+    assert.deepEqual(retryCommitSchema.required, ['retry'])
+    assert.deepEqual(retryCommitSchema.properties.retry.required, ['token', 'patches'])
+    assert.ok(ctx.rpRuntime.artifactGenerators.has('rp.reply-options'))
+    assert.equal(ctx.rpRuntime.artifactExtensions.has('rp.reply-options'), false)
+    assert.ok(ctx.rpRuntime.effectTypes.has('state.update'))
 
     const emptySession = HarnessSession.create(SessionId('s-empty'))
     const emptyAgentTools = fakeAgentTools()
@@ -368,17 +379,8 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
       header: { config: { provider: 'rp-test-provider', model: 'rp-test-model' } },
       reason: 'initial',
     })
-    const replyOptionExtensions = {
-      'rp.reply-options': {
-        options: [
-          'The hero listens at the door and asks who is outside.',
-          'She steps back toward the window and looks for another way out.',
-          'The hero opens the door and faces whoever is waiting there.',
-        ],
-      },
-    }
     const invalidArgs = {
-      runSummary: 'x', references: [], extensions: replyOptionExtensions,
+      runSummary: 'x', references: [],
       effects: [{ kind: 'state.update', namespace, expectedRevision: 0, payload: { changes: [{ op: 'set', path: '/hp', value: 9, reason: '错误的版本号' }] } }],
     }
     agent.session.append('assistant/message', {
@@ -390,13 +392,21 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     }, { surfaceOp: 'append' })
     agent.session.append('tool/call', { turn: 2, step: 1, callId: 'commit-invalid', name: 'rp_commit_turn', arguments: JSON.stringify(invalidArgs) })
     seedWriter(run, 'An invalid stale-state attempt.')
-    await assert.rejects(tools.get('rp_commit_turn').execute(invalidArgs, { agent, callId: 'commit-invalid', turn: 2, step: 1, concludeTurn() {} }), /revision conflict/i)
+    await assert.rejects(
+      tools.get('rp_commit_turn').execute(invalidArgs, { agent, callId: 'commit-invalid', turn: 2, step: 1, concludeTurn() {} }),
+      error => /revision conflict/i.test(error.message)
+        && error.issues.some(issue => issue.path === '/effects/0/expectedRevision'
+          && issue.namespace === namespace
+          && issue.changeIndex === null
+          && issue.ruleId === null),
+    )
+    assert.equal(generatedReplyOptionCalls, 0)
     assert.deepEqual(ctx.rpState.get(agent).namespaces[namespace].value, { hp: 7, location: 'cliff' })
 
     let concluded = false
     const loreRevision = run.fragments.find(fragment => fragment.id === 'rp.lore.character-descriptions').revision
     const commitArgs = {
-      runSummary: 'The hero heard the dawn bell.', references: [{ source: 'rp.lore.character-descriptions', id: '1', revision: loreRevision }], extensions: replyOptionExtensions,
+      runSummary: 'The hero heard the dawn bell.', references: [{ source: 'rp.lore.character-descriptions', id: '1', revision: loreRevision }],
       effects: [{
         kind: 'state.update', namespace, expectedRevision: 1,
         payload: { changes: [{ op: 'set', path: '/hp', value: 6, reason: '赶路让旧伤继续消耗体力' }] },
@@ -413,10 +423,11 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     seedWriter(run, 'The dawn bell rolls across the water.')
     const committed = await tools.get('rp_commit_turn').execute(commitArgs, { agent, callId: 'commit', turn: 2, step: 1, concludeTurn() { concluded = true } })
     assert.equal(concluded, true)
+    assert.equal(generatedReplyOptionCalls, 1)
     assert.deepEqual(committed.meta.assistant, { seq: assistantEvent.seq, messageId: assistantEvent.data.message.id })
     assert.deepEqual(committed.meta.extensions['rp.reply-options'], {
       version: 1,
-      options: replyOptionExtensions['rp.reply-options'].options,
+      options: generatedReplyOptions,
     })
     assert.equal('narrative' in committed, false)
     agent.session.append('tool/result', {

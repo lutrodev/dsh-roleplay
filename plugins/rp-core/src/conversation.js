@@ -1,4 +1,5 @@
 import { decodeRpCommitEvent, resolveRpCommitAssistant } from './protocol.js'
+import { snapshotSessionEvents } from './session-runtime.js'
 
 /** Durable metadata kind carried by native Roleplay message replacements. */
 export const RP_MESSAGE_ACTION_META_KIND = 'rp-agent/message-action'
@@ -84,7 +85,7 @@ export function deletedRpMessageActionTargets(events) {
  */
 export function roleplayTranscriptMessages(session) {
   const nodes = Array.isArray(session?.surface?.nodes) ? session.surface.nodes : []
-  const events = session.snapshotEvents()
+  const events = snapshotSessionEvents(session)
   const active = nodes.map(seq => events[seq]).filter(Boolean)
   const endedTurns = new Map()
   const userTurns = new Map()
@@ -152,7 +153,7 @@ export function roleplayAssistantReplyKind(session, message) {
     || typeof message.id !== 'string'
     || message.id.length === 0) return undefined
   if (isSelectedOpeningMessage(message)) return 'writing'
-  const events = session.snapshotEvents()
+  const events = snapshotSessionEvents(session)
   for (const event of events) {
     const commit = decodeRpCommitEvent(event)
     if (commit?.assistant?.messageId !== message.id) continue
@@ -162,7 +163,7 @@ export function roleplayAssistantReplyKind(session, message) {
 }
 
 /** Return the active surface event descending from one append-origin event. */
-export function currentSurfaceDescendant(session, originalSeq, events = session.snapshotEvents()) {
+export function currentSurfaceDescendant(session, originalSeq, events = snapshotSessionEvents(session)) {
   const seq = session?.surface?.nodes?.findLast(candidate => surfaceDescendsFrom(
     events, candidate, originalSeq,
   ))

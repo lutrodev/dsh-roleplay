@@ -8,10 +8,12 @@ Chat 模式适合直接续写；Agent 模式还可以使用资料工具和任务
 
 角色卡、世界书、人设、创作预设和文风都是可选的实时资料。未绑定时直接生成；绑定资料被删除、损坏或超出可读限制时，Core 会把对应来源标为不可用并从本轮 Prompt 跳过，同时保留绑定 ID 供界面提示和 Agent 修复，不会因此阻断 Writer。运行服务、会话状态或非资料代码本身的错误仍会明确失败。
 
-提交失败统一规范化为带稳定 code 的结构化结果，并返回所有已经能够独立确认的 reference、effect、extension 与 guard 问题及其 JSON Pointer 范围。即使参数先违反当前能力 Schema，Core 也会对同一草稿做一次无写入领域预检，让模型一次看到 Schema 违规和其他独立业务错误，而不是修完一个才暴露下一个。Core 只在当前 Run 内缓存最新失败草稿；错误结果携带与 Writer 和 Context Build 绑定的 token 后，模型可用同一个 `rp_commit_turn` 只发送有界 `add`／`replace`／`remove` 补丁，以及 live Schema 仍要求的完整 extensions。后者按 namespace 覆盖缓存值，未重发的可选 extension 和其他字段保持不变。重建后的完整草稿必须重新通过当前动态 Schema、全部领域校验和 live context 校验，之后才原子提交；上下文变化会使 token 失效。重试时父模型生成的推理或错误解释不会显示，也不会替换 Writer 正文，失败尝试不会产生部分状态变化。
+`rp_commit_turn` 使用全局静态 Tool Schema，不随当前 Agent、State revision 或插件启停生成 shadow tool。完整提交与修复提交由同一固定 `oneOf` 严格互斥：首次失败后 Core 只在当前 Run 缓存完整草稿，错误结果返回绑定 run、turn、Context Build 与 Writer 的 token；重试只能发送 `retry.token` 和有界的 RFC 6901 `add`／`replace`／`remove` 补丁，不能混入 summary、effects、references 或 extensions。重建后的完整草稿重新通过静态结构检查、当前能力 validator、guard、大小限制与 live context 校验后才原子提交；上下文、Writer 或提交轮次变化会立即使 token 失效，成功 token 也不可复用。
 
-Artifact 扩展通过 `registerArtifactExtension` 注册对象 JSON Schema，并可声明为必需。默认仍要求 namespace 内对象闭合；确实拥有规范化边界的扩展可显式设置 `acceptAdditionalProperties: true` 并使用开放 Schema，从而忽略模型附加的非权威注释，最终事件仍只保存 validator 返回的规范值。Core 始终保持顶层 `extensions` 闭合并拒绝未知命名空间，在注册或卸载时发送 `tools/change`；完整提交和补丁重试都保留顶层及 namespace 级 required 约束，因此重试会重新发送必需 extensions，但不重复 summary、effects、references 或可选 extension。必需扩展缺失或扩展领域校验失败都会沿用可重试的提交错误，只有规范化结果随成功提交进入事件元数据。
+参数错误统一规范化为带稳定 code 的结构化结果。Core 在无写入预检中收集能够独立确认的 reference、effect、父代理扩展与 guard 问题，并保留能力返回的精确 JSON Pointer，不把深层路径压缩到 effect 根。能力 Schema 不再进入模型侧 Tool Schema，而由各注册能力在静态提交结构之后校验；未知 effect 或父代理扩展仍会失败。`registerArtifactExtension` 保留给真正由父代理提交的通用扩展；注册与卸载不再触发 Tool Schema 重建。
 
-Chat 的首个父模型步骤会从同一份 Context Build 获得当前角色卡与用户人设，用于识别角色、用户控制身份和生成回复选项；世界书、预设、文风和 Writer 的其他完整 Slot 仍不向 Chat 展开。Core 的上下文说明只声明 `<section name="人设信息"><item name="我的人设">` 的内容是 user-controlled protagonist，不把实际姓名或人设正文再拼入工具 Schema；该 item 不存在时，Chat 与 Agent 都从其余上下文和当前对话自行判断。两种模式同时在首步获得同一份由 Context Source 声明的提交专用上下文，后续 Writer、子代理和提交步骤复用该前缀。运行中资料刷新会同时重建 Writer 与提交视图；只有提交素材变化时才返回完整替代内容，避免继续使用旧 revision，也避免无变化刷新增加输入。
+Core 另提供 `registerArtifactGenerator`。生成器只在正文、State、guard 和提交诊断全部通过后运行，接收冻结的最终正文、summary、effects、references、角色／提交上下文和取消信号，不接触 live Session 或 Run。结构化子代理能力缺失、超时、格式错误、生成失败或单个派生产物超出字节限制时，只丢弃该产物并写入稳定诊断码，正文和核心 effect 仍正常提交；父级取消仍终止整个提交。
+
+Chat 的首个父模型步骤会从同一份 Context Build 获得当前角色卡与用户人设，用于识别角色和用户控制身份；世界书、预设、文风和 Writer 的其他完整 Slot 仍不向 Chat 展开。Core 的上下文说明只声明 `<section name="人设信息"><item name="我的人设">` 的内容是 user-controlled protagonist，不把实际姓名或人设正文拼入 Tool Schema。两种模式同时在首步获得 Context Source 声明的提交专用上下文；普通叙事轮直接依照其中的紧凑契约提交，只有契约缺失或用户明确要求查看 State 时才调用读取工具。运行中资料刷新会同时重建 Writer 与提交视图，并使旧 retry token 失效。
 
 Writer 的固定系统提示仅保留输入执行与结果交付约定，不规定正文形态或写法。连续性、角色控制、长程推进、信息释放、收束和默认篇幅全部由实时输入及对应资产栏位维护，避免高优先级规则重复或覆盖用户配置。

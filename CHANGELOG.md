@@ -4,10 +4,11 @@
 
 ## Unreleased
 
-- 迁移到 DSH `0.1.2-alpha.4`：Session Event Log 全面改用 `snapshotEvents()`、`eventAt()` 与 `seq`，分支会话改用 `isSeeded` 和精确的 `inheritedEventCount`；失败回复节点复用未变化的 Location Data 引用，并同步套件 `0.1.8`、兼容门禁、依赖目录与公开 lockfile。现有 JSONL 会话格式保持兼容，无需数据改写。
-- 修复 Chat 提交纠错成功后偶发正文消失：消息操作节点现在会在 Conversation Node 重排后持续校正轨迹归属，工具专用空回复不再被误认作最终正文。回复选项同时放宽为可规范化输入：额外 `description` 等注释被忽略，配置条数改为生成目标与结果上限，选项文本长度只由 Prompt 引导；主角身份固定引用“人设信息／我的人设”标签，标签缺失时由模型从其余上下文与对话推断。
-- 回复选项卡片右上角新增设置入口，并移除每条末尾重复的“发送”文字；设置现在可将每条选项的 Unicode 字符上限指导设为 1–200（默认 50），该值与条数、方向关键词一起原子保存并写入主模型提示，但不进入选项文本的提交或回放校验。
-- Roleplay 提交失败统一返回稳定错误码、字段路径和可修正问题列表；参数 Schema 已失败时仍会预检彼此独立的 reference、effect、extension 与 guard 领域校验，避免逐个暴露错误。Core 会在当前 Run 内缓存失败的完整草稿并签发上下文绑定 token，模型通过同一个 `rp_commit_turn` 只提交有界 JSON Pointer 补丁及 Schema 仍要求的 extensions；重建后的完整草稿会重新经过动态 Schema、领域校验和 live context 校验，成功前不产生部分副作用。
+- 微调内置“示例预设”的篇幅与收束指导：保留现有长程推进结构，不再默认要求“中等偏长”，并明确在自然落点后不为单轮完整或剩余输出空间继续推进下一段主要情节；未编辑的托管旧示例会保留栏位 ID 与分组标签设置并升级内容。
+- 迁移到 DSH `0.1.2-alpha.4`：Session Event Log 全面改用 `snapshotEvents()`、`eventAt()` 与 `seq`，分支会话改用 `isSeeded` 和精确的 `inheritedEventCount`；Session 与结构化子代理调用集中到 Core 薄适配层，全部 DSH 开发依赖和 peer dependency 精确锁定同一版本，并新增 Session、Tool Runtime 与 Subagent 行为契约门禁。现有 JSONL 会话格式保持兼容，无需数据改写。
+- 修复 Chat 提交纠错成功后偶发正文消失：消息操作节点现在会在 Conversation Node 重排后持续校正轨迹归属，工具专用空回复不再被误认作最终正文。回复选项输入会执行 trim、去空项、去重和条数截断，忽略额外注释；主角身份标签缺失时从冻结的角色上下文与对话推断。
+- 回复选项迁移为核心提交校验通过后的非阻断 artifact generator：使用最终冻结正文发起一次轻量结构化子代理调用，Provider 不支持、超时、格式错误、生成失败或单独超限时只丢弃选项并记录稳定诊断，正文、State 和其他核心产物仍正常提交。卡片设置可调整目标条数、1–200 的长度指导（默认 50）和方向关键词，这些值只指导生成而不作为硬性提交校验；`rp.reply-options` v1 持久化与客户端投影保持不变。
+- `rp_commit_turn` 改为一份全局静态、完整提交与补丁重试严格 `oneOf` 的 Tool Schema，不再随 Agent、effect、extension 或 State revision 覆盖。首次语义失败后 Core 缓存完整草稿并签发上下文绑定 token，重试只能提交有界 JSON Pointer 补丁；revision、上下文、Writer 或轮次变化会使 token 失效。State 改用每轮紧凑 `state_commit_contract`，先汇总全部独立静态问题，再顺序执行条件、应用和最终 Schema 校验；错误保留到具体 change 字段的 JSON Pointer 及 namespace、changeIndex、ruleId。
 
 ## 0.1.7 - 2026-09-01
 

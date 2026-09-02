@@ -17,7 +17,7 @@ export function commitRetryParameterSchema() {
       token: { type: 'string', description: 'Opaque token copied exactly from the latest failed commit result.' },
       patches: {
         type: 'array',
-        description: `Zero to ${MAX_COMMIT_RETRY_PATCHES} ordered JSON Pointer add, replace, or remove operations. Use an empty array only when corrected extensions supplied beside retry fully resolve the failure.`,
+        description: `One to ${MAX_COMMIT_RETRY_PATCHES} ordered JSON Pointer add, replace, or remove operations against the cached full draft.`,
         items: {
           oneOf: [
             {

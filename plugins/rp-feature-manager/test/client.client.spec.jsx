@@ -64,7 +64,7 @@ const copy = {
   applies: '下一次对话生效。', saveError: '启用状态没有保存，请稍后重试。',
   quickRepliesConfigure: '设置快捷回复', quickRepliesEnableFirst: '启用快捷回复后设置',
   replyOptionsConfigure: '设置回复选项', replyOptionsEnableFirst: '启用回复选项后设置',
-  replyOptionsSettingsSaved: '回复条数、字数上限和方向关键词已保存；新建或重新打开对话后生效。',
+  replyOptionsSettingsSaved: '回复条数、长度指导和方向关键词已保存；新建或重新打开对话后生效。',
   skillsTitle: 'Roleplay Skills', skillsDescription: '逐项选择 Roleplay 插件向 Agent 提供的工作指南。',
   skillsScope: '这里只管理 Roleplay 插件贡献的 Skills；项目目录和用户目录中的其他 Skills 不受影响。',
   visibilityTitle: '可见性预览', parentAgent: 'Agent 模式父代理',
@@ -391,7 +391,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     render(React.createElement(ReplyOptionsSettingsOverlay, { controller, connection }))
 
     expect(await screen.findByRole('dialog', { name: '设置回复选项' })).toBeTruthy()
-    fireEvent.input(screen.getByRole('spinbutton', { name: '每条最多字数' }), { target: { value: '36' } })
+    fireEvent.input(screen.getByRole('spinbutton', { name: '每条长度指导' }), { target: { value: '36' } })
     fireEvent.click(screen.getByRole('button', { name: '保存设置' }))
     await waitFor(() => expect(connection.call).toHaveBeenCalledWith('/rp-features', 'settings/reply-options', {
       count: 3,
@@ -434,10 +434,10 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     fireEvent.click(await screen.findByRole('button', { name: '设置回复选项' }))
     expect(await screen.findByRole('dialog', { name: '设置回复选项' })).toBeTruthy()
     const input = screen.getByRole('spinbutton', { name: '回复条数' })
-    const maxCharactersInput = screen.getByRole('spinbutton', { name: '每条最多字数' })
+    const maxCharactersInput = screen.getByRole('spinbutton', { name: '每条长度指导' })
     expect(input.value).toBe('3')
     expect(maxCharactersInput.value).toBe('50')
-    expect(screen.getByText('回复条数可填写 1–5；每条最多字数可填写 1–200，默认 50 字以内。')).toBeTruthy()
+    expect(screen.getByText('回复条数可填写 1–5；每条长度指导可填写 1–200，默认目标为 50 字以内。生成结果不会按该值硬性拒绝。')).toBeTruthy()
     expect(screen.queryByText(/不会按此数值拦截提交/)).toBeNull()
     expect(input.disabled).toBe(false)
     expect(screen.getAllByRole('textbox')).toHaveLength(3)
@@ -459,7 +459,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
       keywords: ['试探', '直接反抗', '离开', '寻求帮助', ''],
       expectedRevision: 0,
     }))
-    expect(await screen.findByText('回复条数、字数上限和方向关键词已保存；新建或重新打开对话后生效。')).toBeTruthy()
+    expect(await screen.findByText('回复条数、长度指导和方向关键词已保存；新建或重新打开对话后生效。')).toBeTruthy()
     expect(screen.queryByRole('dialog', { name: '设置回复选项' })).toBeNull()
   })
 
@@ -478,12 +478,12 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     expect(connection.call).not.toHaveBeenCalledWith('/rp-features', 'settings/reply-options', expect.anything())
   })
 
-  it('每条字数上限超出 1–200 时保留输入并阻止保存', async () => {
+  it('每条长度指导超出 1–200 时保留输入并阻止保存', async () => {
     const { scope, connection } = harness(['reply-options'], [])
     render(React.createElement(RoleplaySettingsSection, { scope, connection, t }))
 
     fireEvent.click(await screen.findByRole('button', { name: '设置回复选项' }))
-    const input = await screen.findByRole('spinbutton', { name: '每条最多字数' })
+    const input = await screen.findByRole('spinbutton', { name: '每条长度指导' })
     fireEvent.input(input, { target: { value: '201' } })
     expect(input.value).toBe('201')
     expect(screen.getByRole('alert').textContent).toBe('请输入 1 到 200 之间的整数。')

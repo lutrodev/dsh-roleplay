@@ -152,7 +152,7 @@ export class RpFeatureManager extends Service {
     return hasEnabledAssetProvider(this.enabled)
   }
 
-  /** Return the exact number of reply options requested from the main model. */
+  /** Return the preferred number of reply options requested from the artifact generator. */
   replyOptionsCount() {
     return this.replyOptionsCountValue
   }
