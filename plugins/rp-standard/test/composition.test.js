@@ -118,7 +118,7 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
       const definition = projections.get(key)
       return definition === undefined
         ? undefined
-        : session.events.reduce(definition.apply, definition.init())
+        : session.snapshotEvents().reduce(definition.apply, definition.init())
     },
   })
   ctx.provide('commands', fakeCommands())
@@ -233,7 +233,7 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
     const harnessSession = HarnessSession.create(SessionId('s1'), seed)
     const agentTools = fakeAgentTools()
     const agent = { status: 'idle', session: harnessSession, ctx: { tools: agentTools } }
-    const openingMessage = agent.session.events.find(event => event.type === 'assistant/message')
+    const openingMessage = agent.session.snapshotEvents().find(event => event.type === 'assistant/message')
     assert.equal(openingMessage?.data.message.content[0].text, 'The cliff road wakes.')
     assert.equal(openingMessage?.surfaceOp, 'append')
     const routed = await ctx.waterfall('agent/request', { agent, turn: 2, step: 1, signal: new AbortController().signal }, () => Promise.resolve({ provider: 'default', model: 'default', temperature: 0.4 }))
@@ -509,7 +509,7 @@ test('imports an MVU+lore card, creates an Actor session and commits atomically'
       assert.equal(Object.hasOwn(definition, 'schema'), false)
       assert.equal(Object.hasOwn(definition, 'view'), false)
     }
-    assert.equal(agent.session.events.some(event => event.type.startsWith('rp/')), false)
+    assert.equal(agent.session.snapshotEvents().some(event => event.type.startsWith('rp/')), false)
   } finally {
     await ctx.fiber.dispose()
     await rm(root, { recursive: true, force: true })

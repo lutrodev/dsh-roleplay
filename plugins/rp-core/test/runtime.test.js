@@ -22,7 +22,7 @@ test('collects ordered context, validates effects and produces the sole commit m
   assert.equal(Object.hasOwn(commitTool.parameters.properties, 'narrative'), false)
   assert.equal(commitTool.parameters.additionalProperties, false)
   assert.equal(commitTool.parameters.properties.effects.items, undefined)
-  const contractText = runtimeContract.text({ agent: { session: { header: {} } } })
+  const contractText = runtimeContract.text({ agent: { session: { ...sessionMethods(), header: {} } } })
   assert.match(contractText, /adaptive mode, infer what the user is portraying or directing in each message/i)
   assert.match(contractText, /completed prose is inserted into the next assistant message/i)
   assert.match(contractText, /do not reproduce, quote, summarize, or revise it/i)
@@ -38,7 +38,7 @@ test('collects ordered context, validates effects and produces the sole commit m
   assert.match(contractText, /apply every correction exactly/i)
   assert.match(writerTool.description, /Review and revise the returned draft/i)
   assert.match(commitTool.description, /generated prose is already the complete visible narrative/i)
-  assert.equal(runtimeContract.text({ agent: { session: { header: { origin: 'subagent' } } } }), '')
+  assert.equal(runtimeContract.text({ agent: { session: { ...sessionMethods(), header: { origin: 'subagent' } } } }), '')
   runtime.registerContextSource({ id: 'later', dependsOn: ['first'], prepare: () => ({ revision: 2, text: 'later' }) })
   runtime.registerContextSource({ id: 'first', prepare: () => ({ revision: 1, text: 'first' }) })
   runtime.registerEffectType({
@@ -54,7 +54,7 @@ test('collects ordered context, validates effects and produces the sole commit m
   runtime.registerCommitDiagnosticProvider({ id: 'test.failed-diagnostic', inspect: () => { throw new Error('diagnostics must not block') } })
 
   const events = []
-  const agent = { session: { events, append(type, data, opts) { const event = { seq: events.length, type, data, ...opts }; events.push(event); return event } } }
+  const agent = { session: { ...sessionMethods(), events, append(type, data, opts) { const event = { seq: events.length, type, data, ...opts }; events.push(event); return event } } }
   const run = await runtime.prepareRun(agent, 1, [{ role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'Open the gate.' }] }])
   assert.equal(events.length, 0)
   assert.deepEqual(run.fragments.map(fragment => fragment.id), ['first', 'later', 'rp.current-input'])
@@ -111,7 +111,7 @@ test('commit exposes registered effect schemas and returns structured correction
   assert.equal([...boundedCorrections[0]].length, 1000)
 
   const commit = tools.get('rp_commit_turn')
-  const agent = { session: { events: [] } }
+  const agent = { session: { ...sessionMethods(), events: [] } }
   const exec = { agent, callId: 'invalid-effect', concludeTurn() { throw new Error('invalid arguments must not conclude') } }
   let failure
   await assert.rejects(
@@ -218,7 +218,7 @@ test('commit exposes required artifact extension schemas and persists canonical 
   assert.equal(toolChanges, 2)
 
   const invalidExec = {
-    agent: { session: { events: [] } },
+    agent: { session: { ...sessionMethods(), events: [] } },
     callId: 'invalid-extension',
     concludeTurn() { throw new Error('invalid arguments must not conclude') },
   }
@@ -230,7 +230,7 @@ test('commit exposes required artifact extension schemas and persists canonical 
   )
 
   const events = []
-  const agent = { session: { events, append() {} } }
+  const agent = { session: { ...sessionMethods(), events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   seedWriter(run, 'The road continues.')
   appendCommitCall(events, 1, 1, 'missing-extension', 'The road continues.')
@@ -332,7 +332,7 @@ test('commit reports independent capability failures together and repairs the ca
   })
   const commit = tools.get('rp_commit_turn')
   const events = []
-  const agent = { session: { events, append() {} } }
+  const agent = { session: { ...sessionMethods(), events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   seedWriter(run, 'The cached prose remains visible.')
   appendCommitCall(events, 1, 1, 'repair-full', 'The cached prose remains visible.')
@@ -427,7 +427,7 @@ test('commit reports independent capability failures together and repairs the ca
   assert.deepEqual(result.meta.assistant, { seq: 0, messageId: 'assistant-repair-full' })
 
   const domainEvents = []
-  const domainAgent = { session: { events: domainEvents, append() {} } }
+  const domainAgent = { session: { ...sessionMethods(), events: domainEvents, append() {} } }
   const domainRun = await runtime.prepareRun(domainAgent, 1, [currentInput()])
   seedWriter(domainRun, 'Another visible reply.')
   appendCommitCall(domainEvents, 1, 1, 'domain-full', 'Another visible reply.')
@@ -475,7 +475,7 @@ test('Chat receives selected identity context while Writer and Agent retain the 
   assert.throws(() => runtime.registerContextSource({ id: 'invalid', parentDelivery: 'full', prepare: () => ({ text: 'x' }) }), /parentDelivery/)
 
   const input = currentInput()
-  const chatAgent = { session: { events: [], append() {} } }
+  const chatAgent = { session: { ...sessionMethods(), events: [], append() {} } }
   const chatRun = await runtime.prepareRun(chatAgent, 1, [input])
   const chatReady = runtime.writerReadyMessage(chatRun).content.map(block => block.text ?? '').join('')
   assert.match(chatReady, /<roleplay_context read_only="true">/)
@@ -502,7 +502,7 @@ test('Chat receives selected identity context while Writer and Agent retain the 
       { id: 'current-input', label: '当前输入', sourceIds: ['rp.current-input'] },
     ] },
   }) })
-  const agentRun = await runtime.prepareRun({ session: { events: [], append() {} } }, 2, [input])
+  const agentRun = await runtime.prepareRun({ session: { ...sessionMethods(), events: [], append() {} } }, 2, [input])
   const agentReady = runtime.writerReadyMessage(agentRun).content.map(block => block.text ?? '').join('')
   assert.match(agentReady, /<roleplay_context read_only="true">/)
   assert.match(agentReady, /current state: gate open/)
@@ -519,7 +519,7 @@ test('Chat receives selected identity context while Writer and Agent retain the 
 
   runtime.registerContextSource({ id: 'orphan-parent-text', prepare: () => ({ text: 'visible', parentText: 'hidden' }) })
   await assert.rejects(
-    runtime.prepareRun({ session: { events: [], append() {} } }, 3, [input]),
+    runtime.prepareRun({ session: { ...sessionMethods(), events: [], append() {} } }, 3, [input]),
     /returned parentText without parent delivery/,
   )
   await ctx.fiber.dispose()
@@ -533,7 +533,7 @@ test('rejects unknown effects without creating a commit', async () => {
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   const events = []
-  const agent = { session: { events, append() {} } }
+  const agent = { session: { ...sessionMethods(), events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   seedWriter(run, 'x')
   appendCommitCall(events, 1, 1, 'unknown-1', 'x')
@@ -554,7 +554,7 @@ test('rejects missing prose, oversized prose, mismatched calls, duplicate commit
   const commit = tools.get('rp_commit_turn')
   const attempt = async (callId, text, extraBlocks = [], execCallId = callId) => {
     const events = []
-    const agent = { session: { events, append() {} } }
+    const agent = { session: { ...sessionMethods(), events, append() {} } }
     const run = await runtime.prepareRun(agent, 1, [currentInput()])
     seedWriter(run, text)
     appendCommitCall(events, 1, 1, callId, text, extraBlocks)
@@ -583,7 +583,7 @@ test('accepts harmless content blocks, blank text, and a commit block before lat
   })
   const events = []
   const callId = 'tolerant-commit'
-  const agent = { session: { events, append() {} } }
+  const agent = { session: { ...sessionMethods(), events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   seedWriter(run, 'visible prose')
   events.push({
@@ -625,7 +625,7 @@ test('Chat retry keeps prose from the latest failed commit even if parent commen
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 20,
   })
   const events = []
-  const agent = { session: { events, append() {} } }
+  const agent = { session: { ...sessionMethods(), events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   seedWriter(run, 'original prose')
   appendCommitCall(events, 1, 1, 'failed-commit', 'original prose')
@@ -679,7 +679,7 @@ test('accepts the native thinking-model reasoning, prose, and final commit shape
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 4,
   })
   const events = []
-  const agent = { session: { events, append() {} } }
+  const agent = { session: { ...sessionMethods(), events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   seedWriter(run, 'text')
   appendCommitCall(events, 1, 1, 'reasoning-commit', 'text', [], [
@@ -694,7 +694,7 @@ test('accepts the native thinking-model reasoning, prose, and final commit shape
   assert.deepEqual(result.meta.assistant, { seq: 0, messageId: 'assistant-reasoning-commit' })
 
   const siblingEvents = []
-  const siblingAgent = { session: { events: siblingEvents, append() {} } }
+  const siblingAgent = { session: { ...sessionMethods(), events: siblingEvents, append() {} } }
   const siblingRun = await runtime.prepareRun(siblingAgent, 1, [currentInput()])
   seedWriter(siblingRun, 'text')
   appendCommitCall(siblingEvents, 1, 1, 'reasoning-sibling', 'text', [
@@ -730,7 +730,7 @@ test('allows an ordinary completed assistant response without forcing a commit',
   runtime.registerContextSource({ id: 'test', prepare: () => ({ text: 'context' }) })
   const events = []
   const steering = []
-  const session = { id: 'bounded', events, append(type, data, opts) { events.push({ type, data, ...opts }) } }
+  const session = { ...sessionMethods(), id: 'bounded', events, append(type, data, opts) { events.push({ type, data, ...opts }) } }
   liveAgent = { session, steer(message) { steering.push(message) } }
   const payload = { agent: liveAgent, turn: 1, step: 1, signal: new AbortController().signal, messages: [currentInput()] }
   const decision = await ctx.waterfall('agent/pre-step', payload, () => Promise.resolve({ kind: 'enter', messages: payload.messages }))
@@ -772,7 +772,7 @@ test('chat refresh keeps full material hidden from the parent and returns a comp
     id: 'state', label: '变量', parentDelivery: 'commit', defaultSlot: { id: 'state', label: '变量' }, prepare: () => state,
   })
   const input = currentInput()
-  const agent = { session: { events: [], deriveMessages: () => [input], append() {} } }
+  const agent = { session: { ...sessionMethods(), events: [], deriveMessages: () => [input], append() {} } }
   const run = await runtime.prepareRun(agent, 1, [input])
   seedWriter(run, '旧资料下的草稿。')
   run.writerCallId = 'old-writer'
@@ -827,7 +827,7 @@ test('a failed configuration refresh gates Writer and commit until the same refr
     },
   })
   const input = currentInput()
-  const agent = { session: { events: [], deriveMessages: () => [input], append() {} } }
+  const agent = { session: { ...sessionMethods(), events: [], deriveMessages: () => [input], append() {} } }
   await runtime.prepareRun(agent, 1, [input])
   const refreshOptions = {
     kind: 'state-configuration',
@@ -866,7 +866,7 @@ test('failed asset phases gate commit until a later mutation succeeds', async ()
   const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 3, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   const events = []
   const input = currentInput()
-  const agent = { session: { events, deriveMessages: () => [input], append() {} } }
+  const agent = { session: { ...sessionMethods(), events, deriveMessages: () => [input], append() {} } }
   const run = await runtime.prepareRun(agent, 1, [input])
   runtime.recordAssetMutationOutcome(agent, {
     operation: 'bind', ok: false,
@@ -909,7 +909,7 @@ test('commit rejects a selected live source whose revision changed after context
     prepare: () => ({ revision, text: `revision ${revision}` }),
   })
   const events = []
-  const agent = { session: { events, append() {} } }
+  const agent = { session: { ...sessionMethods(), events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   revision = 2
   appendCommitCall(events, 1, 1, 'stale-source', '旧资料下的续写。')
@@ -953,7 +953,7 @@ test('commit revalidates live context after asynchronous effect and guard valida
     async validate() { await Promise.resolve() },
   })
   const events = []
-  const agent = { session: { events, append() {} } }
+  const agent = { session: { ...sessionMethods(), events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   appendCommitCall(events, 1, 1, 'late-stale-source', '旧资料下的续写。')
   seedWriter(run, '旧资料下的续写。')
@@ -989,7 +989,7 @@ test('commit reports an unavailable live source as stale context', async () => {
     },
   })
   const events = []
-  const agent = { session: { events, append() {} } }
+  const agent = { session: { ...sessionMethods(), events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   available = false
   appendCommitCall(events, 1, 1, 'unavailable-source', '旧资料下的续写。')
@@ -1018,7 +1018,7 @@ test('references require one active source and its exact assembled revision', as
   })
   const attempt = async (callId, reference) => {
     const events = []
-    const agent = { session: { events, append() {} } }
+    const agent = { session: { ...sessionMethods(), events, append() {} } }
     const run = await runtime.prepareRun(agent, 1, [currentInput()])
     appendCommitCall(events, 1, 1, callId, '引用资料。')
     seedWriter(run, '引用资料。')
@@ -1039,7 +1039,7 @@ test('derives the step budget from the persisted execution mode and session cap'
   ctx.provide('tools', { register() {} })
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
-  const agent = { session: { events: [], append() {} } }
+  const agent = { session: { ...sessionMethods(), events: [], append() {} } }
   ctx.provide('rpSessions', { get: () => ({ runtime: { executionMode: 'agent', maxSteps: 5 } }) })
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   assert.equal(run.executionMode, 'agent')
@@ -1054,7 +1054,7 @@ test('reads Session settings through the registered profile provider across Cord
   ctx.provide('agents', { get() { return undefined } })
   const runtime = new RpRuntime(ctx, { chatMaxStepsPerRun: 2, agentMaxStepsPerRun: 8, maxEffectsPerCommit: 1, maxArtifactBytes: 1024 })
   runtime.registerSessionProfileProvider(() => ({ mode: 'adaptive', runtime: { executionMode: 'agent', maxSteps: 6 } }))
-  const agent = { session: { events: [], append() {} } }
+  const agent = { session: { ...sessionMethods(), events: [], append() {} } }
 
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
 
@@ -1403,7 +1403,7 @@ test('isolated task subagents bypass RP context assembly, tool masking and commi
   const steering = []
   const agent = {
     ctx: { tools: { restrict() { restrictions += 1; return () => {} } } },
-    session: { header: { origin: 'subagent' }, events: [], append() {} },
+    session: { ...sessionMethods(), header: { origin: 'subagent' }, events: [], append() {} },
     steer(message) { steering.push(message) },
   }
 
@@ -1450,7 +1450,7 @@ test('agent mode preassembles the saved Session slots and exposes no context-bui
   })
   const events = []
   const input = currentInput()
-  const agent = { session: { events, deriveMessages: () => [input], append() {} } }
+  const agent = { session: { ...sessionMethods(), events, deriveMessages: () => [input], append() {} } }
   const run = await runtime.prepareRun(agent, 1, [input])
 
   assert.match(run.contextText, /The gate is sealed/)
@@ -1545,7 +1545,7 @@ test('an unavailable optional Wiki source is skipped without blocking Agent outp
     prepare() { throw Object.assign(new Error('gone'), { code: 'ASSET_NOT_FOUND' }) },
   })
   const input = currentInput()
-  const agent = { session: { events: [], deriveMessages: () => [input], append() {} } }
+  const agent = { session: { ...sessionMethods(), events: [], deriveMessages: () => [input], append() {} } }
 
   const run = await runtime.prepareRun(agent, 1, [input])
 
@@ -1597,7 +1597,7 @@ test('Chat Writer receives one flat Prompt and its prose replaces the parent str
   const input = currentInput(null, [attachment])
   agent = {
     options: { provider: 'parent-provider', model: 'parent-model', maxTokens: 123 },
-    session: { id: 'writer-parent', events, append() {} },
+    session: { ...sessionMethods(), id: 'writer-parent', events, append() {} },
   }
   const run = await runtime.prepareRun(agent, 1, [input])
   const write = tools.get('rp_write_turn')
@@ -1678,7 +1678,7 @@ test('Chat commit retries suppress parent explanations and keep the original Wri
     maxEffectsPerCommit: 1, maxArtifactBytes: 4096, maxNarrativeCharacters: 1000,
   })
   const events = []
-  agent = { session: { id: 'chat-commit-retry', events, append() {} } }
+  agent = { session: { ...sessionMethods(), id: 'chat-commit-retry', events, append() {} } }
   const run = await runtime.prepareRun(agent, 1, [currentInput()])
   seedWriter(run, '原始 Writer 正文。')
   run.chatWriterRelayed = true
@@ -1803,7 +1803,7 @@ test('Agent Writer uses the preassembled Slot context, accepts a bounded brief, 
   })
   const attachment = testImageAttachment('b')
   const input = currentInput('继续。', [attachment])
-  const agent = { options: { provider: 'parent-provider', model: 'parent-model', maxTokens: 456 }, session: { id: 'agent-parent', events: [], append() {} } }
+  const agent = { options: { provider: 'parent-provider', model: 'parent-model', maxTokens: 456 }, session: { ...sessionMethods(), id: 'agent-parent', events: [], append() {} } }
   const run = await runtime.prepareRun(agent, 1, [input])
   const write = tools.get('rp_write_turn')
   await assert.rejects(
@@ -1889,7 +1889,7 @@ test('Agent Writer uses the preassembled Slot context, accepts a bounded brief, 
   assert.equal(run.writerArtifact, undefined)
 
   run.writerArtifact = written.meta
-  appendCommitCall(agent.session.events, 1, 3, 'agent-revised-commit', '父代理采用的修改后正文')
+  appendCommitCall(agent.session.snapshotEvents(), 1, 3, 'agent-revised-commit', '父代理采用的修改后正文')
   let concluded = false
   const committed = await tools.get('rp_commit_turn').execute({}, {
     agent,
@@ -1938,8 +1938,8 @@ test('global Writer and managed task subagents are shared by Chat and Agent, the
   }
   runtime.registerSubagentProfileProvider({ id: 'global', prepare: () => structuredClone(globalProfile) })
 
-  const chatAgent = { mode: 'chat', options: { provider: 'parent', model: 'parent-model', reasoningEffort: 'medium', maxTokens: 111 }, session: { id: 'chat-global', events: [], append() {} } }
-  const agent = { mode: 'agent', options: { provider: 'parent', model: 'parent-model', reasoningEffort: 'medium', maxTokens: 222 }, session: { id: 'agent-global', events: [], append() {} } }
+  const chatAgent = { mode: 'chat', options: { provider: 'parent', model: 'parent-model', reasoningEffort: 'medium', maxTokens: 111 }, session: { ...sessionMethods(), id: 'chat-global', events: [], append() {} } }
+  const agent = { mode: 'agent', options: { provider: 'parent', model: 'parent-model', reasoningEffort: 'medium', maxTokens: 222 }, session: { ...sessionMethods(), id: 'agent-global', events: [], append() {} } }
   const chatRun = await runtime.prepareRun(chatAgent, 1, [currentInput('Chat 继续。')])
   const agentRun = await runtime.prepareRun(agent, 1, [currentInput('Agent 继续。')])
   globalProfile = {
@@ -2011,7 +2011,7 @@ test('inherit routes resolve from the first logged parent request before child e
   let requestHeader
   const agent = {
     options: {},
-    session: { id: 'late-parent-route', events: [], append() {}, requestHeader: () => requestHeader },
+    session: { ...sessionMethods(), id: 'late-parent-route', events: [], append() {}, requestHeader: () => requestHeader },
   }
   const run = await runtime.prepareRun(agent, 1, [currentInput('继续。')])
   assert.equal(run.writerRoute, undefined)
@@ -2058,6 +2058,13 @@ function appendCommitCall(events, turn, step, callId, text, extraBlocks = [], le
     },
   })
   events.push({ seq: events.length, type: 'tool/call', data: { turn, step, callId, name: 'rp_commit_turn', arguments: '{}' } })
+}
+
+function sessionMethods() {
+  return {
+    snapshotEvents() { return this.events ?? [] },
+    eventAt(seq) { return this.events?.[seq] },
+  }
 }
 
 function currentInput(text = 'Continue the story.', images = []) {

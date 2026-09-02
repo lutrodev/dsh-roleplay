@@ -174,12 +174,19 @@ export const failedAssistantNodeDefinition = {
     target: { kind: 'turn', turn: match.event.data.turn },
   }),
   update: (context, match) => failedAssistantUpdate(context.state, match.event),
-  buildLocationData: (context, scope) => scope !== 'turn' || context.state === undefined ? null : ({
-    kind: 'turn',
-    turn: context.state.turn,
-    key: 'rp-floor-failed-assistant',
-    value: context.state,
-  }),
+  buildLocationData: (context, scope, previous) => {
+    if (scope !== 'turn' || context.state === undefined) return null
+    if (previous?.kind === 'turn'
+      && previous.turn === context.state.turn
+      && previous.key === 'rp-floor-failed-assistant'
+      && previous.value === context.state) return previous
+    return {
+      kind: 'turn',
+      turn: context.state.turn,
+      key: 'rp-floor-failed-assistant',
+      value: context.state,
+    }
+  },
   buildViewNode: context => context.state?.failed !== true && context.state?.deleted !== true ? null : ({
     key: context.key,
     kind: 'rp-floor-failed-assistant',

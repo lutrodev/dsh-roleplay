@@ -27,17 +27,17 @@ test('native edits keep message identity, tool calls and committed effects', asy
   const harness = await createHarness(t)
   const first = locateRoleplayTurn(harness.session, 1)
   const commitSeqs = harness.session.surface.nodes.filter(seq => (
-    harness.session.events[seq]?.data?.meta?.kind === 'rp-agent/turn-commit'
+    harness.session.snapshotEvents()[seq]?.data?.meta?.kind === 'rp-agent/turn-commit'
   ))
 
   await action(harness, 'edit', userTarget(first), { content: '修改后的选择' })
-  const userReplacement = harness.session.events.at(-1)
+  const userReplacement = harness.session.snapshotEvents().at(-1)
   assert.equal(userReplacement.type, 'user/message')
   assert.equal(userReplacement.data.id, first.user.data.id)
   assert.equal(decodeRpMessageActionEvent(userReplacement).operation, 'edit')
 
   await action(harness, 'edit', assistantTarget(first), { content: '改写后的正文' })
-  const assistantReplacement = harness.session.events.at(-1)
+  const assistantReplacement = harness.session.snapshotEvents().at(-1)
   assert.equal(assistantReplacement.type, 'assistant/message')
   assert.equal(assistantReplacement.data.message.id, first.assistant.data.message.id)
   assert.equal(decodeRpMessageActionEvent(assistantReplacement).operation, 'edit')
@@ -48,7 +48,7 @@ test('native edits keep message identity, tool calls and committed effects', asy
   assert.deepEqual(transcriptText(harness.session), [
     '修改后的选择', '改写后的正文', '第二个选择', '第二层正文',
   ])
-  assert.equal(activeCommitEntities(harness.session.events).length, 2)
+  assert.equal(activeCommitEntities(harness.session.snapshotEvents()).length, 2)
 })
 
 for (const scenario of [
@@ -82,7 +82,7 @@ for (const scenario of [
     assert.equal(assistantDetail.canReroll, false)
     await assert.rejects(action(harness, 'reroll', assistant), hasCode('REROLL_UNAVAILABLE'))
 
-    const cut = hostForkCut(harness.session.events, assistantDetail.forkSeq)
+    const cut = hostForkCut(harness.session.snapshotEvents(), assistantDetail.forkSeq)
     const child = harness.root.sessions.fork(
       harness.session, cut - 1, SessionId(`message-actions-${scenario.name}-branch`),
     )
@@ -108,7 +108,7 @@ test('deleting a user message replaces the complete active suffix with one empty
   const expectedSources = [...harness.session.surface.nodes.slice(selectedIndex)]
 
   const result = await action(harness, 'delete', userTarget(first))
-  const carrier = harness.session.events.at(-1)
+  const carrier = harness.session.snapshotEvents().at(-1)
   const metadata = decodeRpMessageActionEvent(carrier)
 
   assert.equal(carrier.type, 'assistant/message')
@@ -119,19 +119,19 @@ test('deleting a user message replaces the complete active suffix with one empty
   assert.equal(result.removedTargets, 4)
   assert.deepEqual(transcriptText(harness.session), [])
   assert.equal(harness.session.deriveMessages().some(message => message.content.length === 0), false)
-  assert.equal(activeCommitEntities(harness.session.events).length, 0)
+  assert.equal(activeCommitEntities(harness.session.snapshotEvents()).length, 0)
 
-  const replay = Session.create(SessionId('message-actions-delete-replay'), structuredClone(harness.session.events))
+  const replay = Session.create(SessionId('message-actions-delete-replay'), structuredClone(harness.session.snapshotEvents()))
   assert.deepEqual(replay.surface.nodes, harness.session.surface.nodes)
   assert.deepEqual(transcriptText(replay), [])
-  assert.equal(activeCommitEntities(replay.events).length, 0)
+  assert.equal(activeCommitEntities(replay.snapshotEvents()).length, 0)
 
   const fork = harness.root.sessions.fork(
     harness.session, carrier.seq, SessionId('message-actions-delete-fork'),
   )
   assert.deepEqual(fork.surface.nodes, harness.session.surface.nodes)
   assert.deepEqual(transcriptText(fork), [])
-  assert.equal(activeCommitEntities(fork.events).length, 0)
+  assert.equal(activeCommitEntities(fork.snapshotEvents()).length, 0)
 })
 
 test('deleting an assistant keeps its prompt and removes every later message and entity', async t => {
@@ -142,13 +142,13 @@ test('deleting an assistant keeps its prompt and removes every later message and
   assert.ok(context)
 
   await action(harness, 'delete', assistantTarget(first))
-  const carrier = harness.session.events.at(-1)
+  const carrier = harness.session.snapshotEvents().at(-1)
 
   assert.deepEqual(transcriptText(harness.session), ['第一个选择'])
   assert.equal(harness.session.surface.nodes.includes(first.user.seq), true)
   assert.equal(harness.session.surface.nodes.includes(context.seq), false)
   assert.equal(carrier.sourceEventSeqs[0], context.seq)
-  assert.equal(activeCommitEntities(harness.session.events).length, 0)
+  assert.equal(activeCommitEntities(harness.session.snapshotEvents()).length, 0)
   assert.equal(harness.session.deriveMessages().some(message => message.content.length === 0), false)
   await assert.rejects(get(harness, assistantTarget(first)), hasCode('MESSAGE_NOT_FOUND'))
 })
@@ -164,7 +164,7 @@ test('reroll retracts the complete turn and durably queues pure user text in the
   await action(harness, 'edit', userTarget(second), { content: '{{user}} 的第二个选择' })
 
   const result = await action(harness, 'reroll', assistantTarget(second))
-  const carrier = harness.session.events.findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
+  const carrier = harness.session.snapshotEvents().findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
   const metadata = decodeRpMessageActionEvent(carrier)
 
   assert.equal(result.sameSession, true)
@@ -174,7 +174,7 @@ test('reroll retracts the complete turn and durably queues pure user text in the
   assert.equal(metadata.replay[0].content[0].text, '{{user}} 的第二个选择')
   assert.deepEqual(harness.followups.map(message => message.content[0].text), ['{{user}} 的第二个选择'])
   assert.deepEqual(transcriptText(harness.session), ['第一个选择', '第一层正文'])
-  assert.equal(activeCommitEntities(harness.session.events).length, 1)
+  assert.equal(activeCommitEntities(harness.session.snapshotEvents()).length, 1)
 
   recoverPendingRerolls(harness.agent)
   assert.equal(harness.followups.length, 1)
@@ -190,7 +190,7 @@ test('save and reroll is available only from the last replayable user message', 
   assert.equal((await get(harness, assistantTarget(second))).canSaveAndReroll, false)
 
   await action(harness, 'reroll', userTarget(second), { content: '保存后的第二个选择' })
-  const carrier = harness.session.events.findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
+  const carrier = harness.session.snapshotEvents().findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
 
   assert.equal(decodeRpMessageActionEvent(carrier).replay[0].content[0].text, '保存后的第二个选择')
   assert.deepEqual(harness.followups.map(message => message.content[0].text), ['保存后的第二个选择'])
@@ -202,12 +202,12 @@ test('reroll recovery closes the append-to-inbox crash window and never revives 
   const selected = assistantTarget(locateRoleplayTurn(crashed.session, 2))
   crashed.agent.followup = () => { throw new Error('simulated crash before inbox append') }
   await assert.rejects(action(crashed, 'reroll', selected), hasCode('MESSAGE_OPERATION_FAILED'))
-  const reroll = crashed.session.events.findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
+  const reroll = crashed.session.snapshotEvents().findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
   assert.ok(reroll)
 
   const resumed = {
     session: Session.create(
-      SessionId('message-actions-crash-resumed'), structuredClone(crashed.session.events),
+      SessionId('message-actions-crash-resumed'), structuredClone(crashed.session.snapshotEvents()),
     ),
     followups: [],
     injections: [],
@@ -225,7 +225,7 @@ test('reroll recovery closes the append-to-inbox crash window and never revives 
   const target = assistantTarget(locateRoleplayTurn(abandoned.session, 2))
   abandoned.agent.followup = () => { throw new Error('simulated crash before inbox append') }
   await assert.rejects(action(abandoned, 'reroll', target), hasCode('MESSAGE_OPERATION_FAILED'))
-  const pending = abandoned.session.events.findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
+  const pending = abandoned.session.snapshotEvents().findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
   const deleteAction = createRpMessageActionMetadata('delete', [{ kind: 'turn', turn: 2 }])
   const replacement = structuredClone(pending.data)
   replacement.message.source = { ...replacement.message.source, rpMessageAction: deleteAction }
@@ -242,7 +242,7 @@ test('reroll recovery converges if the process stops while re-arming an already-
   const harness = await createHarness(t, 'rearm-crash')
   const target = assistantTarget(locateRoleplayTurn(harness.session, 2))
   await action(harness, 'reroll', target)
-  const carrier = harness.session.events.findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
+  const carrier = harness.session.snapshotEvents().findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
   const replay = decodeRpMessageActionEvent(carrier).replay[0]
   const nextTurn = [replay]
   const rearming = {
@@ -284,7 +284,7 @@ test('a surface-free failed turn is hidden by an empty native assistant carrier'
 
   assert.equal((await get(harness, failed)).canReroll, true)
   await action(harness, 'delete', failed)
-  const carrier = harness.session.events.at(-1)
+  const carrier = harness.session.snapshotEvents().at(-1)
   const metadata = decodeRpMessageActionEvent(carrier)
 
   assert.equal(carrier.type, 'assistant/message')
@@ -309,14 +309,14 @@ test('an interrupted native assistant keeps message actions and rerolls in the s
   assert.equal(detail.forkSeq, interrupted.seq)
 
   await action(editable, 'edit', target, { content: '人工补完后的中断回复' })
-  const replacement = editable.session.events.at(-1)
+  const replacement = editable.session.snapshotEvents().at(-1)
   assert.equal(replacement.type, 'assistant/message')
   assert.equal(replacement.data.interrupted, true)
   assert.equal(replacement.data.message.id, interrupted.data.message.id)
   assert.equal((await get(editable, target)).content, '人工补完后的中断回复')
   const fork = editable.root.sessions.fork(
     editable.session,
-    hostForkCut(editable.session.events, detail.forkSeq) - 1,
+    hostForkCut(editable.session.snapshotEvents(), detail.forkSeq) - 1,
     SessionId('message-actions-interrupted-actions-fork'),
   )
   assert.deepEqual(surfaceText(fork), [
@@ -337,7 +337,7 @@ test('an interrupted native assistant keeps message actions and rerolls in the s
   appendInterruptedFailure(rerolled.session, 3, '重新生成这一段', '另一个被中断的片段')
   const rerollTarget = assistantTarget(locateRoleplayTurn(rerolled.session, 3))
   const result = await action(rerolled, 'reroll', rerollTarget)
-  const carrier = rerolled.session.events.findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
+  const carrier = rerolled.session.snapshotEvents().findLast(event => decodeRpMessageActionEvent(event)?.operation === 'reroll')
 
   assert.equal(result.sameSession, true)
   assert.deepEqual(decodeRpMessageActionEvent(carrier).targets.map(target => target.kind), [
@@ -376,7 +376,7 @@ test('shared asset writes disable reroll but remain durable after suffix deletio
   assert.equal((await get(harness, selected)).canReroll, false)
   await assert.rejects(action(harness, 'reroll', selected), hasCode('REROLL_UNAVAILABLE'))
   await action(harness, 'delete', selected)
-  assert.equal(harness.session.events.includes(asset), true)
+  assert.equal(harness.session.snapshotEvents().includes(asset), true)
   assert.equal(asset.data.meta.kind, 'rp-agent/asset-mutation')
 })
 
@@ -414,14 +414,14 @@ test('a tail edit keeps the turn anchor while the Host fork cut includes its tra
   assert.equal(detail.forkSeq, second.commit.seq)
   assert.equal(detail.forkEditRequired, false)
 
-  const cut = hostForkCut(harness.session.events, detail.forkSeq)
+  const cut = hostForkCut(harness.session.snapshotEvents(), detail.forkSeq)
   const fork = harness.root.sessions.fork(
     harness.session, cut - 1, SessionId('message-actions-tail-edit-fork-child'),
   )
   assert.deepEqual(transcriptText(fork), [
     '第一个选择', '第一层正文', '第二个选择', '分支中的编辑正文',
   ])
-  assert.equal(activeCommitEntities(fork.events).length, 2)
+  assert.equal(activeCommitEntities(fork.snapshotEvents()).length, 2)
 })
 
 test('a historical edit is replayed into the native fork child without inheriting later turns', async t => {
@@ -433,14 +433,15 @@ test('a historical edit is replayed into the native fork child without inheritin
 
   assert.equal(detail.forkSeq, first.commit.seq)
   assert.equal(detail.forkEditRequired, true)
-  const cut = hostForkCut(harness.session.events, detail.forkSeq)
+  const cut = hostForkCut(harness.session.snapshotEvents(), detail.forkSeq)
   const childId = SessionId('message-actions-historical-edit-fork-child')
   const child = harness.root.sessions.create(childId, {
-    seed: harness.session.events.slice(0, cut),
+    seed: harness.session.snapshotEvents().slice(0, cut),
+    inheritedEventCount: cut,
     meta: {
       agentPreset: 'roleplay',
       parentSession: harness.session.id,
-      seedLength: cut,
+      isSeeded: true,
     },
   })
   assert.deepEqual(transcriptText(child), ['第一个选择', '第一层正文'])
@@ -460,8 +461,8 @@ test('a historical edit is replayed into the native fork child without inheritin
   }, defaultLimits())
 
   assert.deepEqual(transcriptText(child), ['第一个选择', '历史消息的最终编辑正文'])
-  assert.equal(child.events.some(event => event.type === 'turn/start' && event.data.turn === 2), false)
-  assert.equal(activeCommitEntities(child.events).length, 1)
+  assert.equal(child.snapshotEvents().some(event => event.type === 'turn/start' && event.data.turn === 2), false)
+  assert.equal(activeCommitEntities(child.snapshotEvents()).length, 1)
   assert.deepEqual(transcriptText(harness.session), [
     '第一个选择', '历史消息的最终编辑正文', '第二个选择', '第二层正文',
   ])
@@ -516,7 +517,7 @@ test('a historical opening edit forks from the opening turn and requests replay 
 
 test('rejects stale, busy and oversized operations without mutation', async t => {
   const harness = await createHarness(t)
-  const eventCount = harness.session.events.length
+  const eventCount = harness.session.snapshotEvents().length
   await assert.rejects(action(harness, 'edit', userTarget(locateRoleplayTurn(harness.session, 1)), {
     content: '123456',
   }, { maxNarrativeCharacters: 10, maxUserMessageCharacters: 5 }), hasCode('LIMIT_EXCEEDED'))
@@ -525,7 +526,7 @@ test('rejects stale, busy and oversized operations without mutation', async t =>
   }), hasCode('MESSAGE_NOT_FOUND'))
   harness.agent.status = 'running'
   await assert.rejects(action(harness, 'delete', userTarget(locateRoleplayTurn(harness.session, 1))), hasCode('SESSION_RUNNING'))
-  assert.equal(harness.session.events.length, eventCount)
+  assert.equal(harness.session.snapshotEvents().length, eventCount)
 })
 
 test('read-only action metadata joins the active turn before resolving its message', async t => {
@@ -580,7 +581,7 @@ test('a write action joins the closed-turn driver before claiming maintenance', 
   assert.equal(joined, 1)
   assert.equal(result.target.messageId, target.messageId)
   assert.equal(result.removedTargets, 2)
-  assert.equal(harness.session.events.at(-1).data.message.content.length, 0)
+  assert.equal(harness.session.snapshotEvents().at(-1).data.message.content.length, 0)
 })
 
 test('a write action never waits through an open generating turn', async t => {
@@ -622,14 +623,14 @@ test('assistant action folding keeps the original row anchor across native carri
   const originalState = { seq: 10, time: 20, target: { current: true }, text: '第二层正文' }
 
   await action(harness, 'edit', target, { content: '编辑后的第二层正文' })
-  const edit = harness.session.events.at(-1)
+  const edit = harness.session.snapshotEvents().at(-1)
   assert.deepEqual(assistantActionMatch(edit), { id: target.messageId, role: 'update' })
   assert.deepEqual(updateAssistantActionState(originalState, edit), {
     ...originalState, text: '编辑后的第二层正文', edited: true, deleted: false,
   })
 
   await action(harness, 'delete', target)
-  const deletion = harness.session.events.at(-1)
+  const deletion = harness.session.snapshotEvents().at(-1)
   assert.deepEqual(updateAssistantActionState(originalState, deletion), {
     ...originalState, deleted: true,
   })
@@ -665,7 +666,7 @@ async function createHarness(t, suffix = '') {
 }
 
 function appendInbox(harness, target, message, wakeup) {
-  const start = harness.session.events.reduce((length, event) => {
+  const start = harness.session.snapshotEvents().reduce((length, event) => {
     if (event.type !== 'agent/inbox/spliced' || event.data?.target !== target) return length
     return length - (event.data.removedCount ?? 0) + (event.data.inserted?.length ?? 0)
   }, 0)
@@ -862,7 +863,7 @@ function transcriptText(session) {
 
 function surfaceText(session) {
   return session.surface.nodes.flatMap(seq => {
-    const event = session.events[seq]
+    const event = session.snapshotEvents()[seq]
     if (event?.type === 'user/message' && event.data?.source?.kind === 'user') {
       return event.data.content.filter(block => block.type === 'text').map(block => block.text)
     }

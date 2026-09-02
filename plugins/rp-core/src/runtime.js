@@ -1780,8 +1780,10 @@ export class RpRuntime extends Service {
 
   /** @param {object} agent @param {object} run @param {string} callId */
   resolveCommitAssistant(agent, run, callId) {
-    const events = agent.session?.events
-    if (!Array.isArray(events)) throw new RpRuntimeError('RP_COMMIT_MESSAGE_MISSING', 'The Session Event Log is unavailable for this commit.')
+    if (typeof agent.session?.snapshotEvents !== 'function') {
+      throw new RpRuntimeError('RP_COMMIT_MESSAGE_MISSING', 'The Session Event Log is unavailable for this commit.')
+    }
+    const events = agent.session.snapshotEvents()
     const call = events.findLast(event => event?.type === 'tool/call'
       && String(event.data?.callId) === callId
       && event.data?.name === RP_COMMIT_TOOL)

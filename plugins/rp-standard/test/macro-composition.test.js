@@ -32,7 +32,7 @@ test('the standard runtime expands both identities across every model text surfa
   agent = {
     session: {
       id: 'session-1',
-      events: [],
+      snapshotEvents() { return [] },
       deriveMessages() { return [] },
     },
   }

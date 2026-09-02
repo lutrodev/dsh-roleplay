@@ -28,7 +28,7 @@ function runtimeHarness(profile = {}) {
     maxNarrativeCharacters: 1000,
   })
   runtime.registerSessionProfileProvider(() => profile)
-  agent = { id: 'session-1', options: { provider: 'mock', model: 'mock' }, session: { id: 'session-1', events: [], deriveMessages: () => [] } }
+  agent = { id: 'session-1', options: { provider: 'mock', model: 'mock' }, session: { ...sessionMethods(), id: 'session-1', events: [], deriveMessages: () => [] } }
   return { ctx, runtime, agent }
 }
 
@@ -156,3 +156,10 @@ test('assistant stream deltas and authoritative block text share one frozen tran
   assert.equal(chunks.find(chunk => chunk.type === 'block-end').block.text, '洛')
   await ctx.fiber.dispose()
 })
+
+function sessionMethods() {
+  return {
+    snapshotEvents() { return this.events ?? [] },
+    eventAt(seq) { return this.events?.[seq] },
+  }
+}

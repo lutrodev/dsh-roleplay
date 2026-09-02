@@ -37,7 +37,7 @@ test('real Agent Loop streams Writer unchanged in Chat and keeps parent revision
 
   const chatFinal = finalNarrativeMessage(chatHandle.agent.session)
   assert.equal(messageText(chatFinal.data.message), chatWriter)
-  assert.doesNotMatch(JSON.stringify(chatHandle.agent.session.events), new RegExp(chatParentRewrite))
+  assert.doesNotMatch(JSON.stringify(chatHandle.agent.session.snapshotEvents()), new RegExp(chatParentRewrite))
   assert.equal(streamedText(chatHandle.agent.session, chatFinal.data.turn, chatFinal.data.step), chatWriter)
   assert.equal(successfulCommit(chatHandle.agent.session)?.executionMode, 'chat')
   assert.equal(ctx.rpRuntime.inspectRun(chatHandle.agent).status, 'committed')
@@ -156,7 +156,7 @@ class ScriptedAdapter extends LlmAdapter {
 }
 
 function finalNarrativeMessage(session) {
-  const event = session.events.findLast(item => item.type === 'assistant/message'
+  const event = session.snapshotEvents().findLast(item => item.type === 'assistant/message'
     && item.data.message.content.some(block => block.type === 'tool-call' && block.name === 'rp_commit_turn'))
   assert.ok(event)
   return event
@@ -167,7 +167,7 @@ function messageText(message) {
 }
 
 function streamedText(session, turn, step) {
-  return session.events.flatMap(event => event.type === 'assistant/chunk'
+  return session.snapshotEvents().flatMap(event => event.type === 'assistant/chunk'
     && event.data.turn === turn
     && event.data.step === step
     && event.data.chunk.type === 'text-delta'
@@ -176,6 +176,6 @@ function streamedText(session, turn, step) {
 }
 
 function successfulCommit(session) {
-  return session.events.findLast(event => event.type === 'tool/result'
+  return session.snapshotEvents().findLast(event => event.type === 'tool/result'
     && event.data.meta?.kind === 'rp-agent/turn-commit')?.data.meta
 }

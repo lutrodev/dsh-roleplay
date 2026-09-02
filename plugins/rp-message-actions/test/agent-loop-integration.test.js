@@ -143,7 +143,7 @@ test('real Agent Loop exposes and rerolls its durable interrupted assistant mess
   assert.equal(adapter.requests.length, 2)
   assert.deepEqual(requestText(adapter.requests[1]), ['请继续这一段'])
   assert.deepEqual(activeText(agent.session), ['请继续这一段', '中断后的重新生成版本'])
-  assert.equal(agent.session.events.find(event => event.type === 'turn/end' && event.data.turn === 1)?.data.reason.kind, 'aborted')
+  assert.equal(agent.session.snapshotEvents().find(event => event.type === 'turn/end' && event.data.turn === 1)?.data.reason.kind, 'aborted')
 })
 
 test('real resumed Agent Loop rerolls a committed Roleplay turn without retaining its tool history', async t => {
@@ -152,8 +152,9 @@ test('real resumed Agent Loop rerolls a committed Roleplay turn without retainin
   const source = committedSession()
   const handle = await ctx.agents.create({
     sessionId: SessionId('rp-message-actions-committed-loop'),
-    seed: source.events,
-    meta: { agentPreset: 'roleplay', seedLength: source.events.length },
+    seed: source.snapshotEvents(),
+    inheritedEventCount: source.seq,
+    meta: { agentPreset: 'roleplay', isSeeded: true },
     agentOptions: { provider: 'mock', model: 'mock' },
   })
   t.after(async () => {
@@ -319,7 +320,7 @@ test('Roleplay pre-step context survives consecutive rerolls in the same Agent',
 
   assert.equal(adapter.requests.length, 3)
   assert.equal(messageText(locateRoleplayTurn(agent.session, 3).assistant.data.message), '第二次重新生成')
-  assert.equal(agent.session.events.find(event => event.type === 'turn/end' && event.data.turn === 3)?.data.reason.kind, 'completed')
+  assert.equal(agent.session.snapshotEvents().find(event => event.type === 'turn/end' && event.data.turn === 3)?.data.reason.kind, 'completed')
 })
 
 test('real Agent Loop replays every user message from one turn in order during reroll', async t => {
@@ -522,6 +523,7 @@ async function resumableLoopContext(adapter, persisted) {
       return SessionPreparation.create(ctx.sessions.prepare(id, {
         seed: structuredClone(persisted.events),
         meta: structuredClone(persisted.meta),
+        inheritedEventCount: persisted.inheritedEventCount,
         seedSource: 'persistence',
       }))
     },
@@ -532,7 +534,8 @@ async function resumableLoopContext(adapter, persisted) {
 function snapshot(session) {
   return {
     meta: structuredClone(session.header),
-    events: structuredClone(session.events),
+    events: structuredClone(session.snapshotEvents()),
+    inheritedEventCount: session.inheritedEventCount,
   }
 }
 
@@ -544,6 +547,7 @@ function committedSession(
     version: SESSION_FORMAT_VERSION,
     id,
     createdAt: 1,
+    isSeeded: false,
     agentPreset: 'roleplay',
   })
   session.append('turn/start', { turn: 1 })
@@ -589,7 +593,7 @@ function committedSession(
 
 function appendDurableInbox(session, target, message) {
   const pending = { 'next-turn': [], 'next-step': [] }
-  for (const event of session.events) {
+  for (const event of session.snapshotEvents()) {
     if (event.type !== 'agent/inbox/spliced') continue
     pending[event.data.target].splice(
       event.data.start,

@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-dialogue-highlight",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Roleplay dialogue text highlighting during streaming and finalized assistant output",
   "license": "MIT",
   "private": true,
@@ -42,15 +42,15 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.3",
-    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.3"
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.4"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.3",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.4",
     "react": "18.3.1",
     "tsdown": "0.22.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.3",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.4",
     "dsh-roleplay-rp-ui": "workspace:^"
   },
   "engines": {

@@ -74,8 +74,8 @@ test('roleplay bootstrap resolves assets and builds a balanced opening seed befo
   assert.deepEqual(prepared.seed.map(event => event.seq), [0, 1, 2, 3, 4, 5, 6])
   assert.equal(prepared.seed[4].data.message.content[0].text, '阿月来到莱安娜港口。')
   const session = Session.create(SessionId('seeded-roleplay'), prepared.seed)
-  assert.equal(session.events.findLast(event => event.type === 'turn/start').data.turn, 1)
-  assert.equal(session.events.findLast(event => event.type === 'turn/end').data.reason.kind, 'completed')
+  assert.equal(session.snapshotEvents().findLast(event => event.type === 'turn/start').data.turn, 1)
+  assert.equal(session.snapshotEvents().findLast(event => event.type === 'turn/end').data.reason.kind, 'completed')
   await host.fiber.dispose()
 })
 
@@ -206,7 +206,7 @@ test('host coordinator activates without optional asset providers', async () => 
 test('session binding delegates ids and opening selection to the canonical Session service', async () => {
   let captured
   const sessions = { bindAssetChanges: async (_agent, request) => { captured = request; return { revision: 7, resources: request.changes } } }
-  const agent = { status: 'idle', ctx: {}, session: { header: { agentPreset: 'roleplay' }, events: [] } }
+  const agent = { status: 'idle', ctx: {}, session: sessionFixture({ header: { agentPreset: 'roleplay' } }) }
   const ctx = {
     typert: { lookups: { get: () => ({ resolve: async () => agent }) } },
     agentPresets: { serviceFor: (candidate, name) => candidate === agent && name === 'rpSessions' ? sessions : undefined },
@@ -240,7 +240,7 @@ test('session binding delegates ids and opening selection to the canonical Sessi
 test('session binding forwards an explicit skipped opening', async () => {
   let captured
   const sessions = { bindAssetChanges: async (_agent, request) => { captured = request; return { revision: 1 } } }
-  const agent = { status: 'idle', ctx: {}, session: { header: { agentPreset: 'roleplay' }, events: [] } }
+  const agent = { status: 'idle', ctx: {}, session: sessionFixture({ header: { agentPreset: 'roleplay' } }) }
   const ctx = {
     typert: { lookups: { get: () => ({ resolve: async () => agent }) } },
     agentPresets: { serviceFor: () => sessions },
@@ -276,7 +276,7 @@ test('session Wiki resolves every section through the matching capability field'
 test('session binding preserves fields owned by disabled capabilities', async () => {
   let captured
   const sessions = { bindAssetChanges: async (_agent, request) => { captured = request; return { revision: 8 } } }
-  const agent = { status: 'idle', session: { header: { agentPreset: 'roleplay' }, events: [] } }
+  const agent = { status: 'idle', session: sessionFixture({ header: { agentPreset: 'roleplay' } }) }
   const ctx = {
     typert: { lookups: { get: () => ({ resolve: async () => agent }) } },
     agentPresets: { serviceFor: () => sessions },
@@ -297,7 +297,7 @@ test('roleplay bootstrap defaults every omitted optional material to unbound', a
 })
 
 test('session binding rejects a roleplay log when its isolated session service is not mounted', async () => {
-  const agent = { status: 'idle', ctx: {}, session: { header: { agentPreset: 'roleplay' }, events: [] } }
+  const agent = { status: 'idle', ctx: {}, session: sessionFixture({ header: { agentPreset: 'roleplay' } }) }
   const ctx = {
     typert: { lookups: { get: () => ({ resolve: async () => agent }) } },
     agentPresets: { serviceFor: () => undefined },
@@ -313,7 +313,7 @@ test('session binding rejects a roleplay log when its isolated session service i
 test('session execution mode dispatches through the isolated session service', async () => {
   let captured
   const sessions = { setExecutionMode: async (_agent, request) => { captured = request; return { revision: 4, runtime: { executionMode: request.executionMode } } } }
-  const agent = { status: 'idle', session: { header: { agentPreset: 'roleplay' }, events: [] } }
+  const agent = { status: 'idle', session: sessionFixture({ header: { agentPreset: 'roleplay' } }) }
   const ctx = {
     typert: { lookups: { get: () => ({ resolve: async () => agent }) } },
     agentPresets: { serviceFor: (candidate, name) => candidate === agent && name === 'rpSessions' ? sessions : undefined },
@@ -324,7 +324,7 @@ test('session execution mode dispatches through the isolated session service', a
 })
 
 test('context build preview and persistence dispatch through Session-owned services', async () => {
-  const agent = { status: 'idle', session: { header: { agentPreset: 'roleplay' }, events: [] } }
+  const agent = { status: 'idle', session: sessionFixture({ header: { agentPreset: 'roleplay' } }) }
   let saved
   let messages
   const sessions = { setContextBuild: async (_agent, request) => { saved = request; return { revision: 5, contextBuild: request.contextBuild } } }
@@ -379,7 +379,7 @@ test('character deletion lists live and cold references but deletes assets witho
   const cardId = '00000000-0000-0000-0000-000000000020'
   const lorebookId = '00000000-0000-0000-0000-000000000021'
   const unrelatedCardId = '00000000-0000-0000-0000-000000000022'
-  const live = { id: 'live-rp', events: profileEvents(cardId) }
+  const live = sessionFixture({ id: 'live-rp', events: profileEvents(cardId) })
   const deletedLorebooks = []
   const deletedCards = []
   const ctx = {
@@ -417,7 +417,7 @@ test('character deletion proceeds while a referencing session is running', async
   const cardId = '00000000-0000-0000-0000-000000000030'
   const mutations = []
   const ctx = {
-    sessions: { list: () => [{ id: 'running-rp', events: profileEvents(cardId) }] },
+    sessions: { list: () => [sessionFixture({ id: 'running-rp', events: profileEvents(cardId) })] },
     agents: { get: () => ({ status: 'running' }) },
     sessionPersistence: { list: async () => [] },
     rpCharacterCards: {
@@ -685,6 +685,15 @@ function profileEvents(cardId) {
     { seq: 0, type: 'command/run', data: { commandId: `bind-${cardId}`, name: 'rp-session-apply', args: encodeSessionCommand(0, profile) } },
     { seq: 1, type: 'command/done', data: { commandId: `bind-${cardId}`, kind: 'success' } },
   ]
+}
+
+function sessionFixture({ events = [], ...session } = {}) {
+  return {
+    ...session,
+    get seq() { return events.length },
+    snapshotEvents() { return events },
+    eventAt(seq) { return events[seq] },
+  }
 }
 
 test('character selection defaults linked lorebooks while preserving additional choices', () => {

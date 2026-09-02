@@ -137,7 +137,7 @@ async function resolveRoleplayAgent(ctx, sessionId) {
 
 function roleplayPreset(session) {
   let selected = session.header?.agentPreset
-  for (const event of session.events ?? []) if (event?.type === 'agent-preset/selected') selected = event.data?.agentPreset
+  for (const event of session.snapshotEvents()) if (event?.type === 'agent-preset/selected') selected = event.data?.agentPreset
   return selected
 }
 

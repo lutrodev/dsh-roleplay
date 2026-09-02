@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-core",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Event-sourced roleplay agent runtime for DeepSeek Harness",
   "license": "MIT",
   "private": true,
@@ -36,21 +36,21 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-agent": "^0.1.2-alpha.3",
-    "@deepseek-ai/dsh-llm": "^0.1.2-alpha.3",
-    "@deepseek-ai/dsh-session": "^0.1.2-alpha.3",
-    "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.3",
-    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.3"
+    "@deepseek-ai/dsh-agent": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-llm": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-session": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.4",
+    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.4"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-agent": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-agent-loop": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-llm": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-session": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-session-projection": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-system-prompt": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-token-meter": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-tools": "0.1.2-alpha.3"
+    "@deepseek-ai/dsh-agent": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-agent-loop": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-llm": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-session": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-session-projection": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-system-prompt": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-token-meter": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-tools": "0.1.2-alpha.4"
   },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

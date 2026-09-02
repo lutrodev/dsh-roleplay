@@ -24,7 +24,7 @@ test('summary Slot follows active checkpoint order and ignores inactive summary 
 })
 
 test('summary Slot is absent with no active checkpoint and fails closed on broken correlation', () => {
-  assert.equal(conversationSummaryContext({ events: [], surface: { nodes: [] } }), undefined)
+  assert.equal(conversationSummaryContext(fixture([], [], [])), undefined)
   assert.throws(
     () => conversationSummaryContext(fixture([checkpoint(0, 'missing')], [], [0])),
     /no matching summary event/,
@@ -45,7 +45,7 @@ test('bridge registers one movable required factual native-history source immedi
   assert.deepEqual(definition.defaultSlot, {
     id: 'conversation-summary', label: '会话总结', order: -1,
   })
-  assert.equal(definition.prepare({ agent: { session: { events: [], surface: { nodes: [] } } } }), undefined)
+  assert.equal(definition.prepare({ agent: { session: fixture([], [], []) } }), undefined)
   const prepared = definition.prepare({ agent: { session: fixture(
     [checkpoint(1, 'active')],
     [summary(0, 'active', '较早剧情。')],
@@ -57,7 +57,12 @@ test('bridge registers one movable required factual native-history source immedi
 function fixture(checkpoints, summaries, nodes) {
   const events = []
   for (const event of [...checkpoints, ...summaries]) events[event.seq] = event
-  return { events, surface: { nodes } }
+  return {
+    surface: { nodes },
+    get seq() { return events.length },
+    snapshotEvents() { return events },
+    eventAt(seq) { return events[seq] },
+  }
 }
 
 function checkpoint(seq, compactionId) {

@@ -66,14 +66,15 @@ test('Harness Session fork restores profile and state at the selected turn bound
     const child = ctx.sessions.fork(parent, turn1End.seq, SessionId('rp-turn-child'))
 
     assert.equal(child.header.parentSession, parent.id)
-    assert.equal(child.header.seedLength, turn1End.seq + 1)
-    assert.deepEqual(profileFromEvents(child.events), profile1)
-    assert.deepEqual(projectState(child.events), {
+    assert.equal(child.header.isSeeded, true)
+    assert.equal(child.inheritedEventCount, turn1End.seq + 1)
+    assert.deepEqual(profileFromEvents(child.snapshotEvents()), profile1)
+    assert.deepEqual(projectState(child.snapshotEvents()), {
       protocolVersion: 2,
       revision: 2,
       namespaces: { story: stateSnapshot(2, 9) },
     })
-    const childWriter = child.events.map(decodeRpWriterEvent).find(Boolean)
+    const childWriter = child.snapshotEvents().map(decodeRpWriterEvent).find(Boolean)
     assert.equal(childWriter?.writerSessionId, writer1.id)
     assert.equal(childWriter?.promptHash, 'prompt-hash-1')
     assert.equal(childWriter?.narrative, '第 1 楼层正文。')
@@ -85,11 +86,11 @@ test('Harness Session fork restores profile and state at the selected turn bound
     assert.match(stateContext.text, /"hp": 9/)
     assert.doesNotMatch(stateContext.text, /"hp": 5/)
 
-    assert.deepEqual(profileFromEvents(parent.events), profile2)
-    assert.equal(projectState(parent.events).namespaces.story.value.hp, 5)
+    assert.deepEqual(profileFromEvents(parent.snapshotEvents()), profile2)
+    assert.equal(projectState(parent.snapshotEvents()).namespaces.story.value.hp, 5)
 
-    const secondCommit = parent.events.find(event => decodeRpCommitEvent(event)?.runId === 'run-2')
-    const secondAssistant = parent.events[secondCommit.data.meta.assistant.seq]
+    const secondCommit = parent.snapshotEvents().find(event => decodeRpCommitEvent(event)?.runId === 'run-2')
+    const secondAssistant = parent.eventAt(secondCommit.data.meta.assistant.seq)
     const target = {
       kind: 'message', role: 'assistant', messageId: secondAssistant.data.message.id,
       turn: secondAssistant.data.turn, step: secondAssistant.data.step,
@@ -108,7 +109,7 @@ test('Harness Session fork restores profile and state at the selected turn bound
       surfaceOp: { op: 'replace', start: secondAssistant.seq, end: secondCommit.seq },
       sourceEventSeqs: [secondAssistant.seq, secondCommit.seq],
     })
-    assert.equal(projectState(parent.events).namespaces.story.value.hp, 9)
+    assert.equal(projectState(parent.snapshotEvents()).namespaces.story.value.hp, 9)
   } finally {
     await ctx.fiber.dispose()
   }

@@ -29,12 +29,12 @@ export function roleplayCompactionTokenMeter(baseMeter) {
       return baseMeter.estimateMessage(message)
     },
     measure(session, requestHeader) {
-      if (!shadows.has(session) && !session.events.some(isRoleplayActionAssistant)) {
+      if (!shadows.has(session) && !session.snapshotEvents().some(isRoleplayActionAssistant)) {
         return baseMeter.measure(session, requestHeader)
       }
       const shadow = meterShadowSession(session, shadows)
       const measured = baseMeter.measure(shadow, requestHeader)
-      return Object.freeze({ ...measured, logRevision: session.events.length })
+      return Object.freeze({ ...measured, logRevision: session.seq })
     },
   })
 }
@@ -50,8 +50,11 @@ function meterShadowSession(session, shadows) {
     cached = { revision: 0, session: Session.create(session.id) }
     shadows.set(session, cached)
   }
-  while (cached.revision < session.events.length) {
-    const source = session.events[cached.revision]
+  while (cached.revision < session.seq) {
+    const source = session.eventAt(cached.revision)
+    if (source === undefined) {
+      throw new Error(`conversation summary: Session event ${cached.revision} is unavailable`)
+    }
     const event = meterShadowEvent(source)
     const appended = event.surfaceOp === undefined
       ? cached.session.append(event.type, event.data)

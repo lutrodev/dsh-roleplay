@@ -97,9 +97,10 @@ export async function dispatchMessageAction(
 
 /** Whether the latest native turn already has its durable closing boundary. */
 function hasClosedSessionTail(session) {
-  const start = session.events.findLast(event => event?.type === 'turn/start')
+  const events = session.snapshotEvents()
+  const start = events.findLast(event => event?.type === 'turn/start')
   if (start === undefined) return true
-  return session.events.some(event => event?.seq > start.seq
+  return events.some(event => event?.seq > start.seq
     && event?.type === 'turn/end'
     && event.data?.turn === start.data?.turn)
 }
@@ -221,8 +222,9 @@ function rerollMessage(agent, resolved, input, config, signal) {
 
 /** Locate one current Roleplay operation target by stable identity. */
 export function locateMessageTarget(session, target) {
+  const events = session.snapshotEvents()
   if (target.kind === 'message' && target.role === 'assistant') {
-    const opening = activeOpening(session, target.messageId)
+    const opening = activeOpening(session, target.messageId, events)
     if (opening !== undefined) {
       return {
         kind: 'opening', role: 'assistant', target,
@@ -231,24 +233,24 @@ export function locateMessageTarget(session, target) {
       }
     }
   }
-  const item = visibleRoleplayItems(session)
+  const item = visibleRoleplayItems(session, events)
     .find(candidate => rpMessageActionTargetKey(candidate.target) === rpMessageActionTargetKey(target))
   if (item === undefined) throw coded('MESSAGE_NOT_FOUND', 'The selected message no longer exists.')
   return item
 }
 
 /** Locate one completed Roleplay turn and its append-origin business evidence. */
-export function locateRoleplayTurn(session, turnNumber) {
-  const start = session.events.find(event => event?.type === 'turn/start' && event.data?.turn === turnNumber)
-  const end = session.events.find(event => event?.type === 'turn/end' && event.data?.turn === turnNumber)
+export function locateRoleplayTurn(session, turnNumber, allEvents = session.snapshotEvents()) {
+  const start = allEvents.find(event => event?.type === 'turn/start' && event.data?.turn === turnNumber)
+  const end = allEvents.find(event => event?.type === 'turn/end' && event.data?.turn === turnNumber)
   if (start === undefined || end === undefined) {
     throw coded('MESSAGE_NOT_FOUND', 'The selected Roleplay turn does not exist.')
   }
-  const events = session.events.slice(start.seq + 1, end.seq)
+  const events = allEvents.slice(start.seq + 1, end.seq)
   const users = events.filter(event => event?.type === 'user/message'
     && event.surfaceOp === 'append'
     && event.data?.source?.kind === 'user')
-  const claimedUsers = claimedUserMessages(session.events, turnNumber)
+  const claimedUsers = claimedUserMessages(allEvents, turnNumber)
   if (users.length === 0 && claimedUsers.length === 0) {
     throw coded('MESSAGE_NOT_FOUND', 'The selected turn is not a user-authored Roleplay exchange.')
   }
@@ -262,7 +264,7 @@ export function locateRoleplayTurn(session, turnNumber) {
   const commit = events.findLast(event => decodeRpCommitEvent(event) !== undefined)
   const committed = commit === undefined ? undefined : decodeRpCommitEvent(commit)
   const committedSeq = committed?.assistant?.seq
-  const committedAssistant = Number.isSafeInteger(committedSeq) ? session.events[committedSeq] : undefined
+  const committedAssistant = Number.isSafeInteger(committedSeq) ? allEvents[committedSeq] : undefined
   const finalAssistant = events.findLast(event => event?.type === 'assistant/message'
     && event.surfaceOp === 'append'
     && event.data?.message?.source?.kind === 'model')
@@ -293,7 +295,7 @@ export function recoverPendingRerolls(agent) {
   const replayIds = new Set()
   let queued = false
   for (const seq of agent.session.surface.nodes) {
-    const event = agent.session.events[seq]
+    const event = agent.session.eventAt(seq)
     const action = decodeRpMessageActionEvent(event)
     if (action?.operation !== 'reroll') continue
     for (const message of action.replay) replayIds.add(message.id)
@@ -310,8 +312,9 @@ export function recoverPendingRerolls(agent) {
 function queueRerollReplay(agent, event) {
   const action = decodeRpMessageActionEvent(event)
   if (action?.operation !== 'reroll') return false
-  const delivered = appendOriginUserMessageIds(agent.session.events)
-  const pending = pendingInboxMessageIds(agent.session.events)
+  const events = agent.session.snapshotEvents()
+  const delivered = appendOriginUserMessageIds(events)
+  const pending = pendingInboxMessageIds(events)
   const missing = action.replay.filter(message => !delivered.has(message.id) && !pending.has(message.id))
   if (missing.length === 0) return false
   for (const message of missing.slice(0, -1)) agent.inject(message)
@@ -335,12 +338,13 @@ function rearmPendingReplay(agent, replayIds) {
 }
 
 function deletionSuffix(session, resolved) {
-  const items = visibleRoleplayItems(session)
+  const events = session.snapshotEvents()
+  const items = visibleRoleplayItems(session, events)
   const selected = items.findIndex(item => rpMessageActionTargetKey(item.target) === rpMessageActionTargetKey(resolved.target))
   if (selected < 0) throw coded('MESSAGE_NOT_FOUND', 'The selected message no longer exists.')
   const targets = items.slice(selected).map(item => item.target)
   const start = resolved.kind !== 'message' || resolved.role === 'assistant'
-    ? firstTurnOutputSurfaceIndex(session, resolved.turn, items.slice(selected + 1))
+    ? firstTurnOutputSurfaceIndex(session, resolved.turn, items.slice(selected + 1), events)
     : session.surface.nodes.indexOf(resolved.current.seq)
   return {
     targets,
@@ -349,13 +353,14 @@ function deletionSuffix(session, resolved) {
 }
 
 function rerollSuffix(session, resolved) {
-  const items = visibleRoleplayItems(session)
+  const events = session.snapshotEvents()
+  const items = visibleRoleplayItems(session, events)
   const selectedTurn = resolved.turn.start.data.turn
   const first = items.findIndex(item => item.turn.start.data.turn === selectedTurn)
   if (first < 0) throw coded('MESSAGE_NOT_FOUND', 'The selected Roleplay turn no longer exists.')
   const targets = items.slice(first).map(item => item.target)
   const active = session.surface.nodes.filter(seq => surfaceDescendsFromRange(
-    session.events, seq, resolved.turn.start.seq, resolved.turn.end.seq,
+    events, seq, resolved.turn.start.seq, resolved.turn.end.seq,
   ))
   const start = active.length === 0
     ? firstLaterSurfaceIndex(session, items.slice(first + 1))
@@ -465,13 +470,13 @@ function replaceTextBlocks(blocks, content) {
   return next
 }
 
-function visibleRoleplayItems(session) {
+function visibleRoleplayItems(session, events = session.snapshotEvents()) {
   const items = []
-  const deleted = deletedRpMessageActionTargets(session.events)
-  for (const start of session.events.filter(event => event?.type === 'turn/start')) {
+  const deleted = deletedRpMessageActionTargets(events)
+  for (const start of events.filter(event => event?.type === 'turn/start')) {
     let turn
     try {
-      turn = locateRoleplayTurn(session, start.data.turn)
+      turn = locateRoleplayTurn(session, start.data.turn, events)
     } catch (error) {
       if (error?.code === 'MESSAGE_NOT_FOUND') continue
       throw error
@@ -479,7 +484,7 @@ function visibleRoleplayItems(session) {
     for (const original of turn.users) {
       const target = { kind: 'message', role: 'user', messageId: original.data.id }
       if (deleted.has(rpMessageActionTargetKey(target))) continue
-      const current = currentSurfaceDescendant(session, original.seq)
+      const current = currentSurfaceDescendant(session, original.seq, events)
       if (current?.type !== 'user/message'
         || current.data?.source?.kind !== 'user'
         || current.data.id !== original.data.id
@@ -492,7 +497,7 @@ function visibleRoleplayItems(session) {
         turn: start.data.turn, step: turn.assistant.data.step,
       }
       if (!deleted.has(rpMessageActionTargetKey(target))) {
-        const current = currentSurfaceDescendant(session, turn.assistant.seq)
+        const current = currentSurfaceDescendant(session, turn.assistant.seq, events)
         if (current?.type === 'assistant/message'
           && current.data?.message?.source?.kind === 'model'
           && current.data.message.id === turn.assistant.data.message.id
@@ -531,7 +536,8 @@ function actionSummary(session, resolved, profile) {
       deleteIncludesSharedAssetMutation: false,
     }
   }
-  const items = visibleRoleplayItems(session)
+  const events = session.snapshotEvents()
+  const items = visibleRoleplayItems(session, events)
   const last = items.at(-1)
   const previous = items.at(-2)
   const failedTailBelongsToAssistant = resolved.kind === 'message'
@@ -541,8 +547,9 @@ function actionSummary(session, resolved, profile) {
     && rpMessageActionTargetKey(previous?.target ?? {}) === rpMessageActionTargetKey(resolved.target)
   const lastActionable = failedTailBelongsToAssistant ? previous : last
   const sameTurn = lastActionable?.turn?.start?.data?.turn === resolved.turn.start.data.turn
-  const replayable = currentTurnUserMessages(session, resolved.turn).length > 0
-    && currentTurnUserMessages(session, resolved.turn).every(message => (
+  const turnUserMessages = currentTurnUserMessages(session, resolved.turn, events)
+  const replayable = turnUserMessages.length > 0
+    && turnUserMessages.every(message => (
       !unsupportedUserContent(message) && messageText(message.content).trim().length > 0
   ))
   const isLast = sameTurn
@@ -592,25 +599,26 @@ function forkEditRequired(session, resolved) {
   const turn = resolved.kind === 'opening'
     ? resolved.original.data.turn
     : resolved.turn.start.data.turn
-  const end = session.events.find(event => event?.type === 'turn/end' && event.data?.turn === turn)
+  const events = session.snapshotEvents()
+  const end = events.find(event => event?.type === 'turn/end' && event.data?.turn === turn)
   if (end === undefined) return false
   let cut = end.seq + 1
-  while (cut < session.events.length && session.events[cut]?.type !== 'turn/start') cut++
+  while (cut < events.length && events[cut]?.type !== 'turn/start') cut++
   return resolved.current.seq >= cut
 }
 
 function deletionIncludesSharedAssetMutation(session, resolved) {
-  return session.events.some(event => event.seq >= resolved.turn.start.seq
+  return session.snapshotEvents().some(event => event.seq >= resolved.turn.start.seq
     && event?.type === 'tool/result'
     && successfulToolResult(event)
     && event.data?.meta?.kind === RP_ASSET_MUTATION_META_KIND)
 }
 
-function currentTurnUserMessages(session, turn) {
+function currentTurnUserMessages(session, turn, events = session.snapshotEvents()) {
   const messages = []
   const seen = new Set()
   for (const original of turn.users) {
-    const current = currentSurfaceDescendant(session, original.seq)
+    const current = currentSurfaceDescendant(session, original.seq, events)
     if (current?.type !== 'user/message' || current.data?.source?.kind !== 'user') continue
     messages.push(current.data)
     seen.add(current.data.id)
@@ -679,12 +687,12 @@ function pendingInboxMessageIds(events) {
     .flatMap(message => typeof message?.id === 'string' ? [message.id] : []))
 }
 
-function activeOpening(session, messageId) {
+function activeOpening(session, messageId, events = session.snapshotEvents()) {
   for (let index = session.surface.nodes.length - 1; index >= 0; index -= 1) {
-    const current = session.events[session.surface.nodes[index]]
+    const current = events[session.surface.nodes[index]]
     if (!isSelectedOpeningMessage(current) || current.data.message.id !== messageId) continue
     if (assistantText(current).trim().length === 0) return undefined
-    const original = session.events.find(event => event?.surfaceOp === 'append'
+    const original = events.find(event => event?.surfaceOp === 'append'
       && isSelectedOpeningMessage(event)
       && event.data.message.id === messageId)
     if (original !== undefined) return { original, current }
@@ -692,13 +700,13 @@ function activeOpening(session, messageId) {
   return undefined
 }
 
-function firstTurnOutputSurfaceIndex(session, turn, laterItems) {
+function firstTurnOutputSurfaceIndex(session, turn, laterItems, events = session.snapshotEvents()) {
   const userSeqs = new Set(turn.users.flatMap(original => {
-    const current = currentSurfaceDescendant(session, original.seq)
+    const current = currentSurfaceDescendant(session, original.seq, events)
     return current === undefined ? [] : [current.seq]
   }))
   const own = session.surface.nodes.findIndex(seq => !userSeqs.has(seq)
-    && surfaceDescendsFromRange(session.events, seq, turn.start.seq, turn.end.seq))
+    && surfaceDescendsFromRange(events, seq, turn.start.seq, turn.end.seq))
   return own >= 0 ? own : firstLaterSurfaceIndex(session, laterItems)
 }
 
@@ -770,7 +778,7 @@ async function resolveRoleplayAgent(ctx, sessionId) {
 
 function roleplayPreset(session) {
   let selected = session.header?.agentPreset
-  for (const event of session.events ?? []) {
+  for (const event of session.snapshotEvents()) {
     if (event?.type === 'agent-preset/selected') selected = event.data?.agentPreset
   }
   return selected

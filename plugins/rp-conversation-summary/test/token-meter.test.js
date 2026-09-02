@@ -14,7 +14,7 @@ test('compatibility metering is limited to validated Roleplay message-action ass
   const native = new TokenMeter(ctx)
   const meter = roleplayCompactionTokenMeter(native)
   const session = completedAssistantSession('rp-meter-action', '原始正文')
-  const original = session.events.find(event => event.type === 'assistant/message')
+  const original = session.snapshotEvents().find(event => event.type === 'assistant/message')
   const data = structuredClone(original.data)
   data.message.content = [{ type: 'text', text: '编辑后的正文' }]
   data.message.source = {
@@ -31,7 +31,7 @@ test('compatibility metering is limited to validated Roleplay message-action ass
 
   assert.throws(() => native.measure(session), /has no matching step\/start event/u)
   const measured = meter.measure(session)
-  assert.equal(measured.logRevision, session.events.length)
+  assert.equal(measured.logRevision, session.snapshotEvents().length)
   assert.deepEqual(measured.nodes.map(node => node.seq), [replacement.seq])
   assert.equal(measured.nodes[0].tokens, native.estimateMessage(data.message))
 
@@ -48,7 +48,7 @@ test('compatibility metering is limited to validated Roleplay message-action ass
   session.append('step/end', { turn: 2, step: 1 })
   session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
   const advanced = meter.measure(session)
-  assert.equal(advanced.logRevision, session.events.length)
+  assert.equal(advanced.logRevision, session.snapshotEvents().length)
   assert.deepEqual(advanced.nodes.map(node => node.seq), [replacement.seq, later.seq])
 
   const laterData = structuredClone(later.data)
@@ -65,11 +65,11 @@ test('compatibility metering is limited to validated Roleplay message-action ass
     sourceEventSeqs: [later.seq],
   })
   const readvanced = meter.measure(session)
-  assert.equal(readvanced.logRevision, session.events.length)
+  assert.equal(readvanced.logRevision, session.snapshotEvents().length)
   assert.deepEqual(readvanced.nodes.map(node => node.seq), [replacement.seq, laterReplacement.seq])
 
   const malformed = completedAssistantSession('rp-meter-unrelated', '正常正文')
-  const unrelated = structuredClone(malformed.events.find(event => event.type === 'assistant/message').data)
+  const unrelated = structuredClone(malformed.snapshotEvents().find(event => event.type === 'assistant/message').data)
   malformed.append('assistant/message', unrelated, {
     surfaceOp: 'append', sourceEventSeqs: [],
   })

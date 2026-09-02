@@ -262,7 +262,7 @@ function latestReplyExchangeStart(session) {
   while (replyIndex > 0 && transcript[replyIndex - 1]?.role === 'user') replyIndex -= 1
   const anchorId = transcript[replyIndex]?.id
   if (typeof anchorId !== 'string' || anchorId.length === 0) return undefined
-  return session.surface.nodes.find(seq => surfaceMessage(session.events[seq])?.id === anchorId)
+  return session.surface.nodes.find(seq => surfaceMessage(session.eventAt(seq))?.id === anchorId)
 }
 
 function surfaceMessage(event) {
@@ -272,9 +272,10 @@ function surfaceMessage(event) {
 }
 
 function firstStepBoundary(session) {
-  const boundary = openTurnBoundary(session.events)
+  const events = session.snapshotEvents()
+  const boundary = openTurnBoundary(events)
   return boundary !== undefined
-    && !session.events.some(event => event?.type === 'step/start' && event.data?.turn === boundary.turn)
+    && !events.some(event => event?.type === 'step/start' && event.data?.turn === boundary.turn)
     ? boundary
     : undefined
 }

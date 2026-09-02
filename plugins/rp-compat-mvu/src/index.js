@@ -39,7 +39,7 @@ export function apply(ctx) {
       id: 'compat.mvu',
       async prepare({ agent, profile }) {
         const previousProfile = sessionCtx.rpSessions.get(agent)
-        const blank = !agent.session.events.some(event => event?.type === 'user/message')
+        const blank = !agent.session.snapshotEvents().some(event => event?.type === 'user/message')
         if (!blank) return undefined
         const characterId = profile.resources.card?.id
         const cards = sessionCtx.get('rpCharacterCards')

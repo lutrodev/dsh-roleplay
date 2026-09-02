@@ -1313,6 +1313,13 @@ describe('Roleplay message action presentation', () => {
     expect(state).toMatchObject({
       endReasonKind: 'aborted', endCancelKind: 'user', finalAssistantInterrupted: true,
     })
+    const locationData = failedAssistantNodeDefinition.buildLocationData({ state }, 'turn')
+    expect(locationData).toMatchObject({
+      kind: 'turn', turn: 4, key: 'rp-floor-failed-assistant', value: state,
+    })
+    expect(failedAssistantNodeDefinition.buildLocationData({ state }, 'turn', locationData)).toBe(locationData)
+    expect(failedAssistantNodeDefinition.buildLocationData({ state: { ...state } }, 'turn', locationData)).not.toBe(locationData)
+    expect(failedAssistantNodeDefinition.buildLocationData({ state }, 'chat', locationData)).toBeNull()
     expect(selectFailedTurnRecovery({ turn })).toBeNull()
     expect(failedAssistantNodeDefinition.buildViewNode({
       key: 'rp-floor-failed-assistant:4', id: '4', state,

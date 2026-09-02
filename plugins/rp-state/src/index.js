@@ -135,7 +135,7 @@ export class RpState extends Service {
   /** Return the current detached State projection for one Agent Session. */
   get(agent) {
     const projection = this.ctx.get('sessionProjections')?.stateOf(agent.session, 'rp/state')
-    return cloneJson(projection === undefined ? this.rebuild(agent.session.events) : projection.value)
+    return cloneJson(projection === undefined ? this.rebuild(agent.session.snapshotEvents()) : projection.value)
   }
 
   /** Rebuild the complete State projection from an explicit event sequence. */
@@ -515,7 +515,7 @@ function stateToolOutput() {
 }
 
 function stateToolOwner(agent, callId) {
-  const resolved = resolveRpToolCallAssistant(agent.session?.events, callId, RP_STATE_TOOL)
+  const resolved = resolveRpToolCallAssistant(agent.session.snapshotEvents(), callId, RP_STATE_TOOL)
   if (resolved === undefined) {
     throw new RpStateError('RP_STATE_OWNER_MISSING', 'rp_state requires one durable model assistant tool call in the current turn and step.')
   }

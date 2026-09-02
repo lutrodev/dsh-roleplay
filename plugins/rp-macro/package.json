@@ -1,6 +1,6 @@
 {
   "name": "dsh-roleplay-rp-macro",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Session-scoped character and user identity macros for Roleplay",
   "license": "MIT",
   "private": true,

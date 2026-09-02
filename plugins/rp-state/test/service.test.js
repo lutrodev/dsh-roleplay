@@ -167,11 +167,11 @@ test('create, update, reset, and delete are durable configuration commands with 
       required: ['hp', 'mood'], additionalProperties: false,
     },
   }
-  const commandsBeforeFailure = agent.session.events.filter(event => event.type === 'command/run').length
+  const commandsBeforeFailure = agent.session.snapshotEvents().filter(event => event.type === 'command/run').length
   await assert.rejects(configureState(state, agent, 'invalid-update', {
     action: 'update', namespace: 'story', expectedRevision: 1, definition: expandedDefinition,
   }), /missing required property "mood"/)
-  assert.equal(agent.session.events.filter(event => event.type === 'command/run').length, commandsBeforeFailure)
+  assert.equal(agent.session.snapshotEvents().filter(event => event.type === 'command/run').length, commandsBeforeFailure)
   await configureState(state, agent, 'update', {
     action: 'update', namespace: 'story', expectedRevision: 1, definition: expandedDefinition,
     initialValue: { hp: 10, mood: 'calm' }, value: { hp: 8, mood: 'hurt' },
@@ -184,7 +184,7 @@ test('create, update, reset, and delete are durable configuration commands with 
   assert.deepEqual(state.get(agent).namespaces.story.value, { hp: 10, mood: 'calm' })
   await configureState(state, agent, 'delete', { action: 'delete', namespace: 'story', expectedRevision: 3 })
   assert.deepEqual(state.get(agent).namespaces, {})
-  assert.equal(agent.session.events.filter(event => event.type === 'command/run').length, 4)
+  assert.equal(agent.session.snapshotEvents().filter(event => event.type === 'command/run').length, 4)
   await assert.rejects(state.configure(agent, {
     action: 'create', namespace: 'other', expectedRevision: 0,
     definition: baseDefinition, initialValue: { hp: 1 },
@@ -306,7 +306,9 @@ function emptyAgent() {
 function agentWithEvents(events) {
   return {
     session: {
-      events,
+      get seq() { return events.length },
+      snapshotEvents(from = 0, to = events.length) { return events.slice(from, to) },
+      eventAt(seq) { return events[seq] },
       append(type, data, options = {}) {
         const event = { seq: events.length, type, data, ...options }
         events.push(event)

@@ -84,7 +84,7 @@ export function deletedRpMessageActionTargets(events) {
  */
 export function roleplayTranscriptMessages(session) {
   const nodes = Array.isArray(session?.surface?.nodes) ? session.surface.nodes : []
-  const events = Array.isArray(session?.events) ? session.events : []
+  const events = session.snapshotEvents()
   const active = nodes.map(seq => events[seq]).filter(Boolean)
   const endedTurns = new Map()
   const userTurns = new Map()
@@ -152,7 +152,7 @@ export function roleplayAssistantReplyKind(session, message) {
     || typeof message.id !== 'string'
     || message.id.length === 0) return undefined
   if (isSelectedOpeningMessage(message)) return 'writing'
-  const events = Array.isArray(session?.events) ? session.events : []
+  const events = session.snapshotEvents()
   for (const event of events) {
     const commit = decodeRpCommitEvent(event)
     if (commit?.assistant?.messageId !== message.id) continue
@@ -162,11 +162,11 @@ export function roleplayAssistantReplyKind(session, message) {
 }
 
 /** Return the active surface event descending from one append-origin event. */
-export function currentSurfaceDescendant(session, originalSeq) {
+export function currentSurfaceDescendant(session, originalSeq, events = session.snapshotEvents()) {
   const seq = session?.surface?.nodes?.findLast(candidate => surfaceDescendsFrom(
-    session.events, candidate, originalSeq,
+    events, candidate, originalSeq,
   ))
-  return seq === undefined ? undefined : session.events[seq]
+  return seq === undefined ? undefined : events[seq]
 }
 
 /** Whether one current surface node descends from an original event. */

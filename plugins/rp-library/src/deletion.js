@@ -80,7 +80,7 @@ async function sessionsReferencingCard(ctx, cardId, signal) {
   const matches = []
   for (const session of sessions.values()) {
     signal?.throwIfAborted()
-    if (profileCardId(session.events) !== cardId) continue
+    if (profileCardId(session.snapshotEvents()) !== cardId) continue
     matches.push(sessionReference(ctx, session.id, true))
   }
   for (const header of persisted) {

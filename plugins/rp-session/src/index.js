@@ -154,7 +154,7 @@ export class RpSessions extends Service {
       this.ctx.rpRuntime.syncExecutionMode(agent)
       const currentOpening = current.scene.openingText
       const nextOpening = profile.scene.openingText
-      const setupExpansionChanged = !hasUserMessage(agent.session.events)
+      const setupExpansionChanged = !hasUserMessage(agent.session.snapshotEvents())
         && openingMessageText(activeOpening?.message) !== expandedOpening
       if (currentOpening !== nextOpening || activeOpening === undefined || setupExpansionChanged) {
         synchronizeOpeningMessage(agent.session, expandedOpening, profile)
@@ -225,7 +225,7 @@ export class RpSessions extends Service {
     if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== current.revision) {
       throw new RpSessionError('REVISION_CONFLICT', `Roleplay session revision conflict: expected ${String(expectedRevision)}, current ${current.revision}.`)
     }
-    const storyStarted = hasUserMessage(agent.session.events)
+    const storyStarted = hasUserMessage(agent.session.snapshotEvents())
     const resolved = await resolveAssetChanges(this.ctx, current, request.changes, request.openingIndex, has(request, 'openingText'))
     if (has(request, 'openingText')) resolved.openingText = request.openingText
     else if (storyStarted) {
@@ -263,7 +263,7 @@ export class RpSessions extends Service {
       : openingRequested
         ? requestedOpening === undefined ? 'skip' : 'custom'
         : current.scene.openingSource
-    const storyStarted = hasUserMessage(agent.session.events)
+    const storyStarted = hasUserMessage(agent.session.snapshotEvents())
     const openingChanged = (!storyStarted && !sameBinding(current.resources.card, nextResources.card))
       || nextOpeningIndex !== (current.scene.openingIndex ?? 0)
       || requestedOpeningSource !== current.scene.openingSource
@@ -419,7 +419,7 @@ export class RpSessions extends Service {
   /** @param {object} agent @returns {Record<string, unknown>} */
   get(agent) {
     const projection = this.ctx.get('sessionProjections')?.stateOf(agent.session, 'rp/session')
-    const profile = projection === undefined ? profileFromEvents(agent.session.events) : projection.profile
+    const profile = projection === undefined ? profileFromEvents(agent.session.snapshotEvents()) : projection.profile
     return profile ?? defaultProfile(this.defaultMode, this.defaultExecutionMode)
   }
 
@@ -558,11 +558,12 @@ function findOpeningMessage(events) {
 }
 
 function findActiveOpeningMessage(session) {
+  const events = session.snapshotEvents()
   for (let index = session.surface.nodes.length - 1; index >= 0; index -= 1) {
-    const event = session.events[session.surface.nodes[index]]
+    const event = events[session.surface.nodes[index]]
     const message = eventMessage(event)
     if (message?.source?.provider !== OPENING_MESSAGE_PROVIDER || message.source.model !== OPENING_MESSAGE_MODEL) continue
-    const original = session.events.find(candidate => isSelectedOpeningMessage(candidate)
+    const original = events.find(candidate => isSelectedOpeningMessage(candidate)
       && candidate.data.message.id === message.id)
     if (original !== undefined) return { event, message, original }
   }

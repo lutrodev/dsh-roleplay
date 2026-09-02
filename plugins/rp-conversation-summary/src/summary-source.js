@@ -9,7 +9,7 @@ export const CONVERSATION_SUMMARY_SLOT_ID = 'conversation-summary'
  * current surface. A newer but inactive summary event is deliberately ignored.
  */
 export function activeConversationSummaries(session) {
-  const events = Array.isArray(session?.events) ? session.events : []
+  const events = session.snapshotEvents()
   const nodes = Array.isArray(session?.surface?.nodes) ? session.surface.nodes : []
   const summaries = new Map()
   for (const event of events) {

@@ -31,7 +31,7 @@ test('pressure input snapshots only completed logical RP dialogue', () => {
     { seq: 5, type: 'step/end', data: { turn: 1, step: 1 } },
     { seq: 6, type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
   ]
-  const input = pressureSummaryInput({ events, surface: { nodes: [1, 3, 4] } })
+  const input = pressureSummaryInput(sessionFixture(events, [1, 3, 4]))
   assert.equal(input.newMessageCount, 2)
   assert.deepEqual(input.messages.map(message => [message.role, message.content[0].text]), [
     ['user', '打开潮门。'],
@@ -65,7 +65,7 @@ test('later pressure input merges the active checkpoint summary with only newer 
     { seq: 7, type: 'step/end', data: { turn: 2, step: 1 } },
     { seq: 8, type: 'turn/end', data: { turn: 2, reason: { kind: 'completed' } } },
   ]
-  const input = pressureSummaryInput({ events, surface: { nodes: [1, 3, 5, 6] } })
+  const input = pressureSummaryInput(sessionFixture(events, [1, 3, 5, 6]))
   assert.equal(input.newMessageCount, 2)
   assert.deepEqual(input.messages.map(message => [message.role, message.content[0].text]), [
     ['user', '<已有会话总结>\n旧总结仍有效。\n</已有会话总结>'],
@@ -80,7 +80,7 @@ test('manual input labels an ordinary assistant response as non-writing', () => 
     role: 'assistant', id: 'assistant-discussion', source: { kind: 'model', provider: 'mock', model: 'mock' },
     content: [{ type: 'text', text: '可以先讨论反派的动机。' }],
   }
-  const messages = nativeSummaryInput({ messages: [assistant] }, { events: [], surface: { nodes: [] } })
+  const messages = nativeSummaryInput({ messages: [assistant] }, sessionFixture())
   assert.equal(messages[0].content[0].text, '非写作回复：可以先讨论反派的动机。')
 })
 
@@ -91,15 +91,12 @@ test('manual and overflow input merges only checkpoints inside the selected nati
     content: [{ type: 'text', text: '只和第一份总结一起压缩。' }],
     source: { kind: 'user' },
   })
-  const session = {
-    events: [
+  const session = sessionFixture([
       { seq: 0, type: 'compaction/summary', data: { compactionId: 'first', summary: [{ type: 'text', text: '第一份总结。' }] } },
       { seq: 1, type: 'user/message', data: firstCheckpoint },
       { seq: 2, type: 'compaction/summary', data: { compactionId: 'retained', summary: [{ type: 'text', text: '范围外总结。' }] } },
       { seq: 3, type: 'user/message', data: retainedCheckpoint },
-    ],
-    surface: { nodes: [1, 3] },
-  }
+    ], [1, 3])
 
   const messages = nativeSummaryInput({ messages: [firstCheckpoint, recent] }, session)
   assert.deepEqual(messages.map(message => message.content[0].text), [
@@ -167,6 +164,15 @@ function checkpointMessage(compactionId) {
     content: [{ type: 'text', text: `checkpoint:${compactionId}` }],
     source: { kind: 'plugin', plugin: 'compact', compactionId },
   })
+}
+
+function sessionFixture(events = [], nodes = []) {
+  return {
+    surface: { nodes },
+    get seq() { return events.length },
+    snapshotEvents() { return events },
+    eventAt(seq) { return events[seq] },
+  }
 }
 
 function commitMeta(runId, turn, seq, messageId) {

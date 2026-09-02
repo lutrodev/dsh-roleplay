@@ -41,7 +41,7 @@ test('pressure below 80% is a strict no-op', async (t) => {
   ), null)
   assert.equal(adapter.requests.length, 0)
   assert.deepEqual(session.surface.nodes, before)
-  assert.equal(session.events.some(event => event.type.startsWith('compaction/')), false)
+  assert.equal(session.snapshotEvents().some(event => event.type.startsWith('compaction/')), false)
   assert.equal(conversationSummaryContext(session), undefined)
 })
 
@@ -62,7 +62,7 @@ test('pressure summary overlaps turn N and lands one native checkpoint before tu
   await started.promise
   assert.equal(adapter.requests.length, 1)
   assert.deepEqual(session.surface.nodes, frozenPrefix)
-  assert.equal(session.events.some(event => event.type.startsWith('compaction/')), false)
+  assert.equal(session.snapshotEvents().some(event => event.type.startsWith('compaction/')), false)
 
   appendTurnBody(session, 2, '第二轮近期原文')
   session.append('turn/start', { turn: 3 })
@@ -71,7 +71,7 @@ test('pressure summary overlaps turn N and lands one native checkpoint before tu
     .then(result => { settled = true; return result })
   await Promise.resolve()
   assert.equal(settled, false)
-  assert.equal(session.events.some(event => event.type.startsWith('compaction/')), false)
+  assert.equal(session.snapshotEvents().some(event => event.type.startsWith('compaction/')), false)
 
   gate.resolve()
   const result = await landing
@@ -79,10 +79,10 @@ test('pressure summary overlaps turn N and lands one native checkpoint before tu
   assert.deepEqual(result.shadowedSeqs, frozenPrefix)
   assert.equal(adapter.requests.length, 1, 'landing must reuse the deferred result')
 
-  const summaryEvent = session.events.findLast(event => event.type === 'compaction/summary')
+  const summaryEvent = session.snapshotEvents().findLast(event => event.type === 'compaction/summary')
   assert.ok(summaryEvent)
   assert.equal(Object.hasOwn(summaryEvent.data, 'llmStreamCall'), false)
-  const active = session.surface.nodes.map(seq => session.events[seq])
+  const active = session.surface.nodes.map(seq => session.snapshotEvents()[seq])
   assert.equal(active.length, 3)
   assert.equal(active[0].type, 'user/message')
   assert.equal(isCompactCheckpointSource(active[0].data.source), true)
@@ -119,7 +119,7 @@ test('a failed deferred summary preserves the surface and never opens a compacti
   assert.equal(await ctx.compaction.compactIfNeeded(agent, 'pressure', signal), null)
 
   assert.deepEqual(session.surface.nodes.slice(0, originalSurface.length), originalSurface)
-  assert.equal(session.events.some(event => event.type.startsWith('compaction/')), false)
+  assert.equal(session.snapshotEvents().some(event => event.type.startsWith('compaction/')), false)
   assert.equal(conversationSummaryContext(session), undefined)
 })
 
@@ -136,7 +136,7 @@ test('a completed candidate is discarded when its frozen surface prefix has chan
   assert.equal(await ctx.compaction.compactIfNeeded(agent, 'pressure', signal), null)
   appendTurnBody(session, 2, '第二轮原文')
   const head = session.surface.nodes[0]
-  const original = session.events[head].data
+  const original = session.snapshotEvents()[head].data
   const replacement = session.append('user/message', {
     ...original,
     content: [{ type: 'text', text: '历史已由另一项操作改写' }],
@@ -149,7 +149,7 @@ test('a completed candidate is discarded when its frozen surface prefix has chan
   assert.equal(await ctx.compaction.compactIfNeeded(agent, 'pressure', signal), null)
   assert.equal(session.surface.nodes.includes(replacement.seq), true)
   assert.equal(session.surface.nodes.includes(head), false)
-  assert.equal(session.events.some(event => event.type.startsWith('compaction/')), false)
+  assert.equal(session.snapshotEvents().some(event => event.type.startsWith('compaction/')), false)
   assert.equal(conversationSummaryContext(session), undefined)
 })
 
@@ -177,7 +177,7 @@ test('disposing the plugin aborts a deferred candidate and removes its automatic
   assert.equal(ctx.get('compaction'), undefined)
   gate.resolve()
   await Promise.resolve()
-  assert.equal(session.events.some(event => event.type.startsWith('compaction/')), false)
+  assert.equal(session.snapshotEvents().some(event => event.type.startsWith('compaction/')), false)
 })
 
 test('overflow recovery and manual compact stay synchronous native Roleplay transactions', async (t) => {
@@ -197,7 +197,7 @@ test('overflow recovery and manual compact stay synchronous native Roleplay tran
   assert.ok(overflow)
   assert.equal(conversationSummaryContext(overflowSession).text, VALID_SUMMARY)
   assert.equal(
-    overflowSession.events.findLast(event => event.type === 'compaction/summary').data.llmStreamCall,
+    overflowSession.snapshotEvents().findLast(event => event.type === 'compaction/summary').data.llmStreamCall,
     true,
   )
 
@@ -212,7 +212,7 @@ test('overflow recovery and manual compact stay synchronous native Roleplay tran
   assert.ok(manual)
   assert.equal(conversationSummaryContext(manualSession).text, VALID_SUMMARY)
   assert.equal(
-    manualSession.events.findLast(event => event.type === 'compaction/summary').data.llmStreamCall,
+    manualSession.snapshotEvents().findLast(event => event.type === 'compaction/summary').data.llmStreamCall,
     true,
   )
   assert.equal(adapter.requests.length, 2)
@@ -228,7 +228,7 @@ test('overflow recovery keeps the latest completed Roleplay exchange verbatim', 
   const latestExchangeStart = session.surface.nodes.length
   appendCompletedTurn(session, 2, '必须保留的近期原文')
   const latestExchange = session.surface.nodes.slice(latestExchangeStart)
-  const latestAssistant = latestExchange.findLast(seq => session.events[seq]?.type === 'assistant/message')
+  const latestAssistant = latestExchange.findLast(seq => session.snapshotEvents()[seq]?.type === 'assistant/message')
   session.append('turn/start', { turn: 3 })
   session.append('step/start', { turn: 3, step: 1 })
   const currentInput = session.append('user/message', createUserMessage({
@@ -274,7 +274,7 @@ test('overflow recovery does not consume the only completed model reply', async 
 
   assert.equal(result, null)
   assert.deepEqual(session.surface.nodes, before)
-  assert.equal(session.events.some(event => event.type === 'compaction/start'), false)
+  assert.equal(session.snapshotEvents().some(event => event.type === 'compaction/start'), false)
   assert.equal(adapter.requests.length, 0)
 })
 
@@ -288,8 +288,8 @@ test('manual compact meters an existing idle reroll carrier without changing the
   const secondStart = session.surface.nodes.length
   appendCompletedTurn(session, 2, '被重新生成的第二轮')
   const shadowed = session.surface.nodes.slice(secondStart)
-  const assistant = session.events[shadowed.findLast(seq => (
-    session.events[seq]?.type === 'assistant/message'
+  const assistant = session.snapshotEvents()[shadowed.findLast(seq => (
+    session.snapshotEvents()[seq]?.type === 'assistant/message'
   ))]
   const replay = createUserMessage({
     content: [{ type: 'text', text: '重新生成第二轮' }],
@@ -316,7 +316,7 @@ test('manual compact meters an existing idle reroll carrier without changing the
     new RegExp(`assistant/message at seq ${carrier.seq} has no matching step/start event`, 'u'),
   )
 
-  const eventCount = session.events.length
+  const eventCount = session.snapshotEvents().length
   const result = await ctx.compaction.compactNow({
     session,
     options: { provider: 'mock', model: 'mock' },
@@ -325,7 +325,7 @@ test('manual compact meters an existing idle reroll carrier without changing the
 
   assert.ok(result)
   assert.equal(result.shadowedSeqs.includes(carrier.seq), false)
-  assert.equal(session.events[eventCount].type, 'compaction/start', 'compatibility metering must not append repair events')
+  assert.equal(session.snapshotEvents()[eventCount].type, 'compaction/start', 'compatibility metering must not append repair events')
   assert.equal(session.surface.nodes.includes(carrier.seq), true)
   assert.equal(conversationSummaryContext(session).text, VALID_SUMMARY)
   assert.equal(adapter.requests.length, 1)
@@ -338,12 +338,12 @@ test('overflow recovery uses the same scoped meter for an existing reroll carrie
   const session = ctx.sessions.create(SessionId('rp-overflow-summary-after-reroll'))
   appendCompletedTurn(session, 1, '溢出前应总结的第一轮', true)
   appendCompletedTurn(session, 2, '溢出前保留的第二轮')
-  const retainedAssistant = session.surface.nodes.findLast(seq => session.events[seq]?.type === 'assistant/message')
+  const retainedAssistant = session.surface.nodes.findLast(seq => session.snapshotEvents()[seq]?.type === 'assistant/message')
   const rerollStart = session.surface.nodes.length
   appendCompletedTurn(session, 3, '溢出前重新生成的第三轮')
   const shadowed = session.surface.nodes.slice(rerollStart)
-  const assistant = session.events[shadowed.findLast(seq => (
-    session.events[seq]?.type === 'assistant/message'
+  const assistant = session.snapshotEvents()[shadowed.findLast(seq => (
+    session.snapshotEvents()[seq]?.type === 'assistant/message'
   ))]
   const data = structuredClone(assistant.data)
   data.message.content = []

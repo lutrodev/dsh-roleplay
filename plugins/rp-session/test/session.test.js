@@ -138,7 +138,7 @@ test('publishes the session view and host state through the current Harness proj
     { seq: 0, type: 'command/run', data: { commandId: 'projection', name: RP_SESSION_APPLY_COMMAND, args: encodeSessionCommand(0, profile) } },
     { seq: 1, type: 'command/done', data: { commandId: 'projection', kind: 'success' } },
   ]
-  const session = { events, seq: events.length }
+  const session = fakeSession(events)
 
   assert.deepEqual(ctx.sessionProjections.snapshot(session), { asOfSeq: 1, values: { 'rp/session': profile } })
   assert.deepEqual(ctx.sessionProjections.stateOf(session, 'rp/session'), { profile, pending: [] })
@@ -580,7 +580,7 @@ test('opening edits replay as native assistant replacements on the Session surfa
   const configured = await sessions.bindResources(agent, {
     expectedRevision: 0, card: { id: 'card-a' }, lorebooks: [], openingText: '原生开场。',
   })
-  const opening = session.events.find(event => event.type === 'assistant/message')
+  const opening = session.snapshotEvents().find(event => event.type === 'assistant/message')
   session.append('user/message', {
     role: 'user',
     id: 'before-opening-edit',
@@ -591,7 +591,7 @@ test('opening edits replay as native assistant replacements on the Session surfa
     expectedRevision: configured.revision,
     openingText: '修改后的原生开场。',
   })
-  const replacement = session.events.findLast(event => decodeRpMessageActionEvent(event)?.operation === 'edit')
+  const replacement = session.snapshotEvents().findLast(event => decodeRpMessageActionEvent(event)?.operation === 'edit')
 
   assert.equal(sessions.get(agent).revision, updated.revision)
   assert.equal(sessions.get(agent).scene.openingText, '修改后的原生开场。')
@@ -612,7 +612,7 @@ test('opening edits replay as native assistant replacements on the Session surfa
     '已经开始的对话。',
     '从这里开始。',
   ])
-  const replay = Session.create(SessionId('native-opening-revision-replay'), structuredClone(session.events))
+  const replay = Session.create(SessionId('native-opening-revision-replay'), structuredClone(session.snapshotEvents()))
   assert.deepEqual(replay.deriveMessages(), session.deriveMessages())
   assert.deepEqual(sessions.get({ session: replay }), updated)
   await ctx.fiber.dispose()
@@ -775,8 +775,12 @@ function createSessionHarness(maxProfileCommandBytes, resolveContextBuild = valu
 function fakeSession(events = []) {
   const surface = { nodes: [] }
   return {
-    events,
+    header: { isSeeded: false },
+    inheritedEventCount: 0,
     surface,
+    get seq() { return events.length },
+    snapshotEvents(from = 0, to = events.length) { return events.slice(from, to) },
+    eventAt(seq) { return events[seq] },
     append(type, data, options = {}) {
       const event = { type, seq: events.length, data, ...options }
       events.push(event)
