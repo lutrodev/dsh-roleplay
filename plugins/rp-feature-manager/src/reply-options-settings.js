@@ -137,7 +137,7 @@ export function ReplyOptionsSettingsDialog({
           }),
           h('span', { 'aria-hidden': true }, '字')))),
     h('p', { id: basicsHelpId, className: css.replyOptionsSettingsHint },
-      `回复条数可填写 1–5；每条长度指导可填写 1–${REPLY_OPTION_MAX_CHARACTERS}，默认目标为 ${DEFAULT_REPLY_OPTION_MAX_CHARACTERS} 字以内。生成结果不会按该值硬性拒绝。`)),
+      `回复条数可填写 1–5；每条长度指导可填写 1–${REPLY_OPTION_MAX_CHARACTERS}，默认目标为 ${DEFAULT_REPLY_OPTION_MAX_CHARACTERS} 字以内。`)),
   h('section', { className: css.replyOptionsKeywordSection, 'aria-labelledby': 'rp-reply-options-keywords-title' },
     h('header', { className: css.replyOptionsKeywordHeader },
       h('div', null,

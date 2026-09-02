@@ -80,6 +80,12 @@ const PREVIOUS_LENGTH_BALANCE_TURN_SCOPE = '一个场景可以跨越多轮。本
 const PREVIOUS_LENGTH_BALANCE_CLOSING = '当本轮核心内容及其直接影响已经形成完整可读的进展时选择落点。可以完成当前动作或小目标，也可以停在态势明确、能够自然接续的过程节点，或落在决定、关系变化、后果、余波、暂时平静及已有问题的自然延伸处。让结尾承接本轮已经形成的内容，并为下一轮保留自然空间。'
 const PREVIOUS_LENGTH_BALANCE_CALIBRATION = '写作前确认用户的参与方式与明确意图、当前视角与连续性、角色动机与用户控制边界，以及当前场景正在发展的内容和此刻能够承载的信息。明确后立即写作，让结构与落点在因果推进中形成；不在正文中展示规划、分析或创作说明。'
 const PREVIOUS_LENGTH_BALANCE_FORMAT = '只输出故事正文，并使用用户最新输入的主要语言，除非用户另有指定。除非用户明确指定其他篇幅，默认采用中等偏长的篇幅。不设固定字数、段数或对白比例；重要交流、关键动作、发现和转折按其分量展开，常规过渡、重复动作和已知信息简洁处理。不要输出状态、规划、分析或创作说明。'
+const PREVIOUS_NATURAL_CLOSING = '让结尾承接本轮已经形成的内容，并为下一轮保留自然空间；到达自然落点后，不因仍有可写内容而继续启动下一段主要情节。'
+const PREVIOUS_NATURAL_CLOSING_FORMAT = '只输出故事正文，并使用用户最新输入的主要语言，除非用户另有指定。除非用户明确指定其他篇幅，默认采用与当前内容相称的中等篇幅。不设固定字数、段数或对白比例；重要交流、关键动作、发现和转折按其分量展开，常规过渡、重复动作和已知信息简洁处理。到达本轮自然落点后收束，不继续启动下一段主要情节。不要输出状态、规划、分析或创作说明。'
+const PREVIOUS_SINGLE_BEAT_TURN_SCOPE = '一个场景可以跨越多轮。本轮聚焦当前最有分量的矛盾、互动、行动或发现，使人物回应、彼此作用与必要的直接后果自然展开，并在信息、关系或局势上形成清楚、可继续的进展；不为追求单轮完整而继续展开已经属于后续的内容。各要素随场景交织，详略由其因果分量决定。'
+const PREVIOUS_SINGLE_BEAT_CLOSING = '当本轮核心内容及其必要的直接影响已经形成清楚、可继续的进展时选择落点。可以完成当前动作或小目标，也可以停在态势明确、能够自然接续的过程节点，或落在决定、关系变化、后果、余波、暂时平静及已有问题的自然延伸处。结尾从当前行动及其影响中自然形成，避免在收束时再扩大叙事范围。'
+const PREVIOUS_SINGLE_BEAT_CALIBRATION = '写作前确认用户的参与方式与明确意图、当前视角与连续性、角色动机与用户控制边界，以及当前场景正在发展的内容、此刻能够承载的信息和自然落点。明确后立即写作，让结构与落点在因果推进中形成；不在正文中展示规划、分析或创作说明。'
+const PREVIOUS_SINGLE_BEAT_FORMAT = '只输出故事正文，并使用用户最新输入的主要语言，除非用户另有指定。除非用户明确指定其他篇幅，默认采用与当前内容相称的中等篇幅。不设固定字数、段数或对白比例；重要交流、关键动作、发现和转折按其分量展开，常规过渡、重复动作和已知信息简洁处理。不要输出状态、规划、分析或创作说明。'
 const PREVIOUS_HARM_DECLARATION = '这是虚构文学创作。危险、悲伤、冲突、道德困境和非露骨的亲密关系，在符合故事时可以产生真实的叙事影响；不要仅因内容令人不适就淡化或回避它们。'
 const TARGET_HARM_DECLARATION = '这是虚构文学创作。当人物选择与故事因果导向危险、冲突、暴力、伤亡、血腥场面、悲伤、道德困境或非露骨的亲密关系时，让它们真实发生，并按题材、视角和场景所需具体呈现。不要为了保护角色或使故事舒适而回避、淡化、改成虚惊、及时阻止或迅速复原；也不要为追求刺激无端加重。'
 const PREVIOUS_PROMPT_AUDIT_HARM = '如实呈现恶意与伤害。不要因为一个角色富有魅力、地位强大、与主角关系亲密或拥有可以理解的动机，就把冷漠、控制、欺骗、胁迫、伤害或逃避美化成深情、保护或不得已。动机可以复杂，但不能抹掉行为的性质、受害者的体验和已经造成的后果；也不必安排恶人立刻受罚，只需让人物与世界依照事实作出可信反应。对手和反派可以按照自己的逻辑主动行动、造成损害，并达成阶段性目标。'
@@ -144,7 +150,7 @@ function previousHarmExecutionPreset() {
 }
 
 function previousLengthBalancePreset() {
-  const preset = structuredClone(DEFAULT_PRESET)
+  const preset = previousNaturalClosingPreset()
   const writingGuidance = preset.fields.find(field => field.name === '写作指导')
   const replacements = [
     ['一个场景可以跨越多轮。本轮聚焦当前最有分量的矛盾、互动、行动或发现，使人物回应、彼此作用与必要的直接后果自然展开，并在信息、关系或局势上形成清楚、可继续的进展；不为追求单轮完整而继续展开已经属于后续的内容。各要素随场景交织，详略由其因果分量决定。', PREVIOUS_LENGTH_BALANCE_TURN_SCOPE],
@@ -157,6 +163,33 @@ function previousLengthBalancePreset() {
   }
   preset.fields.find(field => field.name === '写前校准').content = PREVIOUS_LENGTH_BALANCE_CALIBRATION
   preset.fields.find(field => field.name === '格式要求').content = PREVIOUS_LENGTH_BALANCE_FORMAT
+  return preset
+}
+
+function previousNaturalClosingPreset() {
+  const preset = previousSingleBeatScopePreset()
+  const writingGuidance = preset.fields.find(field => field.name === '写作指导')
+  const content = writingGuidance.content.replace('结尾从当前行动及其影响中自然形成，避免在收束时再扩大叙事范围。', PREVIOUS_NATURAL_CLOSING)
+  assert.notEqual(content, writingGuidance.content)
+  writingGuidance.content = content
+  preset.fields.find(field => field.name === '格式要求').content = PREVIOUS_NATURAL_CLOSING_FORMAT
+  return preset
+}
+
+function previousSingleBeatScopePreset() {
+  const preset = structuredClone(DEFAULT_PRESET)
+  const writingGuidance = preset.fields.find(field => field.name === '写作指导')
+  const replacements = [
+    ['一个场景可以跨越多轮。每轮围绕一个主要推进点展开，使人物、关系或局势产生清楚的阶段性变化，并呈现与之直接相关的反应和影响。新的事件或转折应服务于这一推进，避免在同一轮连续跨越多个叙事阶段。各要素随场景交织，详略由其因果分量决定。', PREVIOUS_SINGLE_BEAT_TURN_SCOPE],
+    ['让结尾落在当前推进所形成的变化或影响上。', PREVIOUS_SINGLE_BEAT_CLOSING],
+  ]
+  for (const [current, previous] of replacements) {
+    const content = writingGuidance.content.replace(current, previous)
+    assert.notEqual(content, writingGuidance.content)
+    writingGuidance.content = content
+  }
+  preset.fields.find(field => field.name === '写前校准').content = PREVIOUS_SINGLE_BEAT_CALIBRATION
+  preset.fields.find(field => field.name === '格式要求').content = PREVIOUS_SINGLE_BEAT_FORMAT
   return preset
 }
 
@@ -503,10 +536,11 @@ test('creates a blank preset or the managed example preset', async () => {
     assert.match(writingGuidance, /## 长程推进/)
     assert.doesNotMatch(writingGuidance, /## 长程推进与篇幅/)
     assert.match(writingGuidance, /一个场景可以跨越多轮/)
-    assert.match(writingGuidance, /聚焦当前最有分量的矛盾、互动、行动或发现/)
-    assert.match(writingGuidance, /人物回应、彼此作用与必要的直接后果自然展开/)
-    assert.match(writingGuidance, /在信息、关系或局势上形成清楚、可继续的进展/)
-    assert.match(writingGuidance, /不为追求单轮完整而继续展开已经属于后续的内容/)
+    assert.match(writingGuidance, /每轮围绕一个主要推进点展开/)
+    assert.match(writingGuidance, /使人物、关系或局势产生清楚的阶段性变化/)
+    assert.match(writingGuidance, /呈现与之直接相关的反应和影响/)
+    assert.match(writingGuidance, /新的事件或转折应服务于这一推进/)
+    assert.match(writingGuidance, /避免在同一轮连续跨越多个叙事阶段/)
     assert.match(writingGuidance, /各要素随场景交织，详略由其因果分量决定/)
     assert.match(writingGuidance, /信息随人物接触和因果需要进入正文/)
     assert.match(writingGuidance, /融入观察、对白、冲突或结果/)
@@ -514,11 +548,8 @@ test('creates a blank preset or the managed example preset', async () => {
     assert.match(writingGuidance, /让进展沿已有矛盾和互动纵向生长/)
     assert.match(writingGuidance, /回报可以逐步形成，并在条件成熟时自然兑现/)
     assert.doesNotMatch(writingGuidance, /篇幅|字数|段数|对白比例/)
-    assert.match(writingGuidance, /核心内容及其必要的直接影响已经形成清楚、可继续的进展时选择落点/)
-    assert.match(writingGuidance, /完成当前动作或小目标/)
-    assert.match(writingGuidance, /态势明确、能够自然接续的过程节点/)
-    assert.match(writingGuidance, /让结尾承接本轮已经形成的内容，并为下一轮保留自然空间/)
-    assert.match(writingGuidance, /到达自然落点后，不因仍有可写内容而继续启动下一段主要情节/)
+    assert.match(writingGuidance, /让结尾落在当前推进所形成的变化或影响上/)
+    assert.doesNotMatch(writingGuidance, /为下一轮保留自然空间|不因仍有可写内容而继续启动下一段主要情节|在收束时再扩大叙事范围/)
     assert.doesNotMatch(writingGuidance, /完整可读的进展/)
     assert.match(writingGuidance, /让当前场景决定推进、转折和收束的结构/)
     assert.match(writingGuidance, /有意照应近期结构时，使照应产生新的含义或后果/)
@@ -543,7 +574,7 @@ test('creates a blank preset or the managed example preset', async () => {
     const calibration = calibrationField.content
     assert.match(calibration, /用户的参与方式与明确意图、当前视角与连续性/)
     assert.match(calibration, /角色动机与用户控制边界/)
-    assert.match(calibration, /当前场景正在发展的内容、此刻能够承载的信息和自然落点/)
+    assert.match(calibration, /当前场景的主要推进、此刻能够承载的信息和自然落点/)
     assert.match(calibration, /让结构与落点在因果推进中形成/)
     assert.doesNotMatch(calibration, /本轮最有分量的叙事焦点/)
     assert.doesNotMatch(calibration, /需要呈现的反应与后果和自然落点|选择适合当前内容的结构/)
@@ -556,9 +587,9 @@ test('creates a blank preset or the managed example preset', async () => {
     assert.match(outputRequirements, /不设固定字数、段数或对白比例/)
     assert.doesNotMatch(outputRequirements, /当前核心内容及其直接影响|充分、完整的呈现/)
     assert.doesNotMatch(outputRequirements, /写成一段/)
-    assert.match(outputRequirements, /重要交流、关键动作、发现和转折按其分量展开/)
+    assert.match(outputRequirements, /重要互动、关键动作及其直接影响按其分量展开/)
     assert.match(outputRequirements, /常规过渡、重复动作和已知信息简洁处理/)
-    assert.match(outputRequirements, /到达本轮自然落点后收束，不继续启动下一段主要情节/)
+    assert.doesNotMatch(outputRequirements, /自然落点|下一段主要情节/)
     assert.doesNotMatch(outputRequirements, /中等偏长/)
     assert.match(outputRequirements, /不要输出状态、规划、分析或创作说明/)
     assert.doesNotMatch(outputRequirements, /\d+\s*(?:字|段)|对白.{0,4}\d+\s*%/)
@@ -599,6 +630,8 @@ test('seeds one managed default and preserves an explicit default across service
 
 test('migrates each recent managed preset without replacing field identities', async () => {
   const stages = [
+    ['before-single-beat-scope', previousSingleBeatScopePreset],
+    ['before-natural-closing-refinement', previousNaturalClosingPreset],
     ['before-length-balance', previousLengthBalancePreset],
     ['before-harm-execution-refinement', previousHarmExecutionPreset],
     ['before-moral-realism-refinement', previousMoralRealismPreset],

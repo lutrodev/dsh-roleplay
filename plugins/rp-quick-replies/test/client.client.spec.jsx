@@ -71,11 +71,12 @@ function fixedStore(snapshot = readyState()) {
 }
 
 function sessionProps(store, draft = '港口') {
+  const input = { draft, draftRev: 1, occurrences: [], phase: 'plain' }
   return {
     store,
     sessionId: 'session-1',
-    input: { draft, draftRev: 1, occurrences: [], phase: 'plain' },
     inputActions: { setDraft: vi.fn() },
+    useInput: selector => selector(input),
     useSessions: selector => selector({ byId: { 'session-1': { projectionValues: { agentPreset: 'roleplay' }, origin: 'user' } } }),
     useSession: selector => selector({ removed: false }),
   }
@@ -103,7 +104,7 @@ function renderLexicalComposer(store, initialDraft = '港口') {
   const applyTextEdits = vi.fn(() => true)
   const setDraft = vi.fn()
   const props = sessionProps(store, initialDraft)
-  props.input = { ...props.input, draftRev: 7 }
+  props.useInput = selector => selector({ draft: initialDraft, draftRev: 7, occurrences: [], phase: 'plain' })
   props.inputActions.setDraft = setDraft
   props.applyTextEdits = applyTextEdits
   render(React.createElement('div', { 'data-composer-card': true },
@@ -121,6 +122,13 @@ function renderLexicalComposer(store, initialDraft = '港口') {
 describe('快捷回复输入栏', () => {
   it('declares every Cordis service read during client apply', () => {
     expect(clientInject).toEqual(['slots', 'rpRemote', 'sessions', 'conversation'])
+  })
+
+  it('reads the composer state from the standard session hook without legacy owner props', () => {
+    const props = sessionProps(fixedStore())
+    expect(props).not.toHaveProperty('input')
+    render(React.createElement(QuickReplyControl, props))
+    expect(screen.getByRole('button', { name: '插入快捷回复：继续' })).toBeTruthy()
   })
 
   it('loads and saves the shared Host catalog through one client store', async () => {

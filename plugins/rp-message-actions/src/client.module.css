@@ -16,14 +16,14 @@
 [data-rp-message-actions-native-user-actions],
 [data-rp-message-actions-hidden-opening],
 [data-chat-flow-kind="rp-floor-assistant-actions"]:has(.deletedAssistantMarker),
-[data-chat-flow-kind="rp-floor-failed-assistant"]:has(.deletedAssistantMarker),
+[data-chat-flow-kind="rp-turn-surface"]:has(.deletedAssistantMarker),
 [data-chat-flow-kind="rp-message-suffix-action"]:has(.suffixEffectAnchor),
 [data-chat-flow-kind="rp-floor-user-actions"]:has(.inactiveActionNodeMarker),
 [data-chat-flow-kind="rp-floor-assistant-actions"]:has(.inactiveActionNodeMarker),
 [data-chat-flow-kind="rp-floor-opening-actions"]:has(.inactiveActionNodeMarker),
 [data-chat-flow-kind="rp-floor-assistant-actions"]:has(.assistantEffectNodeMarker),
 [data-chat-flow-kind="rp-floor-opening-actions"]:has(.assistantEffectNodeMarker),
-[data-chat-flow-kind="rp-floor-failed-assistant"]:has(.assistantEffectNodeMarker),
+[data-chat-flow-kind="rp-turn-surface"]:has(.assistantEffectNodeMarker),
 [data-chat-flow-kind="rp-floor-opening-actions"]:has(.deletedOpeningMarker) {
   display: none;
 }

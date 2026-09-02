@@ -19,7 +19,7 @@
     "README.md"
   ],
   "scripts": {
-    "check": "node --check src/index.js && node --check src/protocol.js && node --check src/client.js && node --check src/client-state.js && node --check src/preset-recovery.js",
+    "check": "node --check src/index.js && node --check src/protocol.js && node --check src/client.js && node --check src/client-state.js && node --check src/turn-surface.js && node --check src/preset-recovery.js",
     "test": "pnpm run test:node && pnpm run test:client",
     "test:node": "node --test test/*.test.js",
     "test:client": "vitest run test/client.client.spec.jsx",

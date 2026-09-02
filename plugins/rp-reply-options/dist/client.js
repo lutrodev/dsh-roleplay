@@ -6465,7 +6465,7 @@ get: (_target, key) => {
 			error.code = "RP_REPLY_OPTIONS_INVALID";
 			error.feedback = {
 				extension: REPLY_OPTIONS_EXTENSION_NAMESPACE,
-				correction: `Replace only rp.reply-options with at least one usable and preferably exactly ${expectedCount} distinct, directly sendable third-person protagonist ${expectedCount === 1 ? "message" : "messages"}. Resolve the user-controlled protagonist from the surrounding roleplay_context context_guide when present; otherwise infer the protagonist from the remaining context and conversation. Use that protagonist's established name or pronoun as the narrative subject in every option, allow first-person wording only inside quoted dialogue, describe only what the protagonist says or does next, follow any option direction guidance, omit numbers and labels, then retry.`
+				correction: `Provide at least one usable and preferably exactly ${expectedCount} distinct, directly sendable roleplay ${expectedCount === 1 ? "continuation" : "continuations"} for the user-controlled protagonist. Identify the protagonist from the surrounding roleplay_context context_guide when present; otherwise infer the protagonist from the remaining context and conversation. Let each message form a complete, concrete next move grounded in the current scene through the protagonist's specific action, dialogue, intention, or observation, use third-person narration when narration is present, use the protagonist's natural voice in dialogue, and let configured directions shape their matching options.`
 			};
 			return error;
 		}

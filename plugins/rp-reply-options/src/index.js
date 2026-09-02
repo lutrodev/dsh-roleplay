@@ -25,7 +25,7 @@ export const Config = Schema.object({
 })
 
 const REPLY_OPTIONS_GENERATOR_TIMEOUT_MS = 30000
-const REPLY_OPTIONS_GENERATOR_PERSONA = 'Generate concise roleplay quick replies from the supplied final narrative and context. Return only the requested structured output and never call tools.'
+const REPLY_OPTIONS_GENERATOR_PERSONA = 'Generate natural, substantive, directly sendable roleplay continuations from the supplied final narrative and context. Respond with the requested structured output.'
 
 export function apply(ctx, config) {
   if (config.registerRuntime !== true) return

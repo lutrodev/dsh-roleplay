@@ -28,15 +28,14 @@ test('collects ordered context, validates effects and produces the sole commit m
   const { full: fullCommitSchema, retry: retryCommitSchema } = commitSchemaBranches(commitTool.parameters)
   assert.equal(Object.hasOwn(fullCommitSchema.properties, 'narrative'), false)
   assert.equal(fullCommitSchema.additionalProperties, false)
-  assert.equal(fullCommitSchema.properties.effects.items.additionalProperties, true)
-  assert.deepEqual(fullCommitSchema.properties.effects.items.required, ['kind'])
+  assert.equal(fullCommitSchema.properties.effects.items.properties.kind.const, '__rp_no_registered_effects__')
   assert.deepEqual(retryCommitSchema.required, ['retry'])
   assert.deepEqual(retryCommitSchema.properties.retry.required, ['token', 'patches'])
   assert.notDeepEqual(validateJsonSchemaValue(commitTool.parameters, {
     runSummary: 'mixed',
     retry: { token: 'stale', patches: [{ op: 'remove', path: '/effects' }] },
   }), [])
-  const staticCommitSchema = structuredClone(commitTool.parameters)
+  const initialCommitSchema = structuredClone(commitTool.parameters)
   const contractText = runtimeContract.text({ agent: { session: { ...sessionMethods(), header: {} } } })
   assert.match(contractText, /adaptive mode, infer what the user is portraying or directing in each message/i)
   assert.match(contractText, /completed prose is inserted into the next assistant message/i)
@@ -61,7 +60,9 @@ test('collects ordered context, validates effects and produces the sole commit m
     schema: testEffectSchema(),
     validate: effect => ({ kind: effect.kind, target: effect.target, payload: { accepted: true } }),
   })
-  assert.deepEqual(commitTool.parameters, staticCommitSchema)
+  assert.notDeepEqual(commitTool.parameters, initialCommitSchema)
+  const { full: registeredCommitSchema } = commitSchemaBranches(commitTool.parameters)
+  assert.deepEqual(registeredCommitSchema.properties.effects.items, testEffectSchema())
   runtime.registerCommitDiagnosticProvider({ id: 'test.diagnostic', inspect: () => [{ code: 'TEST_NOTICE', severity: 'info', message: 'recorded' }] })
   runtime.registerCommitDiagnosticProvider({ id: 'test.failed-diagnostic', inspect: () => { throw new Error('diagnostics must not block') } })
 
@@ -90,9 +91,11 @@ test('collects ordered context, validates effects and produces the sole commit m
   await ctx.fiber.dispose()
 })
 
-test('commit keeps a static schema while registered effects return structured correction feedback', async () => {
+test('commit derives its exact effect schema while returning structured correction feedback', async () => {
   const ctx = new Context()
   const tools = new Map()
+  let toolChanges = 0
+  ctx.on('tools/change', () => { toolChanges += 1 })
   ctx.provide('systemPrompt', { section() {} })
   ctx.provide('tools', { register(tool) { tools.set(tool.name, tool) } })
   ctx.provide('agents', { get() { return undefined } })
@@ -108,7 +111,7 @@ test('commit keeps a static schema while registered effects return structured co
   assert.throws(() => runtime.registerEffectType({
     kind: 'bad.diagnostic', schema: testEffectSchema('bad.diagnostic'), diagnoseArguments: 'invalid', validate: effect => effect,
   }), /diagnoseArguments must be a function/)
-  runtime.registerEffectType({
+  const dispose = runtime.registerEffectType({
     kind: 'test.effect',
     schema: testEffectSchema(),
     diagnoseArguments: (effect, { path }) => effect.target === 'bounded'
@@ -116,6 +119,7 @@ test('commit keeps a static schema while registered effects return structured co
       : [`"${path}.value" is not accepted by test.effect; remove it.`],
     validate: effect => effect,
   })
+  assert.equal(toolChanges, 1)
   const boundedCorrections = runtime.commitArgumentCorrections({
     effects: [{ kind: 'test.effect', target: 'bounded', payload: {} }],
   })
@@ -123,6 +127,11 @@ test('commit keeps a static schema while registered effects return structured co
   assert.equal([...boundedCorrections[0]].length, 1000)
 
   const commit = tools.get('rp_commit_turn')
+  const { full: registeredCommitSchema } = commitSchemaBranches(commit.parameters)
+  assert.deepEqual(registeredCommitSchema.properties.effects.items, testEffectSchema())
+  assert.ok(validateJsonSchemaValue(commit.parameters, {
+    effects: [{ kind: 'test.effect', target: 'gate', payload: {}, value: 2 }],
+  }).length > 0)
   const agent = { session: { ...sessionMethods(), events: [] } }
   const exec = { agent, callId: 'invalid-effect', concludeTurn() { throw new Error('invalid arguments must not conclude') } }
   let failure
@@ -152,10 +161,14 @@ test('commit keeps a static schema while registered effects return structured co
     error: { message: failure.message },
     content: [],
   }), undefined)
+  dispose()
+  assert.equal(toolChanges, 2)
+  const { full: emptyCommitSchema } = commitSchemaBranches(commit.parameters)
+  assert.equal(emptyCommitSchema.properties.effects.items.properties.kind.const, '__rp_no_registered_effects__')
   await ctx.fiber.dispose()
 })
 
-test('commit keeps a static schema while parent-authored extensions persist canonical values', async () => {
+test('commit keeps parent-authored extensions open while persisting canonical values', async () => {
   const ctx = new Context()
   const tools = new Map()
   let toolChanges = 0

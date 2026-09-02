@@ -437,7 +437,7 @@ describe('Roleplay 一级设置与 Skill 管理', () => {
     const maxCharactersInput = screen.getByRole('spinbutton', { name: '每条长度指导' })
     expect(input.value).toBe('3')
     expect(maxCharactersInput.value).toBe('50')
-    expect(screen.getByText('回复条数可填写 1–5；每条长度指导可填写 1–200，默认目标为 50 字以内。生成结果不会按该值硬性拒绝。')).toBeTruthy()
+    expect(screen.getByText('回复条数可填写 1–5；每条长度指导可填写 1–200，默认目标为 50 字以内。')).toBeTruthy()
     expect(screen.queryByText(/不会按此数值拦截提交/)).toBeNull()
     expect(input.disabled).toBe(false)
     expect(screen.getAllByRole('textbox')).toHaveLength(3)

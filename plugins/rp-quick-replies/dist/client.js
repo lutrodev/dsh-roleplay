@@ -6687,11 +6687,12 @@ get: (_target, key) => {
 			}, QuickReplyControl));
 		}
 		function QuickReplyControl(props) {
-			const { input, inputActions, sessionId, useSession, useSessions, store, applyTextEdits } = props;
+			const { inputActions, sessionId, useInput, useSession, useSessions, store, applyTextEdits } = props;
 			const roleplay = useSessions((state) => {
 				const summary = state.byId?.[sessionId];
 				return isRoleplaySessionSummary(summary) && summary.origin !== "subagent";
 			});
+			const input = useInput((state) => state);
 			const removed = useSession((state) => state.removed === true);
 			const state = (0, react.useSyncExternalStore)(store.subscribe, store.getSnapshot);
 			const controlRef = (0, react.useRef)(null);

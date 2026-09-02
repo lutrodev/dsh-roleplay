@@ -6436,6 +6436,222 @@ get: (_target, key) => {
 			return typeof value === "object" && value !== null && !Array.isArray(value);
 		}
 		//#endregion
+		//#region src/turn-surface.js
+		const RP_TURN_SURFACE_KEY = "rp-turn-surface";
+		/** Match the durable events that determine one Roleplay turn's visible reply. */
+		function turnSurfaceMatch(event) {
+			if (event?.type === "turn/start") return {
+				id: String(event.data.turn),
+				role: "start"
+			};
+			if (event?.type === "turn/end") return {
+				id: String(event.data.turn),
+				role: "update"
+			};
+			if (event?.type === "tool/result" && ["rp-agent/turn-commit", "rp-agent/asset-mutation"].includes(event.data?.meta?.kind)) return {
+				id: String(event.data?.meta?.turn ?? event.data.turn),
+				role: "update"
+			};
+			if (event?.type === "assistant/message" && Number.isSafeInteger(event.data?.turn)) {
+				const target = decodeRpMessageActionEvent(event)?.targets?.find((candidate) => candidate.kind === "turn");
+				return {
+					id: String(target?.turn ?? event.data.turn),
+					role: "update"
+				};
+			}
+			return null;
+		}
+		/** Start the deterministic read model for one turn. Session events remain the source of truth. */
+		function startTurnSurface(event) {
+			return {
+				turn: event.data.turn,
+				outcome: { kind: "running" },
+				replies: [],
+				reply: void 0,
+				commit: { kind: "none" },
+				hostOpeningSeq: void 0,
+				sharedAssetMutation: false,
+				end: void 0,
+				seq: event.seq
+			};
+		}
+		/**
+		* Fold one Session event into the semantic surface for a turn.
+		*
+		* Empty model messages are protocol activity, not deletion. Only a durable
+		* rpMessageAction can retire a reply. Once a commit attempt claims readable
+		* prose, later acknowledgements cannot replace that prose.
+		*/
+		function updateTurnSurface(state, event) {
+			if (isSelectedOpeningMessage(event)) return {
+				...state,
+				hostOpeningSeq: event.seq
+			};
+			const action = decodeRpMessageActionEvent(event);
+			if (action !== void 0) return updateFromMessageAction(state, event, action);
+			if (event.type === "assistant/message" && event.surfaceOp === "append" && event.data?.message?.source?.kind === "model") return updateFromModelMessage(state, event);
+			if (event.type === "tool/result" && event.surfaceOp === "append" && event.data?.meta?.kind === "rp-agent/asset-mutation") return {
+				...state,
+				sharedAssetMutation: true
+			};
+			if (event.type === "tool/result" && event.surfaceOp === "append" && event.data?.meta?.kind === "rp-agent/turn-commit") return updateFromCommit(state, event);
+			if (event.type === "turn/end") return closeTurnSurface(state, event);
+			return state;
+		}
+		function turnSurfaceIsFailed(state) {
+			return [
+				"uncommitted",
+				"partial",
+				"failed"
+			].includes(state?.outcome?.kind);
+		}
+		function turnSurfaceIsRetired(state) {
+			return state?.outcome?.kind === "retired";
+		}
+		function turnSurfaceIsCommitted(state) {
+			return state?.outcome?.kind === "committed";
+		}
+		function turnSurfaceCommitAttempted(state) {
+			return state?.commit?.kind === "attempted" || state?.commit?.kind === "committed";
+		}
+		function turnSurfaceReply(state) {
+			return state?.reply;
+		}
+		function turnSurfaceCommitSeq(state) {
+			return state?.commit?.kind === "committed" ? state.commit.resultSeq : void 0;
+		}
+		function turnSurfaceEndReasonKind(state) {
+			return state?.end?.reasonKind;
+		}
+		function turnSurfaceEndCancelKind(state) {
+			return state?.end?.cancelKind;
+		}
+		function updateFromMessageAction(state, event, action) {
+			if (action.operation === "delete" || action.operation === "reroll") {
+				const retiresTurn = action.targets.some((target) => target.kind === "turn" && target.turn === state.turn);
+				const retiresReply = action.targets.some((target) => target.kind === "message" && target.role === "assistant" && state.replies.some((reply) => reply.target.messageId === target.messageId));
+				return retiresTurn || retiresReply ? {
+					...state,
+					outcome: {
+						kind: "retired",
+						operation: action.operation
+					},
+					seq: event.seq
+				} : state;
+			}
+			if (action.operation !== "edit") return state;
+			const target = action.targets.find((candidate) => candidate.kind === "message" && candidate.role === "assistant" && state.replies.some((reply) => reply.target.messageId === candidate.messageId));
+			if (target === void 0) return state;
+			const text = assistantMessageText$1(event.data?.message);
+			const update = (reply) => reply.target.messageId === target.messageId ? {
+				...reply,
+				text,
+				edited: true
+			} : reply;
+			return {
+				...state,
+				replies: state.replies.map(update),
+				reply: state.reply?.target?.messageId === target.messageId ? update(state.reply) : state.reply,
+				seq: event.seq
+			};
+		}
+		function updateFromModelMessage(state, event) {
+			const text = assistantMessageText$1(event.data.message);
+			const ownsCommit = assistantCallsTool(event.data.message, "rp_commit_turn");
+			if (text.trim().length === 0) {
+				if (!ownsCommit) return state;
+				return {
+					...state,
+					commit: {
+						kind: "attempted",
+						ownerSeq: state.reply?.seq,
+						attemptSeq: event.seq
+					},
+					seq: event.seq
+				};
+			}
+			const reply = {
+				seq: event.seq,
+				target: {
+					kind: "message",
+					role: "assistant",
+					messageId: event.data.message.id,
+					turn: event.data.turn,
+					step: event.data.step
+				},
+				text,
+				time: event.time,
+				edited: false,
+				interrupted: event.data.interrupted === true
+			};
+			const replies = upsertReply(state.replies, reply);
+			const hasClaimedReply = Number.isSafeInteger(state.commit?.ownerSeq);
+			const selected = ownsCommit || !hasClaimedReply ? reply : state.reply;
+			return {
+				...state,
+				replies,
+				reply: selected,
+				commit: ownsCommit ? {
+					kind: "attempted",
+					ownerSeq: event.seq,
+					attemptSeq: event.seq
+				} : state.commit,
+				seq: event.seq
+			};
+		}
+		function updateFromCommit(state, event) {
+			const ownerSeq = event.data.meta.assistant?.seq ?? state.commit?.ownerSeq ?? state.reply?.seq;
+			const selected = state.replies.find((reply) => reply.seq === ownerSeq) ?? state.reply;
+			return {
+				...state,
+				reply: selected,
+				commit: {
+					kind: "committed",
+					ownerSeq,
+					resultSeq: event.seq
+				},
+				seq: event.seq
+			};
+		}
+		function closeTurnSurface(state, event) {
+			const reasonKind = event.data.reason?.kind;
+			const end = {
+				seq: event.seq,
+				reasonKind,
+				cancelKind: reasonKind === "aborted" ? event.data.reason.reason?.kind : void 0
+			};
+			if (turnSurfaceIsRetired(state)) return {
+				...state,
+				end,
+				seq: event.seq
+			};
+			let outcome;
+			if (state.commit.kind === "committed") outcome = { kind: "committed" };
+			else if (state.commit.kind === "attempted") outcome = { kind: "uncommitted" };
+			else if (reasonKind === "completed") outcome = { kind: "completed" };
+			else if (state.reply !== void 0) outcome = { kind: "partial" };
+			else outcome = { kind: "failed" };
+			return {
+				...state,
+				outcome,
+				end,
+				seq: event.seq
+			};
+		}
+		function upsertReply(replies, reply) {
+			const index = replies.findIndex((candidate) => candidate.seq === reply.seq);
+			if (index === -1) return [...replies, reply];
+			const next = replies.slice();
+			next[index] = reply;
+			return next;
+		}
+		function assistantMessageText$1(message) {
+			return Array.isArray(message?.content) ? message.content.filter((part) => part?.type === "text" && typeof part.text === "string").map((part) => part.text).join("") : "";
+		}
+		function assistantCallsTool(message, name) {
+			return Array.isArray(message?.content) && message.content.some((part) => part?.type === "tool-call" && part.name === name);
+		}
+		//#endregion
 		//#region src/client-state.js
 		/** Resolve the nested RPC envelope used by the Roleplay host plugins. */
 		function messageActionValue(result) {
@@ -6501,14 +6717,14 @@ get: (_target, key) => {
 				target: node.data.target ?? target,
 				turn,
 				role: node.kind === "rp-floor-user-actions" ? "user" : "assistant",
-				content: node.data.text ?? state?.finalAssistantText ?? "",
+				content: node.data.text ?? turnSurfaceReply(state)?.text ?? "",
 				canEdit: true,
 				canDelete: true,
 				canReroll: false,
 				canSaveAndReroll: false,
-				edited: node.data.edited === true || state?.finalAssistantEdited === true,
-				failed: state?.failed === true,
-				failureKind: state?.endReasonKind,
+				edited: node.data.edited === true || turnSurfaceReply(state)?.edited === true,
+				failed: turnSurfaceIsFailed(state),
+				failureKind: turnSurfaceEndReasonKind(state),
 				sharedAssetMutation,
 				deleteIncludesSharedAssetMutation: suffixHasSharedAssetMutation(nodes, turn),
 				sessionRunning
@@ -6519,13 +6735,13 @@ get: (_target, key) => {
 			};
 			return {
 				...common,
-				canReroll: currentTail && replayable && !sharedAssetMutation && nodeTargetKey === safeTargetKey(state?.finalAssistantTarget),
-				forkSeq: Number.isSafeInteger(state?.commitSeq) ? state.commitSeq : node.data.seq
+				canReroll: currentTail && replayable && !sharedAssetMutation && nodeTargetKey === safeTargetKey(turnSurfaceReply(state)?.target),
+				forkSeq: turnSurfaceCommitSeq(state) ?? node.data.seq
 			};
 		}
 		function projectFailedTurnDetail(snapshot, nodes, target) {
-			const state = nodes.find((candidate) => candidate.kind === "rp-floor-failed-assistant" && candidate.data?.turn === target.turn)?.data ?? roleplayTurnState(nodes, target.turn);
-			if (state?.failed !== true || state.deleted === true) return null;
+			const state = nodes.find((candidate) => candidate.kind === "rp-turn-surface" && candidate.data?.turn === target.turn)?.data ?? roleplayTurnState(nodes, target.turn);
+			if (!turnSurfaceIsFailed(state) || turnSurfaceIsRetired(state)) return null;
 			const sessionRunning = snapshot?.running === true;
 			const replayable = replayableTurn(nodes, target.turn);
 			const sharedAssetMutation = state.sharedAssetMutation === true;
@@ -6540,7 +6756,7 @@ get: (_target, key) => {
 				canSaveAndReroll: false,
 				edited: false,
 				failed: true,
-				failureKind: state.endReasonKind,
+				failureKind: turnSurfaceEndReasonKind(state),
 				sharedAssetMutation,
 				deleteIncludesSharedAssetMutation: suffixHasSharedAssetMutation(nodes, target.turn),
 				sessionRunning
@@ -6567,7 +6783,7 @@ get: (_target, key) => {
 			return safeTargetKey(node.data?.target);
 		}
 		function failedAssistantTargetKey(node) {
-			return node?.kind === "rp-floor-failed-assistant" ? safeTargetKey(node.data?.finalAssistantTarget) : void 0;
+			return node?.kind === "rp-turn-surface" ? safeTargetKey(turnSurfaceReply(node.data)?.target) : void 0;
 		}
 		function actionNodeTurn(node) {
 			if (Number.isSafeInteger(node?.data?.turn)) return node.data.turn;
@@ -6575,10 +6791,10 @@ get: (_target, key) => {
 		}
 		function turnStateFromLocation(location) {
 			if (location?.kind !== "turn" && location?.kind !== "step") return void 0;
-			return location.turn.data?.get?.("rp-floor-failed-assistant") ?? location.turn.data?.get?.("rp-message-failed-assistant");
+			return location.turn.data?.get?.(RP_TURN_SURFACE_KEY);
 		}
 		function roleplayTurnState(nodes, turn) {
-			const failed = nodes.find((node) => node?.kind === "rp-floor-failed-assistant" && node.data?.turn === turn);
+			const failed = nodes.find((node) => node?.kind === "rp-turn-surface" && node.data?.turn === turn);
 			if (failed !== void 0) return failed.data;
 			for (const node of nodes) {
 				if (actionNodeTurn(node) !== turn) continue;
@@ -6607,7 +6823,7 @@ get: (_target, key) => {
 					if (Number.isSafeInteger(turn)) turns.push(turn);
 					continue;
 				}
-				if (node?.kind === "rp-floor-failed-assistant" && node.data?.failed === true) {
+				if (node?.kind === "rp-turn-surface" && turnSurfaceIsFailed(node.data)) {
 					if (Number.isSafeInteger(node.data.turn)) turns.push(node.data.turn);
 				}
 			}
@@ -6626,7 +6842,7 @@ get: (_target, key) => {
 			if (typeof event === "string") return {
 				...state,
 				text: event,
-				deleted: event.trim().length === 0
+				deleted: false
 			};
 			const action = decodeRpMessageActionEvent(event);
 			if (action?.operation === "delete" || action?.operation === "reroll") return {
@@ -6639,11 +6855,7 @@ get: (_target, key) => {
 				text,
 				edited: true,
 				deleted: false
-			} : {
-				...state,
-				text,
-				deleted: text.trim().length === 0
-			};
+			} : state;
 		}
 		/** Match model replies and native Roleplay replacement carriers. */
 		function assistantActionMatch(event) {
@@ -6656,10 +6868,10 @@ get: (_target, key) => {
 					role: "update"
 				};
 			}
-			return {
+			return event.surfaceOp === "append" && assistantMessageText(event.data.message).trim().length > 0 ? {
 				id: String(event.data.message?.id ?? event.seq),
 				role: "start"
-			};
+			} : null;
 		}
 		/** Match the selected opening independently from ordinary model replies. */
 		function openingActionMatch(event) {
@@ -6677,141 +6889,31 @@ get: (_target, key) => {
 				role: "start"
 			} : null;
 		}
-		/** Match events that determine whether a completed turn owns a failed reply. */
-		function failedAssistantMatch(event) {
-			if (event?.type === "turn/start") return {
-				id: String(event.data.turn),
-				role: "start"
-			};
-			if (event?.type === "turn/end") return {
-				id: String(event.data.turn),
-				role: "update"
-			};
-			if (event?.type === "tool/result" && ["rp-agent/turn-commit", "rp-agent/asset-mutation"].includes(event.data?.meta?.kind)) return {
-				id: String(event.data?.meta?.turn ?? event.data.turn),
-				role: "update"
-			};
-			if (event?.type === "assistant/message" && Number.isSafeInteger(event.data?.turn)) {
-				const failed = decodeRpMessageActionEvent(event)?.targets?.find((target) => target.kind === "turn");
-				return {
-					id: String(failed?.turn ?? event.data.turn),
-					role: "update"
-				};
-			}
-			return null;
-		}
-		function failedAssistantStart(event) {
-			return {
-				turn: event.data.turn,
-				failed: false,
-				deleted: false,
-				committed: false,
-				commitAttempted: false,
-				commitSeq: void 0,
-				finalAssistantSeq: void 0,
-				finalAssistantTarget: void 0,
-				finalAssistantText: "",
-				finalAssistantTime: void 0,
-				finalAssistantEdited: false,
-				finalAssistantInterrupted: false,
-				finalAssistantOwnsCommit: false,
-				hostOpeningSeq: void 0,
-				sharedAssetMutation: false,
-				endReasonKind: void 0,
-				endCancelKind: void 0
-			};
-		}
-		function failedAssistantUpdate(state, event) {
-			if (isSelectedOpeningMessage(event)) return {
-				...state,
-				hostOpeningSeq: event.seq
-			};
-			const action = decodeRpMessageActionEvent(event);
-			if ((action?.operation === "delete" || action?.operation === "reroll") && action.targets.some((target) => target.kind === "turn" && target.turn === state.turn)) return {
-				...state,
-				deleted: true
-			};
-			if ((action?.operation === "edit" ? action.targets.find((target) => target.kind === "message" && target.role === "assistant" && target.messageId === state.finalAssistantTarget?.messageId) : void 0) !== void 0) return {
-				...state,
-				finalAssistantText: assistantMessageText(event.data?.message),
-				finalAssistantEdited: true
-			};
-			if (event.type === "assistant/message" && event.surfaceOp === "append" && event.data?.message?.source?.kind === "model") {
-				const text = assistantMessageText(event.data.message);
-				const ownsCommit = assistantCallsTool(event.data.message, "rp_commit_turn");
-				if (text.trim().length === 0) return ownsCommit ? {
-					...state,
-					commitAttempted: true,
-					finalAssistantOwnsCommit: Number.isSafeInteger(state.finalAssistantSeq) || state.finalAssistantOwnsCommit === true
-				} : state;
-				if (state.finalAssistantOwnsCommit === true && !ownsCommit) return state;
-				return {
-					...state,
-					commitAttempted: state.commitAttempted === true || ownsCommit,
-					finalAssistantSeq: event.seq,
-					finalAssistantTarget: {
-						kind: "message",
-						role: "assistant",
-						messageId: event.data.message.id,
-						turn: event.data.turn,
-						step: event.data.step
-					},
-					finalAssistantText: text,
-					finalAssistantTime: event.time,
-					finalAssistantEdited: false,
-					finalAssistantInterrupted: event.data.interrupted === true,
-					finalAssistantOwnsCommit: ownsCommit
-				};
-			}
-			if (event.type === "tool/result" && event.surfaceOp === "append" && event.data?.meta?.kind === "rp-agent/asset-mutation") return {
-				...state,
-				sharedAssetMutation: true
-			};
-			if (event.type === "tool/result" && event.surfaceOp === "append" && event.data?.meta?.kind === "rp-agent/turn-commit") return {
-				...state,
-				committed: true,
-				commitAttempted: true,
-				commitSeq: event.seq,
-				failed: false,
-				finalAssistantSeq: event.data.meta.assistant?.seq ?? state.finalAssistantSeq,
-				finalAssistantOwnsCommit: true
-			};
-			if (event.type === "turn/end") return {
-				...state,
-				failed: !state.committed && (state.commitAttempted === true || event.data.reason?.kind !== "completed"),
-				endReasonKind: event.data.reason?.kind,
-				endCancelKind: event.data.reason?.kind === "aborted" ? event.data.reason.reason?.kind : void 0,
-				seq: event.seq
-			};
-			return state;
-		}
 		function selectFailedAssistant(owner) {
-			const state = owner?.turn?.data?.get?.("rp-floor-failed-assistant") ?? owner?.turn?.data?.get?.("rp-message-failed-assistant");
-			if (state?.failed !== true || state.deleted === true) return null;
-			const hasAssistant = state.finalAssistantTarget?.kind === "message" && state.finalAssistantTarget.role === "assistant" && typeof state.finalAssistantTarget.messageId === "string" && typeof state.finalAssistantText === "string" && state.finalAssistantText.trim().length > 0;
+			const state = owner?.turn?.data?.get?.(RP_TURN_SURFACE_KEY);
+			if (!turnSurfaceIsFailed(state) || turnSurfaceIsRetired(state)) return null;
+			const reply = turnSurfaceReply(state);
+			const hasAssistant = reply?.target?.kind === "message" && reply.target.role === "assistant" && typeof reply.target.messageId === "string" && typeof reply.text === "string" && reply.text.trim().length > 0;
 			return {
 				turn: owner.turn,
 				state,
-				target: hasAssistant ? state.finalAssistantTarget : {
+				target: hasAssistant ? reply.target : {
 					kind: "turn",
 					turn: state.turn
 				},
-				copyText: hasAssistant ? state.finalAssistantText : "",
+				copyText: hasAssistant ? reply.text : "",
 				canEdit: hasAssistant,
-				edited: hasAssistant && state.finalAssistantEdited === true,
-				messageTime: hasAssistant ? state.finalAssistantTime : void 0,
-				nativeStatusVisible: state.endReasonKind === "max-tokens" || ["aborted", "interrupted"].includes(state.endReasonKind) && nativeInterruptedAssistantVisible(owner.turn, state)
+				edited: hasAssistant && reply.edited === true,
+				messageTime: hasAssistant ? reply.time : void 0,
+				nativeStatusVisible: turnSurfaceEndReasonKind(state) === "max-tokens" || ["aborted", "interrupted"].includes(turnSurfaceEndReasonKind(state)) && nativeInterruptedAssistantVisible(owner.turn, state)
 			};
 		}
 		function nativeInterruptedAssistantVisible(turn, state) {
-			if (state.finalAssistantInterrupted === true) return true;
+			if (turnSurfaceReply(state)?.interrupted === true) return true;
 			return Array.isArray(turn?.steps) && turn.steps.some((step) => step?.data?.get?.("assistant-step")?.status === "interrupted");
 		}
 		function assistantMessageText(message) {
 			return Array.isArray(message?.content) ? message.content.filter((part) => part?.type === "text" && typeof part.text === "string").map((part) => part.text).join("") : "";
-		}
-		function assistantCallsTool(message, name) {
-			return Array.isArray(message?.content) && message.content.some((part) => part?.type === "tool-call" && part.name === name);
 		}
 		//#endregion
 		//#region src/client-styles.generated.js
@@ -6861,7 +6963,7 @@ get: (_target, key) => {
 		};
 		const STYLE_ID = "dsh-roleplay-rp-message-actions-styles";
 		const STYLE_OWNER = "dsh-roleplay-rp-message-actions";
-		const STYLE_TEXT = ".rp-message-actions-floorActionHost {\n  width: 100%;\n  font-family: var(--dsw-font-family);\n}\n\n/* Deleted messages can orphan generation rows inside their Turn. Keep those\n   rows in the Session log and trajectory, but remove the now-unowned context,\n   reasoning, tool, and failure chrome from the chat transcript. */\n[data-rp-floor-hidden-by-message-delete],\n[data-rp-message-actions-hidden-trace],\n[data-rp-message-actions-hidden-suffix],\n[data-rp-message-actions-hidden-deleted-user],\n[data-rp-message-actions-hidden-deleted-assistant],\n[data-rp-message-actions-hidden-commit],\n[data-rp-message-actions-hidden-native-branch],\n[data-rp-message-actions-native-user-actions],\n[data-rp-message-actions-hidden-opening],\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-deletedAssistantMarker),\n[data-chat-flow-kind=\"rp-floor-failed-assistant\"]:has(.rp-message-actions-deletedAssistantMarker),\n[data-chat-flow-kind=\"rp-message-suffix-action\"]:has(.rp-message-actions-suffixEffectAnchor),\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-failed-assistant\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-deletedOpeningMarker) {\n  display: none;\n}\n\n.rp-message-actions-deletedAssistantMarker,\n.rp-message-actions-deletedUserMarker,\n.rp-message-actions-deletedOpeningMarker,\n.rp-message-actions-inactiveActionNodeMarker,\n.rp-message-actions-assistantEffectNodeMarker,\n.rp-message-actions-traceEffectAnchor,\n.rp-message-actions-nativeUserEffectAnchor,\n.rp-message-actions-nativeBranchEffectAnchor,\n.rp-message-actions-suffixEffectAnchor,\n.rp-message-actions-commitToolMarker,\n[data-chat-flow-kind=\"tool-call\"]:has(.rp-message-actions-commitToolMarker[data-rp-commit-tool-status=\"running\"]),\n[data-chat-flow-kind=\"tool-call\"]:has(.rp-message-actions-commitToolMarker[data-rp-commit-tool-status=\"succeeded\"]),\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-deletedUserMarker) {\n  display: none;\n}\n\n.rp-message-actions-commitFailure {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 10px 12px;\n  border-radius: 10px;\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n  font-family: var(--dsw-font-family);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-commitFailure strong { font-weight: 550; }\n\n.rp-message-actions-failedTurnStatus {\n  display: grid;\n  grid-template-columns: 10px minmax(0, 1fr) auto;\n  gap: 8px;\n  align-items: start;\n  padding: 2px 0;\n  font-family: var(--dsw-font-family);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-message-actions-failedTurnStatusDot { margin-top: 5px; }\n\n.rp-message-actions-failedTurnStatusCopy {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n\n.rp-message-actions-failedTurnStatusCopy strong {\n  margin-right: 6px;\n  font-weight: 600;\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"error\"] {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"warning\"] {\n  color: var(--dsw-alias-state-warn-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"ongoing\"] {\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"done\"] {\n  color: var(--dsw-alias-state-success-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy span { color: var(--dsw-alias-label-secondary); }\n\n.rp-message-actions-failedTurnRecoveryActions {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 4px;\n  margin-left: 18px;\n}\n\n.rp-message-actions-failedTurnStatus > .rp-message-actions-failedTurnRecoveryActions { margin-left: 0; }\n\n.rp-message-actions-failedTurnDeleteAction:not(:disabled) { color: var(--dsw-alias-state-error-primary); }\n\n.rp-message-actions-assistantActionHost {\n  display: contents;\n}\n\n/* The editor is portaled into the message body; hide the native footer until\n   editing finishes so its unrelated controls do not compete with the form. */\n[data-chat-flow-kind=\"turn-tail\"]:has(.rp-message-actions-assistantActionHost[data-rp-message-actions-editing-native]) {\n  display: none;\n}\n\n/* The public Chat Node Slot inserts a display:contents outlet between the\n   flow item and DSH's user renderer. The renderer keeps its message stack\n   first and its resident time/copy row last. Require both a direct native\n   button and a mounted plugin host before replacing that row; declined\n   standard-session projections keep the native controls. */\n[data-chat-flow-kind=\"user\"]:has(\n  + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n)\n  > [data-slot=\"conversation.chat.node\"]\n  > :first-child\n  > :last-child:has(> button[type=\"button\"]),\n[data-chat-flow-kind=\"user\"]:has(\n  + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n  + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n)\n  > [data-slot=\"conversation.chat.node\"]\n  > :first-child\n  > :last-child:has(> button[type=\"button\"]) {\n  display: none;\n}\n\n/* JS ownership covers arbitrary public Conversation Nodes inserted between\n   the native user row and this plugin's projected action row, including a\n   native renderer refresh after the effect first annotated its action row. */\n[data-chat-flow-kind=\"user\"][data-rp-message-actions-user-native-hidden]\n  > [data-slot=\"conversation.chat.node\"]\n  > :first-child\n  > :last-child:has(> button[type=\"button\"]),\n[data-chat-flow-kind=\"steering\"][data-rp-message-actions-user-native-hidden]\n  > [data-slot=\"conversation.chat.node\"]\n  > :first-child\n  > :last-child:has(> button[type=\"button\"]) {\n  display: none;\n}\n\n/* Pull back only the Chat column's 16px gap so the replacement operation row\n   sits 2px below the bubble and reads as part of the same message. */\n.rp-message-actions-userFloorActionHost {\n  width: 100%;\n  margin-top: -14px;\n  font-family: var(--dsw-font-family);\n}\n\n.rp-message-actions-userFloorActionHost .rp-message-actions-floorActions {\n  margin-top: 0;\n  margin-bottom: 2px;\n}\n\n.rp-message-actions-userFloorTime {\n  margin-right: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 14px;\n  line-height: 24px;\n  font-variant-numeric: tabular-nums;\n  white-space: nowrap;\n}\n\n@media (hover: hover) {\n  .rp-message-actions-userFloorTime {\n    opacity: 0;\n    transition: opacity 80ms ease;\n  }\n\n  .rp-message-actions-userFloorActionHost:hover .rp-message-actions-userFloorTime,\n  .rp-message-actions-userFloorActionHost:focus-within .rp-message-actions-userFloorTime,\n  [data-chat-flow-kind=\"user\"]:has(\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n  ):hover\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"]\n    .rp-message-actions-userFloorTime,\n  [data-chat-flow-kind=\"user\"]:has(\n    + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n  ):hover\n    + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"]\n    .rp-message-actions-userFloorTime {\n    opacity: 1;\n  }\n}\n\n.rp-message-actions-floorActions {\n  display: flex;\n  min-height: 28px;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 10px;\n  margin: 2px 0 7px;\n  padding-right: 2px;\n}\n\n.rp-message-actions-floorActionHost .rp-message-actions-floorActions {\n  justify-content: flex-start;\n  padding-right: 0;\n  padding-left: 0;\n  margin-left: -6px;\n}\n\n.rp-message-actions-floorAction {\n  display: inline-flex;\n  width: 28px;\n  height: 28px;\n  padding: 6px;\n  align-items: center;\n  justify-content: center;\n  border: 0;\n  border-radius: 28px;\n  outline: none;\n  color: var(--dsw-alias-label-tertiary);\n  background: transparent;\n  cursor: pointer;\n}\n\n.rp-message-actions-floorAction:hover {\n  color: var(--dsw-alias-label-secondary);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n\n.rp-message-actions-floorAction:disabled {\n  cursor: default;\n  opacity: .4;\n}\n\n.rp-message-actions-floorAction[data-tone=\"danger\"]:hover {\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n}\n\n@media (max-width: 600px) {\n  .rp-message-actions-floorActionHost .rp-message-actions-floorActions {\n    flex-wrap: wrap;\n  }\n}\n\n.rp-message-actions-inlineEditorPortalAnchor,\n.rp-message-actions-editedMessagePortalAnchor { display: none; }\n\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor) {\n  display: none;\n}\n\n[data-rp-message-actions-original-hidden] {\n  display: none;\n}\n\n.rp-message-actions-editedUserMessage {\n  max-width: 100%;\n  align-self: flex-end;\n  padding: 10px 16px;\n  border-radius: 22px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-specific-bubble);\n  font-size: 16px;\n  line-height: 24px;\n}\n\n.rp-message-actions-editedAssistantMessage {\n  display: flex;\n  flex-direction: column;\n  gap: 16px;\n  color: var(--dsw-alias-label-primary);\n  font-size: 16px;\n  line-height: 28px;\n}\n\n.rp-message-actions-inlineEditor {\n  display: flex;\n  min-width: 0;\n  width: 100%;\n  box-sizing: border-box;\n  flex-direction: column;\n  gap: 12px;\n  padding: 14px 16px 12px;\n  border-radius: 22px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-specific-tip);\n  font-family: var(--dsw-font-family);\n}\n\n.rp-message-actions-inlineEditor[data-surface=\"user\"] {\n  align-self: stretch;\n  background: var(--dsw-specific-bubble);\n}\n\n.rp-message-actions-inlineEditor label { display: contents; }\n\n.rp-message-actions-inlineEditor textarea {\n  display: block;\n  width: 100%;\n  height: 72px;\n  min-height: 72px;\n  max-height: 144px;\n  overflow-y: hidden;\n  overscroll-behavior: contain;\n  resize: none;\n  box-sizing: border-box;\n  padding: 0;\n  border: none;\n  border-radius: 0;\n  outline: none;\n  color: var(--dsw-alias-label-primary);\n  background: transparent;\n  font: 16px/24px var(--dsw-font-family);\n}\n\n.rp-message-actions-inlineEditor textarea:focus {\n  outline: none;\n  box-shadow: none;\n}\n\n.rp-message-actions-inlineEditorFooter {\n  display: flex;\n  justify-content: flex-end;\n}\n\n.rp-message-actions-inlineEditorFooter > div {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: flex-end;\n  gap: 8px;\n}\n\n.rp-message-actions-inlineEditorFooter button {\n  min-height: 36px;\n  padding: 7px 14px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 12px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-alias-bg-layer-1);\n  cursor: pointer;\n  font: 12px/20px var(--dsw-font-family);\n  white-space: nowrap;\n}\n\n.rp-message-actions-inlineEditorFooter button[data-primary] {\n  border-color: var(--dsw-alias-button-primary-fill);\n  color: var(--dsw-alias-label-primary-foreground);\n  background: var(--dsw-alias-button-primary-fill);\n}\n\n.rp-message-actions-inlineEditorFooter button:disabled { cursor: not-allowed; opacity: .5; }\n\n.rp-message-actions-editorNotice,\n.rp-message-actions-inlineEditor .rp-message-actions-assetNotice {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-inlineEditor .rp-message-actions-error { margin-top: 0; }\n\n.rp-message-actions-srOnly {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n  clip: rect(0 0 0 0);\n  white-space: nowrap;\n}\n\n.rp-message-actions-dialog {\n  width: min(540px, calc(100vw - 32px));\n}\n\n.rp-message-actions-presetRecoveryDialog {\n  width: min(460px, calc(100vw - 32px));\n}\n\n.rp-message-actions-presetRecoveryBody {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n}\n\n.rp-message-actions-presetRecoveryLoading,\n.rp-message-actions-presetRecoveryHint {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 19px;\n}\n\n.rp-message-actions-presetRecoveryLoading {\n  min-height: 42px;\n  display: flex;\n  align-items: center;\n}\n\n.rp-message-actions-presetRecoveryField {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.rp-message-actions-presetRecoveryField select {\n  width: 100%;\n  box-sizing: border-box;\n  min-height: 40px;\n  padding: 8px 10px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  outline: none;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-alias-bg-layer-1);\n  font: 13px/20px var(--dsw-font-family);\n}\n\n.rp-message-actions-presetRecoveryField select:focus-visible {\n  border-color: var(--dsw-alias-brand-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 16%, transparent);\n}\n\n.rp-message-actions-deleteConfirm {\n  width: min(440px, calc(100vw - 32px));\n}\n\n.rp-message-actions-deleteSummary {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  padding: 12px 14px;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 18%, var(--dsw-alias-border-l2));\n  border-radius: 12px;\n  color: var(--dsw-alias-label-secondary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 4%, var(--dsw-alias-bg-layer-1));\n}\n\n.rp-message-actions-deleteSummary strong {\n  color: var(--dsw-alias-label-primary);\n  font-size: 13px;\n  line-height: 19px;\n  font-weight: 550;\n}\n\n.rp-message-actions-deleteSummary span {\n  font-size: 12px;\n  line-height: 19px;\n}\n\n.rp-message-actions-assetNotice {\n  margin: 12px 0 0;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-message-actions-deleteAction:not(:disabled) {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-message-actions-notice,\n.rp-message-actions-error {\n  margin-top: 10px;\n  padding: 9px 11px;\n  border-radius: 10px;\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-notice {\n  color: var(--dsw-alias-state-warn-label);\n  background: var(--dsw-alias-state-warn-tertiary);\n}\n\n.rp-message-actions-error {\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n}\n\n@media (max-width: 600px) {\n  .rp-message-actions-floorActions { min-height: 28px; gap: 10px; }\n  .rp-message-actions-inlineEditor { padding: 14px; }\n  .rp-message-actions-failedTurnStatus { grid-template-columns: 10px minmax(0, 1fr); }\n  .rp-message-actions-failedTurnStatus > .rp-message-actions-failedTurnRecoveryActions {\n    grid-column: 2;\n    margin-top: 4px;\n  }\n}\n";
+		const STYLE_TEXT = ".rp-message-actions-floorActionHost {\n  width: 100%;\n  font-family: var(--dsw-font-family);\n}\n\n/* Deleted messages can orphan generation rows inside their Turn. Keep those\n   rows in the Session log and trajectory, but remove the now-unowned context,\n   reasoning, tool, and failure chrome from the chat transcript. */\n[data-rp-floor-hidden-by-message-delete],\n[data-rp-message-actions-hidden-trace],\n[data-rp-message-actions-hidden-suffix],\n[data-rp-message-actions-hidden-deleted-user],\n[data-rp-message-actions-hidden-deleted-assistant],\n[data-rp-message-actions-hidden-commit],\n[data-rp-message-actions-hidden-native-branch],\n[data-rp-message-actions-native-user-actions],\n[data-rp-message-actions-hidden-opening],\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-deletedAssistantMarker),\n[data-chat-flow-kind=\"rp-turn-surface\"]:has(.rp-message-actions-deletedAssistantMarker),\n[data-chat-flow-kind=\"rp-message-suffix-action\"]:has(.rp-message-actions-suffixEffectAnchor),\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-inactiveActionNodeMarker),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-turn-surface\"]:has(.rp-message-actions-assistantEffectNodeMarker),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-deletedOpeningMarker) {\n  display: none;\n}\n\n.rp-message-actions-deletedAssistantMarker,\n.rp-message-actions-deletedUserMarker,\n.rp-message-actions-deletedOpeningMarker,\n.rp-message-actions-inactiveActionNodeMarker,\n.rp-message-actions-assistantEffectNodeMarker,\n.rp-message-actions-traceEffectAnchor,\n.rp-message-actions-nativeUserEffectAnchor,\n.rp-message-actions-nativeBranchEffectAnchor,\n.rp-message-actions-suffixEffectAnchor,\n.rp-message-actions-commitToolMarker,\n[data-chat-flow-kind=\"tool-call\"]:has(.rp-message-actions-commitToolMarker[data-rp-commit-tool-status=\"running\"]),\n[data-chat-flow-kind=\"tool-call\"]:has(.rp-message-actions-commitToolMarker[data-rp-commit-tool-status=\"succeeded\"]),\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-deletedUserMarker) {\n  display: none;\n}\n\n.rp-message-actions-commitFailure {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 10px 12px;\n  border-radius: 10px;\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n  font-family: var(--dsw-font-family);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-commitFailure strong { font-weight: 550; }\n\n.rp-message-actions-failedTurnStatus {\n  display: grid;\n  grid-template-columns: 10px minmax(0, 1fr) auto;\n  gap: 8px;\n  align-items: start;\n  padding: 2px 0;\n  font-family: var(--dsw-font-family);\n  font-size: 13px;\n  line-height: 20px;\n}\n\n.rp-message-actions-failedTurnStatusDot { margin-top: 5px; }\n\n.rp-message-actions-failedTurnStatusCopy {\n  min-width: 0;\n  overflow-wrap: anywhere;\n}\n\n.rp-message-actions-failedTurnStatusCopy strong {\n  margin-right: 6px;\n  font-weight: 600;\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"error\"] {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"warning\"] {\n  color: var(--dsw-alias-state-warn-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"ongoing\"] {\n  color: var(--dsw-alias-state-business-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy strong[data-tone=\"done\"] {\n  color: var(--dsw-alias-state-success-primary);\n}\n\n.rp-message-actions-failedTurnStatusCopy span { color: var(--dsw-alias-label-secondary); }\n\n.rp-message-actions-failedTurnRecoveryActions {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 4px;\n  margin-left: 18px;\n}\n\n.rp-message-actions-failedTurnStatus > .rp-message-actions-failedTurnRecoveryActions { margin-left: 0; }\n\n.rp-message-actions-failedTurnDeleteAction:not(:disabled) { color: var(--dsw-alias-state-error-primary); }\n\n.rp-message-actions-assistantActionHost {\n  display: contents;\n}\n\n/* The editor is portaled into the message body; hide the native footer until\n   editing finishes so its unrelated controls do not compete with the form. */\n[data-chat-flow-kind=\"turn-tail\"]:has(.rp-message-actions-assistantActionHost[data-rp-message-actions-editing-native]) {\n  display: none;\n}\n\n/* The public Chat Node Slot inserts a display:contents outlet between the\n   flow item and DSH's user renderer. The renderer keeps its message stack\n   first and its resident time/copy row last. Require both a direct native\n   button and a mounted plugin host before replacing that row; declined\n   standard-session projections keep the native controls. */\n[data-chat-flow-kind=\"user\"]:has(\n  + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n)\n  > [data-slot=\"conversation.chat.node\"]\n  > :first-child\n  > :last-child:has(> button[type=\"button\"]),\n[data-chat-flow-kind=\"user\"]:has(\n  + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n  + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n)\n  > [data-slot=\"conversation.chat.node\"]\n  > :first-child\n  > :last-child:has(> button[type=\"button\"]) {\n  display: none;\n}\n\n/* JS ownership covers arbitrary public Conversation Nodes inserted between\n   the native user row and this plugin's projected action row, including a\n   native renderer refresh after the effect first annotated its action row. */\n[data-chat-flow-kind=\"user\"][data-rp-message-actions-user-native-hidden]\n  > [data-slot=\"conversation.chat.node\"]\n  > :first-child\n  > :last-child:has(> button[type=\"button\"]),\n[data-chat-flow-kind=\"steering\"][data-rp-message-actions-user-native-hidden]\n  > [data-slot=\"conversation.chat.node\"]\n  > :first-child\n  > :last-child:has(> button[type=\"button\"]) {\n  display: none;\n}\n\n/* Pull back only the Chat column's 16px gap so the replacement operation row\n   sits 2px below the bubble and reads as part of the same message. */\n.rp-message-actions-userFloorActionHost {\n  width: 100%;\n  margin-top: -14px;\n  font-family: var(--dsw-font-family);\n}\n\n.rp-message-actions-userFloorActionHost .rp-message-actions-floorActions {\n  margin-top: 0;\n  margin-bottom: 2px;\n}\n\n.rp-message-actions-userFloorTime {\n  margin-right: 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 14px;\n  line-height: 24px;\n  font-variant-numeric: tabular-nums;\n  white-space: nowrap;\n}\n\n@media (hover: hover) {\n  .rp-message-actions-userFloorTime {\n    opacity: 0;\n    transition: opacity 80ms ease;\n  }\n\n  .rp-message-actions-userFloorActionHost:hover .rp-message-actions-userFloorTime,\n  .rp-message-actions-userFloorActionHost:focus-within .rp-message-actions-userFloorTime,\n  [data-chat-flow-kind=\"user\"]:has(\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n  ):hover\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"]\n    .rp-message-actions-userFloorTime,\n  [data-chat-flow-kind=\"user\"]:has(\n    + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"] .rp-message-actions-userFloorActionHost\n  ):hover\n    + [data-chat-flow-kind=\"rp-message-avatar-user\"]\n    + [data-chat-flow-kind=\"rp-floor-user-actions\"]\n    .rp-message-actions-userFloorTime {\n    opacity: 1;\n  }\n}\n\n.rp-message-actions-floorActions {\n  display: flex;\n  min-height: 28px;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 10px;\n  margin: 2px 0 7px;\n  padding-right: 2px;\n}\n\n.rp-message-actions-floorActionHost .rp-message-actions-floorActions {\n  justify-content: flex-start;\n  padding-right: 0;\n  padding-left: 0;\n  margin-left: -6px;\n}\n\n.rp-message-actions-floorAction {\n  display: inline-flex;\n  width: 28px;\n  height: 28px;\n  padding: 6px;\n  align-items: center;\n  justify-content: center;\n  border: 0;\n  border-radius: 28px;\n  outline: none;\n  color: var(--dsw-alias-label-tertiary);\n  background: transparent;\n  cursor: pointer;\n}\n\n.rp-message-actions-floorAction:hover {\n  color: var(--dsw-alias-label-secondary);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n\n.rp-message-actions-floorAction:disabled {\n  cursor: default;\n  opacity: .4;\n}\n\n.rp-message-actions-floorAction[data-tone=\"danger\"]:hover {\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n}\n\n@media (max-width: 600px) {\n  .rp-message-actions-floorActionHost .rp-message-actions-floorActions {\n    flex-wrap: wrap;\n  }\n}\n\n.rp-message-actions-inlineEditorPortalAnchor,\n.rp-message-actions-editedMessagePortalAnchor { display: none; }\n\n[data-chat-flow-kind=\"rp-floor-user-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor),\n[data-chat-flow-kind=\"rp-floor-assistant-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor),\n[data-chat-flow-kind=\"rp-floor-opening-actions\"]:has(.rp-message-actions-inlineEditorPortalAnchor) {\n  display: none;\n}\n\n[data-rp-message-actions-original-hidden] {\n  display: none;\n}\n\n.rp-message-actions-editedUserMessage {\n  max-width: 100%;\n  align-self: flex-end;\n  padding: 10px 16px;\n  border-radius: 22px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-specific-bubble);\n  font-size: 16px;\n  line-height: 24px;\n}\n\n.rp-message-actions-editedAssistantMessage {\n  display: flex;\n  flex-direction: column;\n  gap: 16px;\n  color: var(--dsw-alias-label-primary);\n  font-size: 16px;\n  line-height: 28px;\n}\n\n.rp-message-actions-inlineEditor {\n  display: flex;\n  min-width: 0;\n  width: 100%;\n  box-sizing: border-box;\n  flex-direction: column;\n  gap: 12px;\n  padding: 14px 16px 12px;\n  border-radius: 22px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-specific-tip);\n  font-family: var(--dsw-font-family);\n}\n\n.rp-message-actions-inlineEditor[data-surface=\"user\"] {\n  align-self: stretch;\n  background: var(--dsw-specific-bubble);\n}\n\n.rp-message-actions-inlineEditor label { display: contents; }\n\n.rp-message-actions-inlineEditor textarea {\n  display: block;\n  width: 100%;\n  height: 72px;\n  min-height: 72px;\n  max-height: 144px;\n  overflow-y: hidden;\n  overscroll-behavior: contain;\n  resize: none;\n  box-sizing: border-box;\n  padding: 0;\n  border: none;\n  border-radius: 0;\n  outline: none;\n  color: var(--dsw-alias-label-primary);\n  background: transparent;\n  font: 16px/24px var(--dsw-font-family);\n}\n\n.rp-message-actions-inlineEditor textarea:focus {\n  outline: none;\n  box-shadow: none;\n}\n\n.rp-message-actions-inlineEditorFooter {\n  display: flex;\n  justify-content: flex-end;\n}\n\n.rp-message-actions-inlineEditorFooter > div {\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: flex-end;\n  gap: 8px;\n}\n\n.rp-message-actions-inlineEditorFooter button {\n  min-height: 36px;\n  padding: 7px 14px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 12px;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-alias-bg-layer-1);\n  cursor: pointer;\n  font: 12px/20px var(--dsw-font-family);\n  white-space: nowrap;\n}\n\n.rp-message-actions-inlineEditorFooter button[data-primary] {\n  border-color: var(--dsw-alias-button-primary-fill);\n  color: var(--dsw-alias-label-primary-foreground);\n  background: var(--dsw-alias-button-primary-fill);\n}\n\n.rp-message-actions-inlineEditorFooter button:disabled { cursor: not-allowed; opacity: .5; }\n\n.rp-message-actions-editorNotice,\n.rp-message-actions-inlineEditor .rp-message-actions-assetNotice {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-inlineEditor .rp-message-actions-error { margin-top: 0; }\n\n.rp-message-actions-srOnly {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n  clip: rect(0 0 0 0);\n  white-space: nowrap;\n}\n\n.rp-message-actions-dialog {\n  width: min(540px, calc(100vw - 32px));\n}\n\n.rp-message-actions-presetRecoveryDialog {\n  width: min(460px, calc(100vw - 32px));\n}\n\n.rp-message-actions-presetRecoveryBody {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n}\n\n.rp-message-actions-presetRecoveryLoading,\n.rp-message-actions-presetRecoveryHint {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 19px;\n}\n\n.rp-message-actions-presetRecoveryLoading {\n  min-height: 42px;\n  display: flex;\n  align-items: center;\n}\n\n.rp-message-actions-presetRecoveryField {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n  font-weight: 600;\n}\n\n.rp-message-actions-presetRecoveryField select {\n  width: 100%;\n  box-sizing: border-box;\n  min-height: 40px;\n  padding: 8px 10px;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 10px;\n  outline: none;\n  color: var(--dsw-alias-label-primary);\n  background: var(--dsw-alias-bg-layer-1);\n  font: 13px/20px var(--dsw-font-family);\n}\n\n.rp-message-actions-presetRecoveryField select:focus-visible {\n  border-color: var(--dsw-alias-brand-primary);\n  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 16%, transparent);\n}\n\n.rp-message-actions-deleteConfirm {\n  width: min(440px, calc(100vw - 32px));\n}\n\n.rp-message-actions-deleteSummary {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  padding: 12px 14px;\n  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 18%, var(--dsw-alias-border-l2));\n  border-radius: 12px;\n  color: var(--dsw-alias-label-secondary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 4%, var(--dsw-alias-bg-layer-1));\n}\n\n.rp-message-actions-deleteSummary strong {\n  color: var(--dsw-alias-label-primary);\n  font-size: 13px;\n  line-height: 19px;\n  font-weight: 550;\n}\n\n.rp-message-actions-deleteSummary span {\n  font-size: 12px;\n  line-height: 19px;\n}\n\n.rp-message-actions-assetNotice {\n  margin: 12px 0 0;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 18px;\n}\n\n.rp-message-actions-deleteAction:not(:disabled) {\n  color: var(--dsw-alias-state-error-primary);\n}\n\n.rp-message-actions-notice,\n.rp-message-actions-error {\n  margin-top: 10px;\n  padding: 9px 11px;\n  border-radius: 10px;\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.rp-message-actions-notice {\n  color: var(--dsw-alias-state-warn-label);\n  background: var(--dsw-alias-state-warn-tertiary);\n}\n\n.rp-message-actions-error {\n  color: var(--dsw-alias-state-error-primary);\n  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);\n}\n\n@media (max-width: 600px) {\n  .rp-message-actions-floorActions { min-height: 28px; gap: 10px; }\n  .rp-message-actions-inlineEditor { padding: 14px; }\n  .rp-message-actions-failedTurnStatus { grid-template-columns: 10px minmax(0, 1fr); }\n  .rp-message-actions-failedTurnStatus > .rp-message-actions-failedTurnRecoveryActions {\n    grid-column: 2;\n    margin-top: 4px;\n  }\n}\n";
 		function ensureStyles() {
 			document.getElementById(STYLE_ID)?.remove();
 			const style = document.createElement("style");
@@ -6877,7 +6979,7 @@ get: (_target, key) => {
 		const EMPTY_PRESET_SELECTION = "__rp-message-actions-no-preset__";
 		/** Diagnose historic pre-model failures so the failed row can offer an explicit rebind. */
 		function shouldInspectPresetFailure(matched) {
-			return matched?.target?.kind === "turn" && matched.state?.endReasonKind === "error" && matched.state?.commitAttempted !== true;
+			return matched?.target?.kind === "turn" && turnSurfaceEndReasonKind(matched.state) === "error" && !turnSurfaceCommitAttempted(matched.state);
 		}
 		function usePresetFailureDiagnostic({ connection, profile, enabled }) {
 			const presetId = profile?.resources?.preset?.id;
@@ -7083,7 +7185,7 @@ get: (_target, key) => {
 					step: match.event.data.step
 				},
 				edited: false,
-				deleted: messageText(match.event.data.message?.content).trim().length === 0
+				deleted: false
 			}),
 			update: (context, match) => updateAssistantActionState(context.state, match.event),
 			buildViewNode: (context) => !Number.isSafeInteger(context.state?.turn) ? null : {
@@ -7156,31 +7258,31 @@ get: (_target, key) => {
 			}
 		};
 		const RP_COMMIT_TOOL = "rp_commit_turn";
-		const failedAssistantNodeDefinition = {
-			kind: "rp-floor-failed-assistant",
+		const turnSurfaceNodeDefinition = {
+			kind: RP_TURN_SURFACE_KEY,
 			target: "chat",
-			match: failedAssistantMatch,
+			match: turnSurfaceMatch,
 			start: (_context, match) => ({
-				...failedAssistantStart(match.event),
+				...startTurnSurface(match.event),
 				target: {
 					kind: "turn",
 					turn: match.event.data.turn
 				}
 			}),
-			update: (context, match) => failedAssistantUpdate(context.state, match.event),
+			update: (context, match) => updateTurnSurface(context.state, match.event),
 			buildLocationData: (context, scope, previous) => {
 				if (scope !== "turn" || context.state === void 0) return null;
-				if (previous?.kind === "turn" && previous.turn === context.state.turn && previous.key === "rp-floor-failed-assistant" && previous.value === context.state) return previous;
+				if (previous?.kind === "turn" && previous.turn === context.state.turn && previous.key === "rp-turn-surface" && previous.value === context.state) return previous;
 				return {
 					kind: "turn",
 					turn: context.state.turn,
-					key: "rp-floor-failed-assistant",
+					key: RP_TURN_SURFACE_KEY,
 					value: context.state
 				};
 			},
-			buildViewNode: (context) => context.state?.failed !== true && context.state?.deleted !== true ? null : {
+			buildViewNode: (context) => !turnSurfaceIsFailed(context.state) && !turnSurfaceIsRetired(context.state) ? null : {
 				key: context.key,
-				kind: "rp-floor-failed-assistant",
+				kind: RP_TURN_SURFACE_KEY,
 				id: context.id,
 				target: "chat",
 				anchorSeq: (context.state.seq ?? context.start?.event.seq ?? 0) + .05,
@@ -7194,7 +7296,7 @@ get: (_target, key) => {
 			ctx.uiConversation.events.register(userFloorNodeDefinition);
 			ctx.uiConversation.events.register(assistantFloorNodeDefinition);
 			ctx.uiConversation.events.register(openingFloorNodeDefinition);
-			ctx.uiConversation.events.register(failedAssistantNodeDefinition);
+			ctx.uiConversation.events.register(turnSurfaceNodeDefinition);
 			ctx.uiConversation.events.register(suffixActionNodeDefinition);
 			const injectFloorUi = () => ({
 				connection: ctx.rpRemote,
@@ -7217,9 +7319,9 @@ get: (_target, key) => {
 			}, OpeningFloorEffects));
 			ctx.slots.inject("conversation.chat.node", () => ctx.slots.register({
 				name: "conversation.chat.node",
-				key: "rp-floor-failed-assistant",
+				key: RP_TURN_SURFACE_KEY,
 				inject: injectFloorUi
-			}, FailedAssistantEffects));
+			}, TurnSurfaceEffects));
 			ctx.slots.inject("conversation.chat.node", () => ctx.slots.register({
 				name: "conversation.chat.node",
 				key: "rp-message-suffix-action"
@@ -7368,15 +7470,17 @@ get: (_target, key) => {
 		function isCanonicalAssistantAction(node) {
 			const location = node?.location;
 			if (location?.kind !== "turn" && location?.kind !== "step" || location.turn.status !== "closed") return false;
-			const state = location.turn.data?.get?.("rp-floor-failed-assistant") ?? location.turn.data?.get?.("rp-message-failed-assistant");
-			return state?.failed !== true && Number.isSafeInteger(state?.finalAssistantSeq) && state.finalAssistantSeq === node.data?.seq;
+			const state = location.turn.data?.get?.(RP_TURN_SURFACE_KEY);
+			const reply = turnSurfaceReply(state);
+			return !turnSurfaceIsFailed(state) && !turnSurfaceIsRetired(state) && Number.isSafeInteger(reply?.seq) && reply.seq === node.data?.seq;
 		}
 		/** Mark the exact readable reply selected for recovery from a failed commit. */
 		function isFailedCanonicalAssistantAction(node) {
 			const location = node?.location;
 			if (location?.kind !== "turn" && location?.kind !== "step" || location.turn.status !== "closed") return false;
-			const state = location.turn.data?.get?.("rp-floor-failed-assistant") ?? location.turn.data?.get?.("rp-message-failed-assistant");
-			return state?.failed === true && Number.isSafeInteger(state?.finalAssistantSeq) && state.finalAssistantSeq === node.data?.seq;
+			const state = location.turn.data?.get?.(RP_TURN_SURFACE_KEY);
+			const reply = turnSurfaceReply(state);
+			return turnSurfaceIsFailed(state) && Number.isSafeInteger(reply?.seq) && reply.seq === node.data?.seq;
 		}
 		function InactiveActionNodeMarker() {
 			return h("span", {
@@ -7423,7 +7527,7 @@ get: (_target, key) => {
 			const roleplay = props.useSessions((state) => isRoleplaySession(state, props.sessionId));
 			const profile = props.useProjection("rp/session");
 			const fallbackNode = {
-				kind: "rp-floor-failed-assistant",
+				kind: RP_TURN_SURFACE_KEY,
 				id: String(props.matched.state.turn),
 				location: {
 					kind: "turn",
@@ -7460,14 +7564,14 @@ get: (_target, key) => {
 		}
 		/** Prefer DSH's visible interruption and length-limit states; translate the remaining terminal outcomes. */
 		function failedTurnStatus(matched, detail, diagnostic = null) {
-			const kind = matched.state?.endReasonKind;
+			const kind = turnSurfaceEndReasonKind(matched.state);
 			if (kind === "max-tokens" || matched.nativeStatusVisible === true) return null;
 			const hasPartial = matched.target?.kind === "message";
 			const recoveryMessage = (base, retryable) => {
 				if (detail?.sharedAssetMutation === true) return `${base}本次已修改共享资料，不能直接重新生成。`;
 				return detail?.canReroll === true ? retryable : `${base}你可以继续发送消息。`;
 			};
-			if (matched.state?.commitAttempted === true && matched.state?.committed !== true) return {
+			if (turnSurfaceCommitAttempted(matched.state) && !turnSurfaceIsCommitted(matched.state)) return {
 				state: "error",
 				title: "回复未能完成保存",
 				message: recoveryMessage("正文已保留，但本次会话变量变化没有生效。", "正文已保留，但本次会话变量变化没有生效，可以重新生成这条回复。")
@@ -7482,7 +7586,7 @@ get: (_target, key) => {
 				title: "回复生成失败",
 				message: hasPartial ? recoveryMessage("已生成的内容可能不完整。", "已生成的内容可能不完整。") : recoveryMessage("没有生成可用内容。", "没有生成可用内容，可以重新尝试。")
 			};
-			if (kind === "aborted" && matched.state?.endCancelKind === "user") return {
+			if (kind === "aborted" && turnSurfaceEndCancelKind(matched.state) === "user") return {
 				state: "warning",
 				title: "已停止生成",
 				message: recoveryMessage("没有生成新的回复。", "没有生成新的回复，可以重新尝试。")
@@ -7530,12 +7634,13 @@ get: (_target, key) => {
 				className: css.failedTurnStatusDot
 			}), h("div", { className: css.failedTurnStatusCopy }, h("strong", { "data-tone": current.state }, current.title), h("span", null, current.message)), actions);
 		}
-		function FailedAssistantEffects(props) {
+		function TurnSurfaceEffects(props) {
 			if (!props.useSessions((state) => isRoleplaySession(state, props.sessionId))) return h(InactiveActionNodeMarker);
-			if (props.node.data.deleted === true) return h(DeletedAssistantTraceMarker, { target: props.node.data.target });
-			return h(react.default.Fragment, null, h(AssistantEffectNodeMarker), h(FailedAssistantTraceEffect, { endReasonKind: props.node.data.endReasonKind }), props.node.data.finalAssistantEdited === true ? h(EditedMessagePortal, {
+			if (turnSurfaceIsRetired(props.node.data)) return h(DeletedAssistantTraceMarker, { target: props.node.data.target });
+			const reply = turnSurfaceReply(props.node.data);
+			return h(react.default.Fragment, null, h(AssistantEffectNodeMarker), h(FailedAssistantTraceEffect, { endReasonKind: turnSurfaceEndReasonKind(props.node.data) }), reply?.edited === true ? h(EditedMessagePortal, {
 				surface: "assistant",
-				text: props.node.data.finalAssistantText
+				text: reply.text
 			}) : null);
 		}
 		function SettledAssistantTraceEffect({ target }) {
@@ -7556,7 +7661,7 @@ get: (_target, key) => {
 		function FailedAssistantTraceEffect({ endReasonKind }) {
 			const ref = (0, react.useRef)(null);
 			(0, react.useLayoutEffect)(() => {
-				const host = ref.current?.closest("[data-chat-flow-kind=\"rp-floor-failed-assistant\"]");
+				const host = ref.current?.closest(`[data-chat-flow-kind="${RP_TURN_SURFACE_KEY}"]`);
 				if (!(host instanceof HTMLElement)) return void 0;
 				const hidden = failedAssistantTraceRows(host, endReasonKind);
 				for (const row of hidden) row.setAttribute("data-rp-message-actions-hidden-trace", "");
@@ -7650,7 +7755,7 @@ get: (_target, key) => {
 		function DeletedAssistantTraceMarker({ target }) {
 			const ref = (0, react.useRef)(null);
 			(0, react.useLayoutEffect)(() => {
-				const host = ref.current?.closest("[data-chat-flow-kind=\"rp-floor-assistant-actions\"], [data-chat-flow-kind=\"rp-floor-failed-assistant\"]");
+				const host = ref.current?.closest(`[data-chat-flow-kind="rp-floor-assistant-actions"], [data-chat-flow-kind="${RP_TURN_SURFACE_KEY}"]`);
 				if (!(host instanceof HTMLElement)) return void 0;
 				return ownDynamicRows(host, () => deletedAssistantTraceRows(host), "data-rp-message-actions-hidden-deleted-assistant", `deleted-assistant-${rpMessageActionTargetKey(target)}`);
 			}, [target]);
@@ -8043,7 +8148,7 @@ get: (_target, key) => {
 				className: nativeAssistant ? css.assistantActionHost : userSurface ? css.userFloorActionHost : css.floorActionHost,
 				"data-rp-message-action-key": targetKey,
 				...nativeAssistant && editing ? { "data-rp-message-actions-editing-native": "" } : {},
-				...failedAssistant ? { "data-rp-floor-failed-assistant-actions": "" } : {}
+				...failedAssistant ? { "data-rp-turn-surface-actions": "" } : {}
 			}, userSurface ? h(NativeUserActionsEffect) : null, editing ? h(InlineMessageEditorPortal, {
 				surface,
 				unitLabel,
@@ -8485,7 +8590,6 @@ get: (_target, key) => {
 		exports.assistantMessageContent = assistantMessageContent;
 		exports.deletedAssistantTraceRows = deletedAssistantTraceRows;
 		exports.deletedUserRows = deletedUserRows;
-		exports.failedAssistantNodeDefinition = failedAssistantNodeDefinition;
 		exports.failedAssistantTraceRows = failedAssistantTraceRows;
 		exports.failedTurnStatus = failedTurnStatus;
 		exports.forkMessageBranch = forkMessageBranch;
@@ -8503,6 +8607,7 @@ get: (_target, key) => {
 		exports.suffixActionNodeDefinition = suffixActionNodeDefinition;
 		exports.suffixActionRows = suffixActionRows;
 		exports.suffixResidentStartKey = suffixResidentStartKey;
+		exports.turnSurfaceNodeDefinition = turnSurfaceNodeDefinition;
 		exports.userFloorNodeDefinition = userFloorNodeDefinition;
 		exports.userMessageContentStack = userMessageContentStack;
 		return module.exports;

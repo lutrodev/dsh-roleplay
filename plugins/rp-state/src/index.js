@@ -19,6 +19,7 @@ import { cloneJson, normalizeJson, stateSchemaAtPointer, validateStateValue } fr
 import {
   applyStateChanges,
   stateUpdateArgumentCorrections,
+  stateUpdateEffectProtocol,
   stateUpdateEffectSchema,
 } from './update.js'
 import {
@@ -45,14 +46,11 @@ export const inject = ['commands', 'rpRuntime', 'tools']
 export const Config = Schema.object({ maxNamespacesInContext: Schema.number().default(32) })
 export const STATE_CONTEXT_SOURCE_ID = 'rp.state'
 export const STATE_ACTIVITY_PROJECTION_KEY = 'rp/state/activity'
-export const RP_STATE_COMMIT_CONTEXT_VERSION = 1
+export const RP_STATE_COMMIT_CONTEXT_VERSION = 2
 
 const STATE_COMMIT_CONSTRAINTS = Object.freeze([
   'Submit only paths whose values changed.',
-  'set and append use value; increment uses by; remove uses neither value nor by.',
-  'append adds exactly one new array item, never the complete current array.',
   'Submit at most one state.update effect per namespace.',
-  'Every change requires a non-empty factual reason.',
   'Paths in one effect must not duplicate, overlap, or contain one another.',
   'All changes in one commit are atomic.',
 ])
@@ -330,6 +328,7 @@ export class RpState extends Service {
         version: RP_STATE_COMMIT_CONTEXT_VERSION,
         stateProtocolVersion: RP_STATE_PROTOCOL_VERSION,
         effectKind: 'state.update',
+        effect: stateUpdateEffectProtocol(),
         constraints: STATE_COMMIT_CONSTRAINTS,
         namespaces: entries.map(([namespace, snapshot]) => stateCommitNamespaceContract(namespace, snapshot)),
       },

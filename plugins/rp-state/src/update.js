@@ -3,6 +3,7 @@ import { jsonPointersConflict, parseJsonPointer, readJsonPointer, requiredArrayI
 import { cloneJson, normalizeJson, stateSchemaAtPointer, validateStateValue } from './schema.js'
 
 const CHANGE_BASE_FIELDS = Object.freeze(['op', 'path', 'reason', 'ruleId'])
+const MIN_STATE_UPDATE_CHANGES = 1
 const OPERATION_SPECS = Object.freeze({
   set: Object.freeze({ argument: 'value', forbidden: Object.freeze(['by']), description: 'Replace the value at one path. Pass the new value in "value"; never use "by". Use append instead when adding one item to an existing array.' }),
   increment: Object.freeze({ argument: 'by', forbidden: Object.freeze(['value']), description: 'Add one finite numeric delta to the number at one path. Pass the delta in "by"; never use "value".' }),
@@ -36,9 +37,28 @@ export function stateUpdateEffectSchema() {
   }
 }
 
+/** Derive the compact live prompt contract from the authoritative effect schema. */
+export function stateUpdateEffectProtocol() {
+  const schema = stateUpdateEffectSchema()
+  const payload = schema.properties.payload
+  return {
+    required: [...schema.required],
+    additionalProperties: schema.additionalProperties,
+    payload: {
+      required: [...payload.required],
+      additionalProperties: payload.additionalProperties,
+      changes: {
+        minItems: MIN_STATE_UPDATE_CHANGES,
+        operations: stateUpdateOperationProtocol(),
+      },
+    },
+  }
+}
+
 /** Return the compact operation table embedded in the live State context. */
 export function stateUpdateOperationProtocol() {
   return Object.fromEntries(Object.entries(OPERATION_SPECS).map(([operation, spec]) => [operation, {
+    description: spec.description,
     required: ['op', 'path', ...(spec.argument === undefined ? [] : [spec.argument]), 'reason'],
     optional: ['ruleId'],
     forbidden: [...spec.forbidden],

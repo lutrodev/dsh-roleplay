@@ -20,7 +20,10 @@ import {
   isRoleplaySession,
   messageActionError,
   messageActionValue,
+  startTurnSurface,
+  turnSurfaceReply,
   updateAssistantActionState,
+  updateTurnSurface,
 } from '../src/client-state.js'
 
 test('native edits keep message identity, tool calls and committed effects', async t => {
@@ -633,6 +636,84 @@ test('assistant action folding keeps the original row anchor across native carri
   const deletion = harness.session.snapshotEvents().at(-1)
   assert.deepEqual(updateAssistantActionState(originalState, deletion), {
     ...originalState, deleted: true,
+  })
+
+  const toolOnlyRetry = {
+    type: 'assistant/message',
+    surfaceOp: 'append',
+    data: {
+      turn: 2,
+      step: 3,
+      message: {
+        id: 'tool-only-retry',
+        source: { kind: 'model', provider: 'mock', model: 'mock' },
+        content: [{ type: 'tool-call', id: 'retry', name: 'rp_commit_turn', arguments: '{}' }],
+      },
+    },
+  }
+  assert.equal(assistantActionMatch(toolOnlyRetry), null)
+  assert.equal(updateAssistantActionState(originalState, toolOnlyRetry), originalState)
+})
+
+test('four failed tool-only retries cannot retire or replace the readable assistant reply', () => {
+  const turn = 9
+  let state = startTurnSurface({ seq: 90, type: 'turn/start', data: { turn } })
+  const prose = {
+    seq: 91,
+    time: 1091,
+    type: 'assistant/message',
+    surfaceOp: 'append',
+    data: {
+      turn,
+      step: 2,
+      message: {
+        id: 'readable-prose',
+        source: { kind: 'model', provider: 'mock', model: 'mock' },
+        content: [
+          { type: 'text', text: '失败前已经展示的完整正文' },
+          { type: 'tool-call', id: 'initial-commit', name: 'rp_commit_turn', arguments: '{}' },
+        ],
+      },
+    },
+  }
+  state = updateTurnSurface(state, prose)
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const event = {
+      seq: 92 + attempt,
+      time: 1092 + attempt,
+      type: 'assistant/message',
+      surfaceOp: 'append',
+      data: {
+        turn,
+        step: 3 + attempt,
+        message: {
+          id: `tool-only-${attempt}`,
+          source: { kind: 'model', provider: 'mock', model: 'mock' },
+          content: [{ type: 'tool-call', id: `retry-${attempt}`, name: 'rp_commit_turn', arguments: '{}' }],
+        },
+      },
+    }
+    assert.equal(assistantActionMatch(event), null)
+    state = updateTurnSurface(state, event)
+  }
+  state = updateTurnSurface(state, {
+    seq: 96,
+    time: 1096,
+    type: 'turn/end',
+    data: { turn, reason: { kind: 'completed' } },
+  })
+
+  assert.equal(state.outcome.kind, 'uncommitted')
+  assert.equal(state.commit.kind, 'attempted')
+  assert.equal(state.commit.ownerSeq, 91)
+  assert.deepEqual(turnSurfaceReply(state), {
+    seq: 91,
+    target: { kind: 'message', role: 'assistant', messageId: 'readable-prose', turn, step: 2 },
+    text: '失败前已经展示的完整正文',
+    time: 1091,
+    edited: false,
+    interrupted: false,
   })
 })
 

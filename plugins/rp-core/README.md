@@ -8,9 +8,9 @@ Chat 模式适合直接续写；Agent 模式还可以使用资料工具和任务
 
 角色卡、世界书、人设、创作预设和文风都是可选的实时资料。未绑定时直接生成；绑定资料被删除、损坏或超出可读限制时，Core 会把对应来源标为不可用并从本轮 Prompt 跳过，同时保留绑定 ID 供界面提示和 Agent 修复，不会因此阻断 Writer。运行服务、会话状态或非资料代码本身的错误仍会明确失败。
 
-`rp_commit_turn` 使用全局静态 Tool Schema，不随当前 Agent、State revision 或插件启停生成 shadow tool。完整提交与修复提交由同一固定 `oneOf` 严格互斥：首次失败后 Core 只在当前 Run 缓存完整草稿，错误结果返回绑定 run、turn、Context Build 与 Writer 的 token；重试只能发送 `retry.token` 和有界的 RFC 6901 `add`／`replace`／`remove` 补丁，不能混入 summary、effects、references 或 extensions。重建后的完整草稿重新通过静态结构检查、当前能力 validator、guard、大小限制与 live context 校验后才原子提交；上下文、Writer 或提交轮次变化会立即使 token 失效，成功 token 也不可复用。
+`rp_commit_turn` 全局只注册一个 Tool，不按当前 Agent 或 State revision 生成 shadow tool。它的完整提交分支从全局已注册 effect capability 的闭合 Schema 联合实时派生，因此模型看到的 effect 字段与运行时使用同一份 Schema；插件启停只改变下一次读取到的参数声明，不替换工具实例。父代理扩展仍保持独立的运行时注册与校验边界。完整提交与修复提交由同一固定顶层 `oneOf` 严格互斥：首次失败后 Core 只在当前 Run 缓存完整草稿，错误结果返回绑定 run、turn、Context Build 与 Writer 的 token；重试只能发送 `retry.token` 和有界的 RFC 6901 `add`／`replace`／`remove` 补丁，不能混入 summary、effects、references 或 extensions。重建后的完整草稿重新通过当前完整 Schema、能力 validator、guard、大小限制与 live context 校验后才原子提交；上下文、Writer 或提交轮次变化会立即使 token 失效，成功 token 也不可复用。
 
-参数错误统一规范化为带稳定 code 的结构化结果。Core 在无写入预检中收集能够独立确认的 reference、effect、父代理扩展与 guard 问题，并保留能力返回的精确 JSON Pointer，不把深层路径压缩到 effect 根。能力 Schema 不再进入模型侧 Tool Schema，而由各注册能力在静态提交结构之后校验；未知 effect 或父代理扩展仍会失败。`registerArtifactExtension` 保留给真正由父代理提交的通用扩展；注册与卸载不再触发 Tool Schema 重建。
+参数错误统一规范化为带稳定 code 的结构化结果。Core 在无写入预检中收集能够独立确认的 reference、effect、父代理扩展与 guard 问题，并保留能力返回的精确 JSON Pointer，不把深层路径压缩到 effect 根。effect capability 的同一闭合 Schema 同时进入模型侧 Tool 参数和执行前校验，领域 validator 再检查 revision、规则与 live context；未知 effect 或父代理扩展仍会失败。`registerArtifactExtension` 保留给真正由父代理提交的通用扩展。
 
 Core 另提供 `registerArtifactGenerator`。生成器只在正文、State、guard 和提交诊断全部通过后运行，接收冻结的最终正文、summary、effects、references、角色／提交上下文和取消信号，不接触 live Session 或 Run。结构化子代理能力缺失、超时、格式错误、生成失败或单个派生产物超出字节限制时，只丢弃该产物并写入稳定诊断码，正文和核心 effect 仍正常提交；父级取消仍终止整个提交。
 

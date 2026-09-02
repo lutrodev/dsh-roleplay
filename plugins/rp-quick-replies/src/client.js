@@ -27,11 +27,12 @@ export function apply(ctx) {
 }
 
 export function QuickReplyControl(props) {
-  const { input, inputActions, sessionId, useSession, useSessions, store, applyTextEdits } = props
+  const { inputActions, sessionId, useInput, useSession, useSessions, store, applyTextEdits } = props
   const roleplay = useSessions(state => {
     const summary = state.byId?.[sessionId]
     return isRoleplaySessionSummary(summary) && summary.origin !== 'subagent'
   })
+  const input = useInput(state => state)
   const removed = useSession(state => state.removed === true)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
   const controlRef = useRef(null)

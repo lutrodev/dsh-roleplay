@@ -431,21 +431,36 @@ export class RpRuntime extends Service {
     }
     const normalized = { ...definition, schema }
     this.effectTypes.set(definition.kind, normalized)
+    this.ctx.emit('tools/change')
     const dispose = this.ctx.effect(() => () => {
       if (this.effectTypes.get(definition.kind) !== normalized) return
       this.effectTypes.delete(definition.kind)
+      this.ctx.emit('tools/change')
     }, `rpRuntime.register(effect type:${definition.kind})`)
     return () => void dispose()
   }
 
-  /** Return the static model-facing commit protocol. */
+  /** Return the model-facing commit protocol derived from registered capabilities. */
   commitParametersSchema() {
-    return commitParametersSchema()
+    return commitParametersSchema(this.effectSchemas())
   }
 
   /** Return the strict full-draft branch used after applying retry patches. */
   fullCommitParametersSchema() {
-    return fullCommitParametersSchema()
+    return fullCommitParametersSchema(this.effectSchemas())
+  }
+
+  /** Return defensive copies of registered effect schemas in deterministic order. */
+  effectSchemas() {
+    return ordered(this.effectTypes.values()).map(definition => jsonClone(definition.schema))
+  }
+
+  /** Validate the selected dynamic protocol arm while retaining exact field paths. */
+  validateCommitArgumentsSchema(args) {
+    const schema = isRetryCommitArguments(args)
+      ? this.commitParametersSchema().oneOf[1]
+      : this.fullCommitParametersSchema()
+    return validateJsonSchemaValue(schema, args, '')
   }
 
   /** Collect bounded capability-owned hints for otherwise opaque nested schema failures. */
@@ -1741,7 +1756,7 @@ export class RpRuntime extends Service {
     tool.execute = async (args, exec) => {
       try {
         const violations = [
-          ...validateCommitArgumentsSchema(args),
+          ...runtime.validateCommitArgumentsSchema(args),
           ...(isRetryCommitArguments(args) ? [] : runtime.commitCapabilityArgumentViolations(args)),
         ]
         if (violations.length > 0) {
@@ -1760,7 +1775,7 @@ export class RpRuntime extends Service {
     }
     Object.defineProperty(tool, 'parameters', {
       enumerable: true,
-      value: runtime.commitParametersSchema(),
+      get: () => runtime.commitParametersSchema(),
     })
     return tool
   }
@@ -2216,8 +2231,24 @@ function safeJsonRecordClone(value) {
   }
 }
 
-/** Build the full-draft arm of the static rp_commit_turn protocol. */
-function fullCommitParametersSchema() {
+/** Build the full-draft arm from the currently registered effect schemas. */
+function fullCommitParametersSchema(effectSchemas) {
+  const effectItems = effectSchemas.length === 1
+    ? effectSchemas[0]
+    : effectSchemas.length > 1
+      ? { oneOf: effectSchemas }
+      : {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            kind: {
+              type: 'string',
+              const: '__rp_no_registered_effects__',
+              description: 'No persistent effect types are currently registered; submit an empty effects array.',
+            },
+          },
+          required: ['kind'],
+        }
   const schema = {
     type: 'object',
     additionalProperties: false,
@@ -2226,14 +2257,7 @@ function fullCommitParametersSchema() {
       effects: {
         type: 'array',
         description: 'Optional persistent changes. Follow the frozen commit context for every registered effect kind and payload.',
-        items: {
-          type: 'object',
-          additionalProperties: true,
-          properties: {
-            kind: { type: 'string', description: 'Registered effect discriminator.' },
-          },
-          required: ['kind'],
-        },
+        items: effectItems,
       },
       references: {
         type: 'array',
@@ -2260,11 +2284,11 @@ function fullCommitParametersSchema() {
   return schema
 }
 
-/** Build the one fixed, exact-one full-or-retry rp_commit_turn schema. */
-function commitParametersSchema() {
+/** Build the exact-one full-or-retry rp_commit_turn schema. */
+function commitParametersSchema(effectSchemas) {
   const schema = {
     oneOf: [
-      fullCommitParametersSchema(),
+      fullCommitParametersSchema(effectSchemas),
       {
         type: 'object',
         additionalProperties: false,
@@ -2275,14 +2299,6 @@ function commitParametersSchema() {
   }
   assertSupportedJsonSchema(schema)
   return schema
-}
-
-/** Validate the selected static protocol arm while retaining exact field paths. */
-function validateCommitArgumentsSchema(args) {
-  const schema = isRetryCommitArguments(args)
-    ? commitParametersSchema().oneOf[1]
-    : fullCommitParametersSchema()
-  return validateJsonSchemaValue(schema, args, '')
 }
 
 function normalizeCommitError(error) {

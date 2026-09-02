@@ -2,7 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import { RP_SESSION_APPLY_COMMAND, encodeSessionCommand } from 'dsh-roleplay-rp-session/protocol'
-import { STATE_ACTIVITY_PROJECTION_KEY, RpState, createStateLoreActivation } from '../src/index.js'
+import {
+  STATE_ACTIVITY_PROJECTION_KEY,
+  RpState,
+  createStateLoreActivation,
+  stateUpdateOperationProtocol,
+} from '../src/index.js'
 
 test('State lore gate supports cross-namespace expressions and fails closed with diagnostics', () => {
   const adapter = createStateLoreActivation({
@@ -67,9 +72,21 @@ test('registers State v2 context, semantic effect, diagnostics, and Chat-readabl
 
   const commitVisible = JSON.parse(prepared.parentText)
   const contract = commitVisible.state_commit_contract
-  assert.equal(contract.version, 1)
+  assert.equal(contract.version, 2)
   assert.equal(contract.stateProtocolVersion, 2)
   assert.equal(contract.effectKind, 'state.update')
+  assert.deepEqual(contract.effect, {
+    required: ['kind', 'namespace', 'expectedRevision', 'payload'],
+    additionalProperties: false,
+    payload: {
+      required: ['changes'],
+      additionalProperties: false,
+      changes: {
+        minItems: 1,
+        operations: stateUpdateOperationProtocol(),
+      },
+    },
+  })
   assert.equal(contract.namespaces[0].namespace, 'story')
   assert.equal(contract.namespaces[0].updateMode, 'rules-required')
   assert.equal(contract.namespaces[0].expectedRevision, 1)
@@ -85,7 +102,7 @@ test('registers State v2 context, semantic effect, diagnostics, and Chat-readabl
   assert.equal(Object.hasOwn(contract.namespaces[0], 'schema'), false)
   assert.equal(Object.hasOwn(contract.namespaces[0], 'initialValue'), false)
   assert.equal(Object.hasOwn(contract.namespaces[0], 'diagnostics'), false)
-  assert.match(contract.constraints.join('\n'), /increment uses by/)
+  assert.match(contract.effect.payload.changes.operations.increment.description, /delta.*"by"/)
   assert.equal(/\n\s+"/.test(prepared.parentText), false)
   assert.ok([...prepared.text].length < [...prepared.parentText].length)
   assert.deepEqual(harness.effectType.diagnoseArguments({

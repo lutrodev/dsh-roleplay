@@ -28,14 +28,14 @@ export function replyOptionsExtensionSchema(
     // stored shape, so harmless model-added annotations must not make the
     // narrative transaction retry.
     additionalProperties: true,
-    description: `Generate exactly ${normalizedCount} different, directly sendable third-person next ${normalizedCount === 1 ? 'message' : 'messages'} for the user-controlled protagonist resolved by the surrounding roleplay_context context_guide when present; otherwise infer the protagonist from the remaining context and conversation.${directionGuidance} In every option, use that protagonist's established name or third-person pronoun as the narrative subject and write only what the protagonist says and/or does next. First-person wording may appear only inside the protagonist's quoted dialogue, never in narration or action. Do not write director instructions, other characters' reactions, guaranteed outcomes, option numbers, labels, keywords, or analysis.`,
+    description: `Generate exactly ${normalizedCount} distinct, directly sendable roleplay ${normalizedCount === 1 ? 'continuation' : 'continuations'} for the user-controlled protagonist identified from the surrounding roleplay_context context_guide when present; otherwise infer the protagonist from the remaining context and conversation.${directionGuidance} Let each message form a complete, concrete next move grounded in the current scene and led by the protagonist. Narration uses third person, and dialogue uses the protagonist's natural voice.`,
     properties: {
       options: {
         type: 'array',
-        description: `Exactly ${normalizedCount} distinct third-person protagonist ${normalizedCount === 1 ? 'message' : 'messages'}, each no longer than ${normalizedMaxCharacters} Unicode characters.`,
+        description: `Exactly ${normalizedCount} distinct, directly sendable roleplay ${normalizedCount === 1 ? 'continuation' : 'continuations'}, each within ${normalizedMaxCharacters} Unicode characters.`,
         items: {
           type: 'string',
-          description: 'One complete, directly sendable third-person message using the protagonist\'s established name or pronoun to describe what the protagonist says and/or does next.',
+          description: 'One complete, concrete next move by the protagonist, ready to send as the next message.',
         },
       },
     },
@@ -71,17 +71,16 @@ export function renderReplyOptionsPrompt({
     ? []
     : [`Option ${index + 1} direction: ${keyword}`]).join('\n')
   const prefix = `${[
-    `Generate preferably exactly ${normalizedCount} distinct quick replies the user could send next.`,
-    `Treat ${normalizedMaxCharacters} Unicode characters per option as a concise length target, not a hard limit.`,
-    'Each option must describe only the user-controlled protagonist\'s next speech and/or action in third-person narration, using that protagonist\'s established name or pronoun as the subject. First-person wording is allowed only inside quoted dialogue.',
-    'Do not include numbering, labels, analysis, director instructions, other characters\' reactions, or guaranteed outcomes.',
+    `Generate ${normalizedCount} distinct, directly sendable roleplay continuations the user could choose next.`,
+    `Keep each option within ${normalizedMaxCharacters} Unicode characters.`,
+    'Write each option as a complete, concrete next move that meaningfully continues the interaction. Use the available space to ground it in the current scene through the user-controlled protagonist\'s specific action, dialogue, intention, or observation, combining elements when natural. Use third-person narration when narration is present, and use the protagonist\'s natural voice in dialogue.',
     keywordGuidance.length === 0 ? undefined : keywordGuidance,
     '<final_narrative>',
     narrative.trim(),
     '</final_narrative>',
     '<roleplay_context>',
   ].filter(Boolean).join('\n')}\n`
-  const suffix = '\n</roleplay_context>\nUse the context only to identify the protagonist, continuity, and plausible next moves. Return the structured options object.'
+  const suffix = '\n</roleplay_context>\nUse the context to identify the protagonist, preserve continuity, and choose plausible next moves. Return the structured options object.'
   const fixedCharacters = [...prefix].length + [...suffix].length
   if (fixedCharacters > maxPromptCharacters) {
     const error = new RangeError(`reply options fixed prompt exceeds ${maxPromptCharacters} characters`)
@@ -200,7 +199,7 @@ function invalidReplyOptions(message, expectedCount) {
   error.code = 'RP_REPLY_OPTIONS_INVALID'
   error.feedback = {
     extension: REPLY_OPTIONS_EXTENSION_NAMESPACE,
-    correction: `Replace only rp.reply-options with at least one usable and preferably exactly ${expectedCount} distinct, directly sendable third-person protagonist ${expectedCount === 1 ? 'message' : 'messages'}. Resolve the user-controlled protagonist from the surrounding roleplay_context context_guide when present; otherwise infer the protagonist from the remaining context and conversation. Use that protagonist's established name or pronoun as the narrative subject in every option, allow first-person wording only inside quoted dialogue, describe only what the protagonist says or does next, follow any option direction guidance, omit numbers and labels, then retry.`,
+    correction: `Provide at least one usable and preferably exactly ${expectedCount} distinct, directly sendable roleplay ${expectedCount === 1 ? 'continuation' : 'continuations'} for the user-controlled protagonist. Identify the protagonist from the surrounding roleplay_context context_guide when present; otherwise infer the protagonist from the remaining context and conversation. Let each message form a complete, concrete next move grounded in the current scene through the protagonist's specific action, dialogue, intention, or observation, use third-person narration when narration is present, use the protagonist's natural voice in dialogue, and let configured directions shape their matching options.`,
   }
   return error
 }
@@ -210,7 +209,7 @@ function configuredDirectionGuidance(keywords) {
     ? []
     : [`option ${index + 1}: ${JSON.stringify(keyword)}`])
   if (configured.length === 0) return ''
-  return ` Follow this option direction mapping: ${configured.join('; ')}. Use each phrase only to guide its matching option; do not copy it as a label. Unspecified options are model-chosen.`
+  return ` Shape the matching options with these directions: ${configured.join('; ')}. Options without a configured direction follow a plausible path suggested by the scene.`
 }
 
 function normalizeKeyword(candidate, index) {

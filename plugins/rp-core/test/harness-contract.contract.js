@@ -178,3 +178,35 @@ test('pinned DSH ToolRuntime preserves a raw static oneOf argument contract', as
   assert.equal(retry.value, 'retry')
   await ctx.fiber.dispose()
 })
+
+test('pinned DSH ToolRuntime reprojects a registered tool parameters getter', async () => {
+  const ctx = new Context()
+  await ctx.plugin(SystemPrompt)
+  await ctx.plugin(ToolRuntime)
+  let discriminator = 'first.effect'
+  const definition = {
+    name: 'rp_contract_dynamic_schema',
+    description: 'Dynamic registered-capability schema contract fixture',
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: value }],
+    },
+    async execute() { return 'ok' },
+  }
+  Object.defineProperty(definition, 'parameters', {
+    enumerable: true,
+    get: () => ({
+      type: 'object',
+      additionalProperties: false,
+      properties: { kind: { type: 'string', const: discriminator } },
+      required: ['kind'],
+    }),
+  })
+  ctx.tools.register(definition)
+
+  const schema = () => ctx.tools.schemas().find(item => item.name === definition.name)?.parameters
+  assert.equal(schema().properties.kind.const, 'first.effect')
+  discriminator = 'second.effect'
+  assert.equal(schema().properties.kind.const, 'second.effect')
+  await ctx.fiber.dispose()
+})

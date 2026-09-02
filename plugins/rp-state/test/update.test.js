@@ -5,6 +5,7 @@ import { createNamespaceSnapshot } from '../src/definition.js'
 import {
   applyStateChanges,
   stateUpdateArgumentCorrections,
+  stateUpdateEffectProtocol,
   stateUpdateEffectSchema,
   stateUpdateOperationProtocol,
   StateUpdateError,
@@ -15,10 +16,31 @@ test('publishes one strict schema and operation table for all State update paths
   assert.equal(schema.additionalProperties, false)
   assert.deepEqual(schema.required, ['kind', 'namespace', 'expectedRevision', 'payload'])
   assert.deepEqual(stateUpdateOperationProtocol(), {
-    set: { required: ['op', 'path', 'value', 'reason'], optional: ['ruleId'], forbidden: ['by'] },
-    increment: { required: ['op', 'path', 'by', 'reason'], optional: ['ruleId'], forbidden: ['value'] },
-    append: { required: ['op', 'path', 'value', 'reason'], optional: ['ruleId'], forbidden: ['by'] },
-    remove: { required: ['op', 'path', 'reason'], optional: ['ruleId'], forbidden: ['value', 'by'], rootAllowed: false },
+    set: {
+      description: 'Replace the value at one path. Pass the new value in "value"; never use "by". Use append instead when adding one item to an existing array.',
+      required: ['op', 'path', 'value', 'reason'], optional: ['ruleId'], forbidden: ['by'],
+    },
+    increment: {
+      description: 'Add one finite numeric delta to the number at one path. Pass the delta in "by"; never use "value".',
+      required: ['op', 'path', 'by', 'reason'], optional: ['ruleId'], forbidden: ['value'],
+    },
+    append: {
+      description: 'Append exactly one JSON item to an existing array without repeating its current contents. Pass that one item in "value"; never use "by".',
+      required: ['op', 'path', 'value', 'reason'], optional: ['ruleId'], forbidden: ['by'],
+    },
+    remove: {
+      description: 'Remove one existing non-root path. Do not pass "value" or "by".',
+      required: ['op', 'path', 'reason'], optional: ['ruleId'], forbidden: ['value', 'by'], rootAllowed: false,
+    },
+  })
+  assert.deepEqual(stateUpdateEffectProtocol(), {
+    required: ['kind', 'namespace', 'expectedRevision', 'payload'],
+    additionalProperties: false,
+    payload: {
+      required: ['changes'],
+      additionalProperties: false,
+      changes: { minItems: 1, operations: stateUpdateOperationProtocol() },
+    },
   })
   const effect = change => ({
     kind: 'state.update', namespace: 'story', expectedRevision: 1,

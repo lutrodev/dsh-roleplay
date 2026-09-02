@@ -46,7 +46,7 @@ import {
   assistantFloorNodeDefinition,
   deletedAssistantTraceRows,
   deletedUserRows,
-  failedAssistantNodeDefinition,
+  turnSurfaceNodeDefinition,
   failedAssistantTraceRows,
   failedTurnStatus,
   forkMessageBranch,
@@ -115,7 +115,7 @@ describe('Roleplay message action presentation', () => {
       'rp-floor-user-actions',
       'rp-floor-assistant-actions',
       'rp-floor-opening-actions',
-      'rp-floor-failed-assistant',
+      'rp-turn-surface',
       'rp-message-suffix-action',
     ])
     expect(slots).toEqual([
@@ -212,19 +212,18 @@ describe('Roleplay message action presentation', () => {
 
     const state = {
       turn: 3,
-      failed: true,
-      deleted: false,
-      committed: false,
-      finalAssistantTarget: undefined,
-      finalAssistantText: '',
+      outcome: { kind: 'failed' },
+      replies: [],
+      reply: undefined,
+      commit: { kind: 'none' },
       sharedAssetMutation: false,
-      endReasonKind: 'error',
+      end: { reasonKind: 'error' },
     }
     const turn = {
       turn: 3,
       status: 'closed',
       steps: [],
-      data: new Map([['rp-floor-failed-assistant', state]]),
+      data: new Map([['rp-turn-surface', state]]),
     }
     const matched = selectFailedAssistant({ turn })
     const location = { kind: 'turn', turn }
@@ -321,19 +320,18 @@ describe('Roleplay message action presentation', () => {
 
     const state = {
       turn: 4,
-      failed: true,
-      deleted: false,
-      committed: false,
-      finalAssistantTarget: undefined,
-      finalAssistantText: '',
+      outcome: { kind: 'failed' },
+      replies: [],
+      reply: undefined,
+      commit: { kind: 'none' },
       sharedAssetMutation: false,
-      endReasonKind: 'error',
+      end: { reasonKind: 'error' },
     }
     const turn = {
       turn: 4,
       status: 'closed',
       steps: [],
-      data: new Map([['rp-floor-failed-assistant', state]]),
+      data: new Map([['rp-turn-surface', state]]),
     }
     const matched = selectFailedAssistant({ turn })
     const location = { kind: 'turn', turn }
@@ -987,7 +985,7 @@ describe('Roleplay message action presentation', () => {
     const target = {
       kind: 'message', role: 'assistant', messageId: 'canonical-prose', turn: 7, step: 2,
     }
-    const state = { failed: false, finalAssistantSeq: 71 }
+    const state = { outcome: { kind: 'completed' }, reply: { seq: 71 } }
     const parent = document.createElement('div')
     flowRow('user', parent)
     const prose = flowRow('assistant-step', parent)
@@ -1002,7 +1000,7 @@ describe('Roleplay message action presentation', () => {
       node: {
         location: {
           kind: 'turn',
-          turn: { turn: 7, status: 'closed', data: new Map([['rp-floor-failed-assistant', state]]) },
+          turn: { turn: 7, status: 'closed', data: new Map([['rp-turn-surface', state]]) },
         },
         data: { seq: 71, target, text: '工具重试前已经展示的正文', deleted: false, edited: false },
       },
@@ -1044,19 +1042,19 @@ describe('Roleplay message action presentation', () => {
   })
 
   it('declines every intermediate assistant action node in a multi-step turn', () => {
-    const state = { failed: false, finalAssistantSeq: 12 }
+    const state = { outcome: { kind: 'completed' }, reply: { seq: 12 } }
     const location = {
       kind: 'turn',
-      turn: { turn: 1, status: 'closed', data: new Map([['rp-floor-failed-assistant', state]]) },
+      turn: { turn: 1, status: 'closed', data: new Map([['rp-turn-surface', state]]) },
     }
     expect(isCanonicalAssistantAction({ location, data: { seq: 8 } })).toBe(false)
     expect(isCanonicalAssistantAction({ location, data: { seq: 12 } })).toBe(true)
-    state.failed = true
+    state.outcome = { kind: 'partial' }
     expect(isCanonicalAssistantAction({ location, data: { seq: 12 } })).toBe(false)
     expect(isFailedCanonicalAssistantAction({ location, data: { seq: 8 } })).toBe(false)
     expect(isFailedCanonicalAssistantAction({ location, data: { seq: 12 } })).toBe(true)
     location.turn.status = 'open'
-    state.failed = false
+    state.outcome = { kind: 'completed' }
     expect(isCanonicalAssistantAction({ location, data: { seq: 12 } })).toBe(false)
     expect(isFailedCanonicalAssistantAction({ location, data: { seq: 12 } })).toBe(false)
   })
@@ -1072,7 +1070,7 @@ describe('Roleplay message action presentation', () => {
     const emptyStep = flowRow('assistant-step', parent)
     const error = flowRow('turn-error', parent)
     const maxTokens = flowRow('turn-max-tokens', parent)
-    const effect = flowRow('rp-floor-failed-assistant', parent)
+    const effect = flowRow('rp-turn-surface', parent)
 
     expect(failedAssistantTraceRows(effect)).toEqual([maxTokens, error, emptyStep, tool, intermediate, context])
     expect(failedAssistantTraceRows(effect)).not.toContain(tail)
@@ -1088,7 +1086,7 @@ describe('Roleplay message action presentation', () => {
     committedMarker.dataset.rpMessageActionsFailedCanonical = ''
     committedActions.append(committedMarker)
     const placeholder = readableAssistantRow(commitParent, '—')
-    const commitEffect = flowRow('rp-floor-failed-assistant', commitParent)
+    const commitEffect = flowRow('rp-turn-surface', commitParent)
 
     expect(failedAssistantTraceRows(commitEffect)).not.toContain(committedProse)
     expect(failedAssistantTraceRows(commitEffect)).toContain(placeholder)
@@ -1096,9 +1094,9 @@ describe('Roleplay message action presentation', () => {
 
   it('keeps failed commit prose canonical when a later model step emits a placeholder', () => {
     const start = { seq: 60, time: 1060, type: 'turn/start', data: { turn: 6 } }
-    let state = failedAssistantNodeDefinition.start({}, {
+    let state = turnSurfaceNodeDefinition.start({}, {
       event: start,
-      ...failedAssistantNodeDefinition.match(start),
+      ...turnSurfaceNodeDefinition.match(start),
     })
     const commitAssistant = {
       seq: 61,
@@ -1118,9 +1116,9 @@ describe('Roleplay message action presentation', () => {
         },
       },
     }
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: commitAssistant,
-      ...failedAssistantNodeDefinition.match(commitAssistant),
+      ...turnSurfaceNodeDefinition.match(commitAssistant),
     })
     const placeholder = {
       ...assistantEvent('assistant-placeholder', '—', 62),
@@ -1130,9 +1128,9 @@ describe('Roleplay message action presentation', () => {
         step: 3,
       },
     }
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: placeholder,
-      ...failedAssistantNodeDefinition.match(placeholder),
+      ...turnSurfaceNodeDefinition.match(placeholder),
     })
     const end = {
       seq: 63,
@@ -1140,26 +1138,23 @@ describe('Roleplay message action presentation', () => {
       type: 'turn/end',
       data: { turn: 6, reason: { kind: 'completed' } },
     }
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: end,
-      ...failedAssistantNodeDefinition.match(end),
+      ...turnSurfaceNodeDefinition.match(end),
     })
     const turn = {
       turn: 6,
       status: 'closed',
       start,
       end,
-      data: new Map([['rp-floor-failed-assistant', state]]),
+      data: new Map([['rp-turn-surface', state]]),
     }
     const selected = selectFailedAssistant({ turn })
     expect(state).toMatchObject({
-      failed: true,
-      committed: false,
-      commitAttempted: true,
-      finalAssistantSeq: 61,
-      finalAssistantText: '提交时已经展示的完整正文',
-      finalAssistantOwnsCommit: true,
-      endReasonKind: 'completed',
+      outcome: { kind: 'uncommitted' },
+      commit: { kind: 'attempted', ownerSeq: 61, attemptSeq: 61 },
+      reply: { seq: 61, text: '提交时已经展示的完整正文' },
+      end: { reasonKind: 'completed' },
     })
     expect(selected).toMatchObject({
       target: { kind: 'message', messageId: 'assistant-commit-prose', turn: 6, step: 2 },
@@ -1174,9 +1169,9 @@ describe('Roleplay message action presentation', () => {
 
   it('keeps the original prose canonical after a tool-only commit retry succeeds', () => {
     const start = { seq: 70, time: 1070, type: 'turn/start', data: { turn: 7 } }
-    let state = failedAssistantNodeDefinition.start({}, {
+    let state = turnSurfaceNodeDefinition.start({}, {
       event: start,
-      ...failedAssistantNodeDefinition.match(start),
+      ...turnSurfaceNodeDefinition.match(start),
     })
     const prose = {
       ...assistantEvent('assistant-retry-prose', '工具重试前已经展示的正文', 71),
@@ -1186,9 +1181,9 @@ describe('Roleplay message action presentation', () => {
         step: 2,
       },
     }
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: prose,
-      ...failedAssistantNodeDefinition.match(prose),
+      ...turnSurfaceNodeDefinition.match(prose),
     })
     const toolOnlyRetry = {
       ...assistantEvent('assistant-tool-only-retry', '', 72),
@@ -1203,9 +1198,9 @@ describe('Roleplay message action presentation', () => {
         },
       },
     }
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: toolOnlyRetry,
-      ...failedAssistantNodeDefinition.match(toolOnlyRetry),
+      ...turnSurfaceNodeDefinition.match(toolOnlyRetry),
     })
     const placeholder = {
       ...assistantEvent('assistant-retry-placeholder', '—', 73),
@@ -1215,9 +1210,9 @@ describe('Roleplay message action presentation', () => {
         step: 4,
       },
     }
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: placeholder,
-      ...failedAssistantNodeDefinition.match(placeholder),
+      ...turnSurfaceNodeDefinition.match(placeholder),
     })
     const commit = {
       seq: 74,
@@ -1237,9 +1232,9 @@ describe('Roleplay message action presentation', () => {
         },
       },
     }
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: commit,
-      ...failedAssistantNodeDefinition.match(commit),
+      ...turnSurfaceNodeDefinition.match(commit),
     })
     const end = {
       seq: 75,
@@ -1247,26 +1242,23 @@ describe('Roleplay message action presentation', () => {
       type: 'turn/end',
       data: { turn: 7, reason: { kind: 'completed' } },
     }
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: end,
-      ...failedAssistantNodeDefinition.match(end),
+      ...turnSurfaceNodeDefinition.match(end),
     })
     const turn = {
       turn: 7,
       status: 'closed',
       start,
       end,
-      data: new Map([['rp-floor-failed-assistant', state]]),
+      data: new Map([['rp-turn-surface', state]]),
     }
     const location = { kind: 'turn', turn }
 
     expect(state).toMatchObject({
-      failed: false,
-      committed: true,
-      commitAttempted: true,
-      finalAssistantSeq: 71,
-      finalAssistantText: '工具重试前已经展示的正文',
-      finalAssistantOwnsCommit: true,
+      outcome: { kind: 'committed' },
+      commit: { kind: 'committed', ownerSeq: 71, resultSeq: 74 },
+      reply: { seq: 71, text: '工具重试前已经展示的正文' },
     })
     expect(isCanonicalAssistantAction({ location, data: { seq: 71 } })).toBe(true)
     expect(isCanonicalAssistantAction({ location, data: { seq: 73 } })).toBe(false)
@@ -1274,9 +1266,9 @@ describe('Roleplay message action presentation', () => {
 
   it('targets a durable interrupted assistant for failed actions and falls back to the turn without one', () => {
     const start = { seq: 30, time: 1030, type: 'turn/start', data: { turn: 4 } }
-    let state = failedAssistantNodeDefinition.start({}, {
+    let state = turnSurfaceNodeDefinition.start({}, {
       event: start,
-      ...failedAssistantNodeDefinition.match(start),
+      ...turnSurfaceNodeDefinition.match(start),
     })
     const interrupted = {
       ...assistantEvent('assistant-interrupted', '生成到这里时被中断', 34),
@@ -1288,9 +1280,9 @@ describe('Roleplay message action presentation', () => {
         interrupted: true,
       },
     }
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: interrupted,
-      ...failedAssistantNodeDefinition.match(interrupted),
+      ...turnSurfaceNodeDefinition.match(interrupted),
     })
     const end = {
       seq: 36,
@@ -1298,16 +1290,16 @@ describe('Roleplay message action presentation', () => {
       type: 'turn/end',
       data: { turn: 4, reason: { kind: 'aborted', reason: { kind: 'user' } } },
     }
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: end,
-      ...failedAssistantNodeDefinition.match(end),
+      ...turnSurfaceNodeDefinition.match(end),
     })
     const turn = {
       turn: 4,
       status: 'closed',
       start,
       end,
-      data: new Map([['rp-floor-failed-assistant', state]]),
+      data: new Map([['rp-turn-surface', state]]),
     }
     expect(selectFailedAssistant({ turn })).toMatchObject({
       target: {
@@ -1320,37 +1312,39 @@ describe('Roleplay message action presentation', () => {
       nativeStatusVisible: true,
     })
     expect(state).toMatchObject({
-      endReasonKind: 'aborted', endCancelKind: 'user', finalAssistantInterrupted: true,
+      outcome: { kind: 'partial' },
+      end: { reasonKind: 'aborted', cancelKind: 'user' },
+      reply: { interrupted: true },
     })
-    const locationData = failedAssistantNodeDefinition.buildLocationData({ state }, 'turn')
+    const locationData = turnSurfaceNodeDefinition.buildLocationData({ state }, 'turn')
     expect(locationData).toMatchObject({
-      kind: 'turn', turn: 4, key: 'rp-floor-failed-assistant', value: state,
+      kind: 'turn', turn: 4, key: 'rp-turn-surface', value: state,
     })
-    expect(failedAssistantNodeDefinition.buildLocationData({ state }, 'turn', locationData)).toBe(locationData)
-    expect(failedAssistantNodeDefinition.buildLocationData({ state: { ...state } }, 'turn', locationData)).not.toBe(locationData)
-    expect(failedAssistantNodeDefinition.buildLocationData({ state }, 'chat', locationData)).toBeNull()
+    expect(turnSurfaceNodeDefinition.buildLocationData({ state }, 'turn', locationData)).toBe(locationData)
+    expect(turnSurfaceNodeDefinition.buildLocationData({ state: { ...state } }, 'turn', locationData)).not.toBe(locationData)
+    expect(turnSurfaceNodeDefinition.buildLocationData({ state }, 'chat', locationData)).toBeNull()
     expect(selectFailedTurnRecovery({ turn })).toBeNull()
-    expect(failedAssistantNodeDefinition.buildViewNode({
-      key: 'rp-floor-failed-assistant:4', id: '4', state,
+    expect(turnSurfaceNodeDefinition.buildViewNode({
+      key: 'rp-turn-surface:4', id: '4', state,
       start: { event: start, location: { kind: 'turn', turn } },
-    })).toMatchObject({ kind: 'rp-floor-failed-assistant', anchorSeq: 36.05 })
+    })).toMatchObject({ kind: 'rp-turn-surface', anchorSeq: 36.05 })
 
     const edit = actionEvent('edit', [{
       kind: 'message', role: 'assistant', messageId: 'assistant-interrupted', turn: 4, step: 2,
     }], '人工补完后的中断回复', 40, 'assistant')
-    state = failedAssistantNodeDefinition.update({ state }, {
+    state = turnSurfaceNodeDefinition.update({ state }, {
       event: edit,
-      ...failedAssistantNodeDefinition.match(edit),
+      ...turnSurfaceNodeDefinition.match(edit),
     })
-    turn.data.set('rp-floor-failed-assistant', state)
+    turn.data.set('rp-turn-surface', state)
     expect(selectFailedAssistant({ turn })).toMatchObject({
       copyText: '人工补完后的中断回复', canEdit: true, edited: true,
     })
 
     const emptyStart = { seq: 50, time: 1050, type: 'turn/start', data: { turn: 5 } }
-    let emptyState = failedAssistantNodeDefinition.start({}, {
+    let emptyState = turnSurfaceNodeDefinition.start({}, {
       event: emptyStart,
-      ...failedAssistantNodeDefinition.match(emptyStart),
+      ...turnSurfaceNodeDefinition.match(emptyStart),
     })
     const emptyEnd = {
       seq: 51,
@@ -1358,16 +1352,16 @@ describe('Roleplay message action presentation', () => {
       type: 'turn/end',
       data: { turn: 5, reason: { kind: 'error', error: { message: 'pre-step failed' } } },
     }
-    emptyState = failedAssistantNodeDefinition.update({ state: emptyState }, {
+    emptyState = turnSurfaceNodeDefinition.update({ state: emptyState }, {
       event: emptyEnd,
-      ...failedAssistantNodeDefinition.match(emptyEnd),
+      ...turnSurfaceNodeDefinition.match(emptyEnd),
     })
     const emptyTurn = {
       turn: 5,
       status: 'closed',
       start: emptyStart,
       end: emptyEnd,
-      data: new Map([['rp-floor-failed-assistant', emptyState]]),
+      data: new Map([['rp-turn-surface', emptyState]]),
     }
     expect(selectFailedAssistant({ turn: emptyTurn })).toMatchObject({
       target: { kind: 'turn', turn: 5 }, copyText: '', canEdit: false, edited: false,
@@ -1381,7 +1375,7 @@ describe('Roleplay message action presentation', () => {
     const partial = readableAssistantRow(parent, '生成到这里时被中断')
     const tail = flowRow('turn-tail', parent)
     const actionHost = document.createElement('div')
-    actionHost.dataset.rpFloorFailedAssistantActions = ''
+    actionHost.dataset.rpTurnSurfaceActions = ''
     const anchor = document.createElement('span')
     actionHost.append(anchor)
     tail.append(actionHost)
@@ -1397,13 +1391,13 @@ describe('Roleplay message action presentation', () => {
 
     const blockedState = {
       ...state,
-      endReasonKind: 'blocked',
-      endCancelKind: undefined,
-      finalAssistantInterrupted: false,
+      outcome: { kind: 'partial' },
+      end: { reasonKind: 'blocked', cancelKind: undefined },
+      reply: { ...state.reply, interrupted: false },
     }
     const blockedTurn = {
       ...turn,
-      data: new Map([['rp-floor-failed-assistant', blockedState]]),
+      data: new Map([['rp-turn-surface', blockedState]]),
     }
     expect(failedTurnStatus(selectFailedAssistant({ turn: blockedTurn }), {
       canReroll: false, sharedAssetMutation: false,
@@ -1413,10 +1407,10 @@ describe('Roleplay message action presentation', () => {
       message: '已生成的内容可能不完整。你可以继续发送消息。',
     })
 
-    const maxTokenState = { ...emptyState, endReasonKind: 'max-tokens' }
+    const maxTokenState = { ...emptyState, end: { reasonKind: 'max-tokens' } }
     const maxTokenTurn = {
       ...emptyTurn,
-      data: new Map([['rp-floor-failed-assistant', maxTokenState]]),
+      data: new Map([['rp-turn-surface', maxTokenState]]),
     }
     expect(failedTurnStatus(selectFailedAssistant({ turn: maxTokenTurn }), {
       canReroll: true, sharedAssetMutation: false,
@@ -1695,22 +1689,26 @@ function roleplayActionProjection({
     kind: 'message', role: 'assistant', messageId: `assistant-${turn - 1}`, turn, step: 1,
   }
   const assistantSeq = turn * 10 + userTexts.length
+  const reply = {
+    seq: assistantSeq,
+    target: assistantTarget,
+    text: '正文',
+    edited: false,
+    interrupted: false,
+  }
   const state = {
     turn,
-    failed: false,
-    deleted: false,
-    committed: true,
-    commitSeq: assistantSeq + 1,
-    finalAssistantSeq: assistantSeq,
-    finalAssistantTarget: assistantTarget,
-    finalAssistantText: '正文',
-    finalAssistantEdited: false,
+    outcome: { kind: 'committed' },
+    replies: [reply],
+    reply,
+    commit: { kind: 'committed', ownerSeq: assistantSeq, resultSeq: assistantSeq + 1 },
+    end: { reasonKind: 'completed' },
     sharedAssetMutation,
   }
   const turnState = {
     turn,
     status: 'closed',
-    data: new Map([['rp-floor-failed-assistant', state]]),
+    data: new Map([['rp-turn-surface', state]]),
   }
   const location = { kind: 'turn', turn: turnState }
   const userTargets = userTexts.map((_text, index) => ({

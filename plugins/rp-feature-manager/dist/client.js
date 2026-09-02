@@ -7871,7 +7871,7 @@ get: (_target, key) => {
 			}), h$1("span", { "aria-hidden": true }, "字")))), h$1("p", {
 				id: basicsHelpId,
 				className: css.replyOptionsSettingsHint
-			}, `回复条数可填写 1–5；每条长度指导可填写 1–200，默认目标为 50 字以内。生成结果不会按该值硬性拒绝。`)), h$1("section", {
+			}, `回复条数可填写 1–5；每条长度指导可填写 1–200，默认目标为 50 字以内。`)), h$1("section", {
 				className: css.replyOptionsKeywordSection,
 				"aria-labelledby": "rp-reply-options-keywords-title"
 			}, h$1("header", { className: css.replyOptionsKeywordHeader }, h$1("div", null, h$1("h3", { id: "rp-reply-options-keywords-title" }, "方向关键词"), h$1("p", { id: directionHelpId }, "每条选项对应一个方向；留空时由模型自行决定。")), h$1("span", null, "可选")), h$1("div", { className: css.replyOptionsKeywordList }, ...Array.from({ length: visibleCount }, (_, index) => {

@@ -4,11 +4,11 @@
 
 ## Unreleased
 
-- 微调内置“示例预设”的篇幅与收束指导：保留现有长程推进结构，不再默认要求“中等偏长”，并明确在自然落点后不为单轮完整或剩余输出空间继续推进下一段主要情节；未编辑的托管旧示例会保留栏位 ID 与分组标签设置并升级内容。
+- 微调内置“示例预设”的篇幅与收束指导：保留现有长程推进结构，不再默认要求“中等偏长”，并将单轮范围明确为一个主要推进点及其直接影响，避免连续跨越多个叙事阶段；未编辑的托管旧示例会保留栏位 ID 与分组标签设置并升级内容。
 - 迁移到 DSH `0.1.2-alpha.4`：Session Event Log 全面改用 `snapshotEvents()`、`eventAt()` 与 `seq`，分支会话改用 `isSeeded` 和精确的 `inheritedEventCount`；Session 与结构化子代理调用集中到 Core 薄适配层，全部 DSH 开发依赖和 peer dependency 精确锁定同一版本，并新增 Session、Tool Runtime 与 Subagent 行为契约门禁。现有 JSONL 会话格式保持兼容，无需数据改写。
-- 修复 Chat 提交纠错成功后偶发正文消失：消息操作节点现在会在 Conversation Node 重排后持续校正轨迹归属，工具专用空回复不再被误认作最终正文。回复选项输入会执行 trim、去空项、去重和条数截断，忽略额外注释；主角身份标签缺失时从冻结的角色上下文与对话推断。
+- 修复 Chat 提交失败或纠错后偶发正文消失：每个 Turn 现在从 Session Log 折叠唯一 `rp-turn-surface`，显式区分可见正文、提交结果、失败与删除；空白或仅含工具调用的模型消息不再创建消息操作节点，也不会被误判成删除。Conversation Node 重排后仍会持续校正轨迹归属。回复选项输入会执行 trim、去空项、去重和条数截断，忽略额外注释；主角身份标签缺失时从冻结的角色上下文与对话推断。
 - 回复选项迁移为核心提交校验通过后的非阻断 artifact generator：使用最终冻结正文发起一次轻量结构化子代理调用，Provider 不支持、超时、格式错误、生成失败或单独超限时只丢弃选项并记录稳定诊断，正文、State 和其他核心产物仍正常提交。卡片设置可调整目标条数、1–200 的长度指导（默认 50）和方向关键词，这些值只指导生成而不作为硬性提交校验；`rp.reply-options` v1 持久化与客户端投影保持不变。
-- `rp_commit_turn` 改为一份全局静态、完整提交与补丁重试严格 `oneOf` 的 Tool Schema，不再随 Agent、effect、extension 或 State revision 覆盖。首次语义失败后 Core 缓存完整草稿并签发上下文绑定 token，重试只能提交有界 JSON Pointer 补丁；revision、上下文、Writer 或轮次变化会使 token 失效。State 改用每轮紧凑 `state_commit_contract`，先汇总全部独立静态问题，再顺序执行条件、应用和最终 Schema 校验；错误保留到具体 change 字段的 JSON Pointer 及 namespace、changeIndex、ruleId。
+- `rp_commit_turn` 保持单一全局 Tool，并让完整提交分支从全局注册 effect capability 的闭合 Schema 实时派生；模型参数声明与执行前校验共享同一 Schema，不再依赖重复的文字协议。完整提交与补丁重试仍由顶层 `oneOf` 严格互斥；首次语义失败后 Core 缓存完整草稿并签发上下文绑定 token，重试只能提交有界 JSON Pointer 补丁，revision、上下文、Writer 或轮次变化会使 token 失效。State 的 v2 `state_commit_contract` 从同一 operation specification 派生 effect envelope 与四类操作表；校验先汇总全部独立静态问题，再顺序执行条件、应用和最终 Schema 校验，错误保留到具体 change 字段的 JSON Pointer 及 namespace、changeIndex、ruleId。
 
 ## 0.1.7 - 2026-09-01
 

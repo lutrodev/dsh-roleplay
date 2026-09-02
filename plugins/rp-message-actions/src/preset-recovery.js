@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import { actionError, messageActionValue } from './client-state.js'
+import {
+  actionError,
+  messageActionValue,
+  turnSurfaceCommitAttempted,
+  turnSurfaceEndReasonKind,
+} from './client-state.js'
 import { css } from './client-styles.generated.js'
 
 const h = React.createElement
@@ -9,8 +14,8 @@ const EMPTY_PRESET_SELECTION = '__rp-message-actions-no-preset__'
 /** Diagnose historic pre-model failures so the failed row can offer an explicit rebind. */
 export function shouldInspectPresetFailure(matched) {
   return matched?.target?.kind === 'turn'
-    && matched.state?.endReasonKind === 'error'
-    && matched.state?.commitAttempted !== true
+    && turnSurfaceEndReasonKind(matched.state) === 'error'
+    && !turnSurfaceCommitAttempted(matched.state)
 }
 
 export function usePresetFailureDiagnostic({ connection, profile, enabled }) {

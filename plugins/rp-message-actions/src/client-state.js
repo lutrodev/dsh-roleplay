@@ -1,6 +1,29 @@
 import { isSelectedOpeningMessage } from 'dsh-roleplay-rp-session/protocol'
 import { isRoleplaySessionSummary } from 'dsh-roleplay-rp-ui/session-summary'
 import { decodeRpMessageActionEvent, rpMessageActionTargetKey } from './protocol.js'
+import {
+  RP_TURN_SURFACE_KEY,
+  turnSurfaceCommitSeq,
+  turnSurfaceEndReasonKind,
+  turnSurfaceIsFailed,
+  turnSurfaceIsRetired,
+  turnSurfaceReply,
+} from './turn-surface.js'
+
+export {
+  RP_TURN_SURFACE_KEY,
+  startTurnSurface,
+  turnSurfaceCommitAttempted,
+  turnSurfaceCommitSeq,
+  turnSurfaceEndCancelKind,
+  turnSurfaceEndReasonKind,
+  turnSurfaceIsCommitted,
+  turnSurfaceIsFailed,
+  turnSurfaceIsRetired,
+  turnSurfaceMatch,
+  turnSurfaceReply,
+  updateTurnSurface,
+} from './turn-surface.js'
 
 /** Resolve the nested RPC envelope used by the Roleplay host plugins. */
 export function messageActionValue(result) {
@@ -73,14 +96,14 @@ export function projectMessageActionDetail(snapshot, target, fallbackNode) {
     target: node.data.target ?? target,
     turn,
     role: node.kind === 'rp-floor-user-actions' ? 'user' : 'assistant',
-    content: node.data.text ?? state?.finalAssistantText ?? '',
+    content: node.data.text ?? turnSurfaceReply(state)?.text ?? '',
     canEdit: true,
     canDelete: true,
     canReroll: false,
     canSaveAndReroll: false,
-    edited: node.data.edited === true || state?.finalAssistantEdited === true,
-    failed: state?.failed === true,
-    failureKind: state?.endReasonKind,
+    edited: node.data.edited === true || turnSurfaceReply(state)?.edited === true,
+    failed: turnSurfaceIsFailed(state),
+    failureKind: turnSurfaceEndReasonKind(state),
     sharedAssetMutation,
     deleteIncludesSharedAssetMutation: suffixHasSharedAssetMutation(nodes, turn),
     sessionRunning,
@@ -99,16 +122,16 @@ export function projectMessageActionDetail(snapshot, target, fallbackNode) {
     canReroll: currentTail
       && replayable
       && !sharedAssetMutation
-      && nodeTargetKey === safeTargetKey(state?.finalAssistantTarget),
-    forkSeq: Number.isSafeInteger(state?.commitSeq) ? state.commitSeq : node.data.seq,
+      && nodeTargetKey === safeTargetKey(turnSurfaceReply(state)?.target),
+    forkSeq: turnSurfaceCommitSeq(state) ?? node.data.seq,
   }
 }
 
 function projectFailedTurnDetail(snapshot, nodes, target) {
-  const node = nodes.find(candidate => candidate.kind === 'rp-floor-failed-assistant'
+  const node = nodes.find(candidate => candidate.kind === RP_TURN_SURFACE_KEY
     && candidate.data?.turn === target.turn)
   const state = node?.data ?? roleplayTurnState(nodes, target.turn)
-  if (state?.failed !== true || state.deleted === true) return null
+  if (!turnSurfaceIsFailed(state) || turnSurfaceIsRetired(state)) return null
   const sessionRunning = snapshot?.running === true
   const replayable = replayableTurn(nodes, target.turn)
   const sharedAssetMutation = state.sharedAssetMutation === true
@@ -125,7 +148,7 @@ function projectFailedTurnDetail(snapshot, nodes, target) {
     canSaveAndReroll: false,
     edited: false,
     failed: true,
-    failureKind: state.endReasonKind,
+    failureKind: turnSurfaceEndReasonKind(state),
     sharedAssetMutation,
     deleteIncludesSharedAssetMutation: suffixHasSharedAssetMutation(nodes, target.turn),
     sessionRunning,
@@ -156,8 +179,8 @@ function actionNodeTargetKey(node) {
 }
 
 function failedAssistantTargetKey(node) {
-  return node?.kind === 'rp-floor-failed-assistant'
-    ? safeTargetKey(node.data?.finalAssistantTarget)
+  return node?.kind === RP_TURN_SURFACE_KEY
+    ? safeTargetKey(turnSurfaceReply(node.data)?.target)
     : undefined
 }
 
@@ -170,12 +193,11 @@ function actionNodeTurn(node) {
 
 function turnStateFromLocation(location) {
   if (location?.kind !== 'turn' && location?.kind !== 'step') return undefined
-  return location.turn.data?.get?.('rp-floor-failed-assistant')
-    ?? location.turn.data?.get?.('rp-message-failed-assistant')
+  return location.turn.data?.get?.(RP_TURN_SURFACE_KEY)
 }
 
 function roleplayTurnState(nodes, turn) {
-  const failed = nodes.find(node => node?.kind === 'rp-floor-failed-assistant'
+  const failed = nodes.find(node => node?.kind === RP_TURN_SURFACE_KEY
     && node.data?.turn === turn)
   if (failed !== undefined) return failed.data
   for (const node of nodes) {
@@ -216,7 +238,7 @@ function latestVisibleTurn(nodes) {
       if (Number.isSafeInteger(turn)) turns.push(turn)
       continue
     }
-    if (node?.kind === 'rp-floor-failed-assistant' && node.data?.failed === true) {
+    if (node?.kind === RP_TURN_SURFACE_KEY && turnSurfaceIsFailed(node.data)) {
       if (Number.isSafeInteger(node.data.turn)) turns.push(node.data.turn)
     }
   }
@@ -236,7 +258,7 @@ function suffixHasSharedAssetMutation(nodes, selectedTurn) {
 
 /** Fold a native assistant edit/delete carrier into its original action row. */
 export function updateAssistantActionState(state, event) {
-  if (typeof event === 'string') return { ...state, text: event, deleted: event.trim().length === 0 }
+  if (typeof event === 'string') return { ...state, text: event, deleted: false }
   const action = decodeRpMessageActionEvent(event)
   if (action?.operation === 'delete' || action?.operation === 'reroll') {
     return { ...state, deleted: true }
@@ -244,7 +266,7 @@ export function updateAssistantActionState(state, event) {
   const text = assistantMessageText(event?.data?.message)
   return action?.operation === 'edit'
     ? { ...state, text, edited: true, deleted: false }
-    : { ...state, text, deleted: text.trim().length === 0 }
+    : state
 }
 
 /** Match model replies and native Roleplay replacement carriers. */
@@ -257,7 +279,9 @@ export function assistantActionMatch(event) {
     const target = action.targets.find(candidate => candidate.kind === 'message' && candidate.role === 'assistant')
     return target === undefined ? null : { id: target.messageId, role: 'update' }
   }
-  return { id: String(event.data.message?.id ?? event.seq), role: 'start' }
+  return event.surfaceOp === 'append' && assistantMessageText(event.data.message).trim().length > 0
+    ? { id: String(event.data.message?.id ?? event.seq), role: 'start' }
+    : null
 }
 
 /** Match the selected opening independently from ordinary model replies. */
@@ -273,157 +297,33 @@ export function openingActionMatch(event) {
     : null
 }
 
-/** Match events that determine whether a completed turn owns a failed reply. */
-export function failedAssistantMatch(event) {
-  if (event?.type === 'turn/start') return { id: String(event.data.turn), role: 'start' }
-  if (event?.type === 'turn/end') return { id: String(event.data.turn), role: 'update' }
-  if (event?.type === 'tool/result' && ['rp-agent/turn-commit', 'rp-agent/asset-mutation'].includes(event.data?.meta?.kind)) {
-    return { id: String(event.data?.meta?.turn ?? event.data.turn), role: 'update' }
-  }
-  if (event?.type === 'assistant/message' && Number.isSafeInteger(event.data?.turn)) {
-    const action = decodeRpMessageActionEvent(event)
-    const failed = action?.targets?.find(target => target.kind === 'turn')
-    return { id: String(failed?.turn ?? event.data.turn), role: 'update' }
-  }
-  return null
-}
-
-export function failedAssistantStart(event) {
-  return {
-    turn: event.data.turn,
-    failed: false,
-    deleted: false,
-    committed: false,
-    commitAttempted: false,
-    commitSeq: undefined,
-    finalAssistantSeq: undefined,
-    finalAssistantTarget: undefined,
-    finalAssistantText: '',
-    finalAssistantTime: undefined,
-    finalAssistantEdited: false,
-    finalAssistantInterrupted: false,
-    finalAssistantOwnsCommit: false,
-    hostOpeningSeq: undefined,
-    sharedAssetMutation: false,
-    endReasonKind: undefined,
-    endCancelKind: undefined,
-  }
-}
-
-export function failedAssistantUpdate(state, event) {
-  if (isSelectedOpeningMessage(event)) return { ...state, hostOpeningSeq: event.seq }
-  const action = decodeRpMessageActionEvent(event)
-  if ((action?.operation === 'delete' || action?.operation === 'reroll')
-    && action.targets.some(target => target.kind === 'turn' && target.turn === state.turn)) {
-    return { ...state, deleted: true }
-  }
-  const editedAssistant = action?.operation === 'edit'
-    ? action.targets.find(target => target.kind === 'message'
-      && target.role === 'assistant'
-      && target.messageId === state.finalAssistantTarget?.messageId)
-    : undefined
-  if (editedAssistant !== undefined) {
-    return {
-      ...state,
-      finalAssistantText: assistantMessageText(event.data?.message),
-      finalAssistantEdited: true,
-    }
-  }
-  if (event.type === 'assistant/message'
-    && event.surfaceOp === 'append'
-    && event.data?.message?.source?.kind === 'model') {
-    const text = assistantMessageText(event.data.message)
-    const ownsCommit = assistantCallsTool(event.data.message, 'rp_commit_turn')
-    if (text.trim().length === 0) {
-      return ownsCommit ? {
-        ...state,
-        commitAttempted: true,
-        // A tool-only commit belongs to the readable prose already emitted in
-        // this turn, so protect that prose from later acknowledgement rows.
-        finalAssistantOwnsCommit: Number.isSafeInteger(state.finalAssistantSeq)
-          || state.finalAssistantOwnsCommit === true,
-      } : state
-    }
-    // Once prose has crossed the atomic commit boundary, a later placeholder
-    // or acknowledgement must not replace it as the recoverable failed reply.
-    if (state.finalAssistantOwnsCommit === true && !ownsCommit) return state
-    return {
-      ...state,
-      commitAttempted: state.commitAttempted === true || ownsCommit,
-      finalAssistantSeq: event.seq,
-      finalAssistantTarget: {
-        kind: 'message',
-        role: 'assistant',
-        messageId: event.data.message.id,
-        turn: event.data.turn,
-        step: event.data.step,
-      },
-      finalAssistantText: text,
-      finalAssistantTime: event.time,
-      finalAssistantEdited: false,
-      finalAssistantInterrupted: event.data.interrupted === true,
-      finalAssistantOwnsCommit: ownsCommit,
-    }
-  }
-  if (event.type === 'tool/result'
-    && event.surfaceOp === 'append'
-    && event.data?.meta?.kind === 'rp-agent/asset-mutation') {
-    return { ...state, sharedAssetMutation: true }
-  }
-  if (event.type === 'tool/result'
-    && event.surfaceOp === 'append'
-    && event.data?.meta?.kind === 'rp-agent/turn-commit') {
-    return {
-      ...state,
-      committed: true,
-      commitAttempted: true,
-      commitSeq: event.seq,
-      failed: false,
-      finalAssistantSeq: event.data.meta.assistant?.seq ?? state.finalAssistantSeq,
-      finalAssistantOwnsCommit: true,
-    }
-  }
-  if (event.type === 'turn/end') {
-    return {
-      ...state,
-      failed: !state.committed && (state.commitAttempted === true || event.data.reason?.kind !== 'completed'),
-      endReasonKind: event.data.reason?.kind,
-      endCancelKind: event.data.reason?.kind === 'aborted'
-        ? event.data.reason.reason?.kind
-        : undefined,
-      seq: event.seq,
-    }
-  }
-  return state
-}
-
 export function selectFailedAssistant(owner) {
-  const state = owner?.turn?.data?.get?.('rp-floor-failed-assistant')
-    ?? owner?.turn?.data?.get?.('rp-message-failed-assistant')
-  if (state?.failed !== true || state.deleted === true) return null
-  const hasAssistant = state.finalAssistantTarget?.kind === 'message'
-    && state.finalAssistantTarget.role === 'assistant'
-    && typeof state.finalAssistantTarget.messageId === 'string'
-    && typeof state.finalAssistantText === 'string'
-    && state.finalAssistantText.trim().length > 0
+  const state = owner?.turn?.data?.get?.(RP_TURN_SURFACE_KEY)
+  if (!turnSurfaceIsFailed(state) || turnSurfaceIsRetired(state)) return null
+  const reply = turnSurfaceReply(state)
+  const hasAssistant = reply?.target?.kind === 'message'
+    && reply.target.role === 'assistant'
+    && typeof reply.target.messageId === 'string'
+    && typeof reply.text === 'string'
+    && reply.text.trim().length > 0
   return {
     turn: owner.turn,
     state,
     target: hasAssistant
-      ? state.finalAssistantTarget
+      ? reply.target
       : { kind: 'turn', turn: state.turn },
-    copyText: hasAssistant ? state.finalAssistantText : '',
+    copyText: hasAssistant ? reply.text : '',
     canEdit: hasAssistant,
-    edited: hasAssistant && state.finalAssistantEdited === true,
-    messageTime: hasAssistant ? state.finalAssistantTime : undefined,
-    nativeStatusVisible: state.endReasonKind === 'max-tokens'
-      || (['aborted', 'interrupted'].includes(state.endReasonKind)
+    edited: hasAssistant && reply.edited === true,
+    messageTime: hasAssistant ? reply.time : undefined,
+    nativeStatusVisible: turnSurfaceEndReasonKind(state) === 'max-tokens'
+      || (['aborted', 'interrupted'].includes(turnSurfaceEndReasonKind(state))
         && nativeInterruptedAssistantVisible(owner.turn, state)),
   }
 }
 
 function nativeInterruptedAssistantVisible(turn, state) {
-  if (state.finalAssistantInterrupted === true) return true
+  if (turnSurfaceReply(state)?.interrupted === true) return true
   return Array.isArray(turn?.steps) && turn.steps.some(step => (
     step?.data?.get?.('assistant-step')?.status === 'interrupted'
   ))
@@ -439,9 +339,4 @@ function assistantMessageText(message) {
   return Array.isArray(message?.content)
     ? message.content.filter(part => part?.type === 'text' && typeof part.text === 'string').map(part => part.text).join('')
     : ''
-}
-
-function assistantCallsTool(message, name) {
-  return Array.isArray(message?.content)
-    && message.content.some(part => part?.type === 'tool-call' && part.name === name)
 }

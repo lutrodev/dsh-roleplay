@@ -19,16 +19,24 @@ import {
 import {
   actionError,
   assistantActionMatch,
-  failedAssistantMatch,
-  failedAssistantStart,
-  failedAssistantUpdate,
   isRoleplaySession,
   messageActionError,
   messageActionValue,
   openingActionMatch,
   projectMessageActionDetail,
+  RP_TURN_SURFACE_KEY,
   selectFailedAssistant,
+  startTurnSurface,
+  turnSurfaceCommitAttempted,
+  turnSurfaceEndCancelKind,
+  turnSurfaceEndReasonKind,
+  turnSurfaceIsCommitted,
+  turnSurfaceIsFailed,
+  turnSurfaceIsRetired,
+  turnSurfaceMatch,
+  turnSurfaceReply,
   updateAssistantActionState,
+  updateTurnSurface,
 } from './client-state.js'
 import { decodeRpMessageActionEvent, rpMessageActionTargetKey } from './protocol.js'
 import { PresetRecoveryDialog, shouldInspectPresetFailure, usePresetFailureDiagnostic } from './preset-recovery.js'
@@ -88,7 +96,7 @@ export const assistantFloorNodeDefinition = {
       turn: match.event.data.turn, step: match.event.data.step,
     },
     edited: false,
-    deleted: messageText(match.event.data.message?.content).trim().length === 0,
+    deleted: false,
   }),
   update: (context, match) => updateAssistantActionState(context.state, match.event),
   buildViewNode: context => !Number.isSafeInteger(context.state?.turn) ? null : ({
@@ -165,31 +173,32 @@ export const suffixActionNodeDefinition = {
 
 const RP_COMMIT_TOOL = 'rp_commit_turn'
 
-export const failedAssistantNodeDefinition = {
-  kind: 'rp-floor-failed-assistant',
+export const turnSurfaceNodeDefinition = {
+  kind: RP_TURN_SURFACE_KEY,
   target: 'chat',
-  match: failedAssistantMatch,
+  match: turnSurfaceMatch,
   start: (_context, match) => ({
-    ...failedAssistantStart(match.event),
+    ...startTurnSurface(match.event),
     target: { kind: 'turn', turn: match.event.data.turn },
   }),
-  update: (context, match) => failedAssistantUpdate(context.state, match.event),
+  update: (context, match) => updateTurnSurface(context.state, match.event),
   buildLocationData: (context, scope, previous) => {
     if (scope !== 'turn' || context.state === undefined) return null
     if (previous?.kind === 'turn'
       && previous.turn === context.state.turn
-      && previous.key === 'rp-floor-failed-assistant'
+      && previous.key === RP_TURN_SURFACE_KEY
       && previous.value === context.state) return previous
     return {
       kind: 'turn',
       turn: context.state.turn,
-      key: 'rp-floor-failed-assistant',
+      key: RP_TURN_SURFACE_KEY,
       value: context.state,
     }
   },
-  buildViewNode: context => context.state?.failed !== true && context.state?.deleted !== true ? null : ({
+  buildViewNode: context => !turnSurfaceIsFailed(context.state)
+    && !turnSurfaceIsRetired(context.state) ? null : ({
     key: context.key,
-    kind: 'rp-floor-failed-assistant',
+    kind: RP_TURN_SURFACE_KEY,
     id: context.id,
     target: 'chat',
     anchorSeq: (context.state.seq ?? context.start?.event.seq ?? 0) + 0.05,
@@ -204,7 +213,7 @@ export function apply(ctx) {
   ctx.uiConversation.events.register(userFloorNodeDefinition)
   ctx.uiConversation.events.register(assistantFloorNodeDefinition)
   ctx.uiConversation.events.register(openingFloorNodeDefinition)
-  ctx.uiConversation.events.register(failedAssistantNodeDefinition)
+  ctx.uiConversation.events.register(turnSurfaceNodeDefinition)
   ctx.uiConversation.events.register(suffixActionNodeDefinition)
   const injectFloorUi = () => ({ connection: ctx.rpRemote, sessions: ctx.sessions })
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
@@ -224,9 +233,9 @@ export function apply(ctx) {
   }, OpeningFloorEffects))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
-    key: 'rp-floor-failed-assistant',
+    key: RP_TURN_SURFACE_KEY,
     inject: injectFloorUi,
-  }, FailedAssistantEffects))
+  }, TurnSurfaceEffects))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: 'rp-message-suffix-action',
@@ -401,22 +410,23 @@ function OpeningFloorEffects(props) {
 export function isCanonicalAssistantAction(node) {
   const location = node?.location
   if ((location?.kind !== 'turn' && location?.kind !== 'step') || location.turn.status !== 'closed') return false
-  const state = location.turn.data?.get?.('rp-floor-failed-assistant')
-    ?? location.turn.data?.get?.('rp-message-failed-assistant')
-  return state?.failed !== true
-    && Number.isSafeInteger(state?.finalAssistantSeq)
-    && state.finalAssistantSeq === node.data?.seq
+  const state = location.turn.data?.get?.(RP_TURN_SURFACE_KEY)
+  const reply = turnSurfaceReply(state)
+  return !turnSurfaceIsFailed(state)
+    && !turnSurfaceIsRetired(state)
+    && Number.isSafeInteger(reply?.seq)
+    && reply.seq === node.data?.seq
 }
 
 /** Mark the exact readable reply selected for recovery from a failed commit. */
 export function isFailedCanonicalAssistantAction(node) {
   const location = node?.location
   if ((location?.kind !== 'turn' && location?.kind !== 'step') || location.turn.status !== 'closed') return false
-  const state = location.turn.data?.get?.('rp-floor-failed-assistant')
-    ?? location.turn.data?.get?.('rp-message-failed-assistant')
-  return state?.failed === true
-    && Number.isSafeInteger(state?.finalAssistantSeq)
-    && state.finalAssistantSeq === node.data?.seq
+  const state = location.turn.data?.get?.(RP_TURN_SURFACE_KEY)
+  const reply = turnSurfaceReply(state)
+  return turnSurfaceIsFailed(state)
+    && Number.isSafeInteger(reply?.seq)
+    && reply.seq === node.data?.seq
 }
 
 function InactiveActionNodeMarker() {
@@ -456,7 +466,7 @@ function FailedTurnRecoveryActions(props) {
   const roleplay = props.useSessions(state => isRoleplaySession(state, props.sessionId))
   const profile = props.useProjection('rp/session')
   const fallbackNode = {
-    kind: 'rp-floor-failed-assistant',
+    kind: RP_TURN_SURFACE_KEY,
     id: String(props.matched.state.turn),
     location: { kind: 'turn', turn: props.matched.turn },
     data: { ...props.matched.state, target: props.matched.target },
@@ -495,7 +505,7 @@ function FailedTurnRecoveryActions(props) {
 
 /** Prefer DSH's visible interruption and length-limit states; translate the remaining terminal outcomes. */
 export function failedTurnStatus(matched, detail, diagnostic = null) {
-  const kind = matched.state?.endReasonKind
+  const kind = turnSurfaceEndReasonKind(matched.state)
   if (kind === 'max-tokens' || matched.nativeStatusVisible === true) return null
   const hasPartial = matched.target?.kind === 'message'
   const recoveryMessage = (base, retryable) => {
@@ -504,7 +514,7 @@ export function failedTurnStatus(matched, detail, diagnostic = null) {
     }
     return detail?.canReroll === true ? retryable : `${base}你可以继续发送消息。`
   }
-  if (matched.state?.commitAttempted === true && matched.state?.committed !== true) {
+  if (turnSurfaceCommitAttempted(matched.state) && !turnSurfaceIsCommitted(matched.state)) {
     return {
       state: 'error',
       title: '回复未能完成保存',
@@ -532,7 +542,7 @@ export function failedTurnStatus(matched, detail, diagnostic = null) {
         : recoveryMessage('没有生成可用内容。', '没有生成可用内容，可以重新尝试。'),
     }
   }
-  if (kind === 'aborted' && matched.state?.endCancelKind === 'user') {
+  if (kind === 'aborted' && turnSurfaceEndCancelKind(matched.state) === 'user') {
     return {
       state: 'warning',
       title: '已停止生成',
@@ -581,17 +591,18 @@ function FailedTurnStatusRow({ status, pending = false, actions = null }) {
   actions)
 }
 
-function FailedAssistantEffects(props) {
+function TurnSurfaceEffects(props) {
   const roleplay = props.useSessions(state => isRoleplaySession(state, props.sessionId))
   if (!roleplay) return h(InactiveActionNodeMarker)
-  if (props.node.data.deleted === true) {
+  if (turnSurfaceIsRetired(props.node.data)) {
     return h(DeletedAssistantTraceMarker, { target: props.node.data.target })
   }
+  const reply = turnSurfaceReply(props.node.data)
   return h(React.Fragment, null,
     h(AssistantEffectNodeMarker),
-    h(FailedAssistantTraceEffect, { endReasonKind: props.node.data.endReasonKind }),
-    props.node.data.finalAssistantEdited === true
-      ? h(EditedMessagePortal, { surface: 'assistant', text: props.node.data.finalAssistantText })
+    h(FailedAssistantTraceEffect, { endReasonKind: turnSurfaceEndReasonKind(props.node.data) }),
+    reply?.edited === true
+      ? h(EditedMessagePortal, { surface: 'assistant', text: reply.text })
       : null)
 }
 
@@ -617,7 +628,7 @@ function SettledAssistantTraceEffect({ target }) {
 function FailedAssistantTraceEffect({ endReasonKind }) {
   const ref = useRef(null)
   useLayoutEffect(() => {
-    const host = ref.current?.closest('[data-chat-flow-kind="rp-floor-failed-assistant"]')
+    const host = ref.current?.closest(`[data-chat-flow-kind="${RP_TURN_SURFACE_KEY}"]`)
     if (!(host instanceof HTMLElement)) return undefined
     const hidden = failedAssistantTraceRows(host, endReasonKind)
     for (const row of hidden) row.setAttribute('data-rp-message-actions-hidden-trace', '')
@@ -718,7 +729,7 @@ function readableAssistantRow(row) {
 function DeletedAssistantTraceMarker({ target }) {
   const ref = useRef(null)
   useLayoutEffect(() => {
-    const host = ref.current?.closest('[data-chat-flow-kind="rp-floor-assistant-actions"], [data-chat-flow-kind="rp-floor-failed-assistant"]')
+    const host = ref.current?.closest(`[data-chat-flow-kind="rp-floor-assistant-actions"], [data-chat-flow-kind="${RP_TURN_SURFACE_KEY}"]`)
     if (!(host instanceof HTMLElement)) return undefined
     return ownDynamicRows(
       host,
@@ -1123,7 +1134,7 @@ function FloorActions({ sessionId, useSessions, turn, target, detail, edited = f
           : userSurface ? css.userFloorActionHost : css.floorActionHost,
         'data-rp-message-action-key': targetKey,
         ...(nativeAssistant && editing ? { 'data-rp-message-actions-editing-native': '' } : {}),
-        ...(failedAssistant ? { 'data-rp-floor-failed-assistant-actions': '' } : {}),
+        ...(failedAssistant ? { 'data-rp-turn-surface-actions': '' } : {}),
       },
         userSurface ? h(NativeUserActionsEffect) : null,
         editing ? h(InlineMessageEditorPortal, {
