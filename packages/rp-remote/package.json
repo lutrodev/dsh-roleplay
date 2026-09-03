@@ -59,14 +59,14 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-api-remotes": "0.1.2-alpha.4",
-    "@deepseek-ai/dsh-typert-protocol": "0.1.2-alpha.4"
+    "@deepseek-ai/dsh-api-remotes": "0.1.2-alpha.5",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.2-alpha.5"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-api-remotes": "0.1.2-alpha.4",
-    "@deepseek-ai/dsh-typert-generator": "0.1.2-alpha.4",
-    "@deepseek-ai/dsh-typert-protocol": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-api-remotes": "0.1.2-alpha.5",
+    "@deepseek-ai/dsh-typert-generator": "0.1.2-alpha.5",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.2-alpha.5",
     "tsdown": "0.22.2",
     "typescript": "6.0.3"
   },

@@ -375,20 +375,23 @@ test('character deletion preview reads optional asset services dynamically and d
   ])
 })
 
-test('character deletion lists live and cold references but deletes assets without opening or rewriting sessions', async () => {
+test('character deletion lists live and cold references but deletes assets without resuming or rewriting sessions', async () => {
   const cardId = '00000000-0000-0000-0000-000000000020'
   const lorebookId = '00000000-0000-0000-0000-000000000021'
   const unrelatedCardId = '00000000-0000-0000-0000-000000000022'
   const live = sessionFixture({ id: 'live-rp', events: profileEvents(cardId) })
   const deletedLorebooks = []
   const deletedCards = []
+  const persistenceCalls = []
+  const signal = new AbortController().signal
   const ctx = {
     sessions: { list: () => [live] },
     agents: { get: id => id === live.id ? { status: 'idle' } : undefined },
-    sessionPersistence: {
-      list: async () => [{ id: 'live-rp' }, { id: 'cold-rp' }, { id: 'other-rp' }],
-      inspect: async id => ({ meta: { agentPreset: 'roleplay' }, events: profileEvents(id === 'cold-rp' ? cardId : unrelatedCardId) }),
-    },
+    sessionPersistence: sessionPersistenceFixture([
+      { id: 'live-rp', events: profileEvents(cardId) },
+      { id: 'cold-rp', events: profileEvents(cardId) },
+      { id: 'other-rp', events: profileEvents(unrelatedCardId) },
+    ], persistenceCalls),
     workspaceRegistry: { archiveSession: async () => { throw new Error('must not be called') } },
     rpCharacterCards: {
       detail: async () => ({ id: cardId, name: 'Archive Hero', revision: 3, linkedLorebookIds: [lorebookId], embeddedLorebooks: [{ id: lorebookId, name: 'Hero Lore' }] }),
@@ -399,13 +402,25 @@ test('character deletion lists live and cold references but deletes assets witho
       delete: async id => { deletedLorebooks.push(id) },
     },
   }
-  const preview = await dispatch(ctx, 'character/delete-preview', { id: cardId })
+  const preview = await dispatch(ctx, 'character/delete-preview', { id: cardId }, signal)
   assert.deepEqual(preview.sessions, [
     { id: 'cold-rp', live: false, running: false },
     { id: 'live-rp', live: true, running: false },
   ])
   assert.equal(preview.sessionScanComplete, true)
   assert.deepEqual(preview.lorebooks, [{ id: lorebookId, name: 'Hero Lore' }])
+  assert.deepEqual(persistenceCalls.map(call => [call.operation, call.id, call.access, call.offset, call.length]), [
+    ['list', undefined, undefined, undefined, undefined],
+    ['open', 'cold-rp', 'read', undefined, undefined],
+    ['read', 'cold-rp', undefined, 0, undefined],
+    ['close', 'cold-rp', undefined, undefined, undefined],
+    ['open', 'other-rp', 'read', undefined, undefined],
+    ['read', 'other-rp', undefined, 0, undefined],
+    ['close', 'other-rp', undefined, undefined, undefined],
+  ])
+  for (const call of persistenceCalls.filter(call => call.options !== undefined)) {
+    assert.equal(call.options.signal, signal)
+  }
 
   const result = await dispatch(ctx, 'character/delete', { id: cardId, deleteLinkedLorebooks: true })
   assert.equal(Object.hasOwn(result, 'detachedSessionIds'), false)
@@ -437,7 +452,7 @@ test('character deletion can preserve related lorebooks without loading cold ses
   const ctx = {
     sessions: { list: () => [] },
     agents: { get: () => undefined },
-    sessionPersistence: { list: async () => [{ id: 'cold-only' }], inspect: async () => ({ meta: { agentPreset: 'roleplay' }, events: profileEvents(cardId) }) },
+    sessionPersistence: sessionPersistenceFixture([{ id: 'cold-only', events: profileEvents(cardId) }]),
     rpCharacterCards: {
       detail: async () => ({ id: cardId, name: 'Keep Lore', revision: 1, linkedLorebookIds: [], embeddedLorebooks: [] }),
       delete: async id => ({ id, name: 'Keep Lore' }),
@@ -460,10 +475,7 @@ test('character deletion never resumes an archived referencing session', async (
   const calls = []
   const ctx = {
     sessions: { list: () => [] },
-    sessionPersistence: {
-      list: async () => [{ id }],
-      inspect: async () => ({ meta: { agentPreset: 'roleplay' }, events }),
-    },
+    sessionPersistence: sessionPersistenceFixture([{ id, events }]),
     agents: {
       get: () => undefined,
       async resume() { calls.push(['resume']); throw new Error('must not be called') },
@@ -500,6 +512,32 @@ test('a failed Session scan does not disable preview or asset deletion', async (
   const result = await dispatch(ctx, 'character/delete', { id: cardId, deleteLinkedLorebooks: true })
   assert.deepEqual(result.deletedCard, { id: cardId, name: 'Retry Hero' })
   assert.deepEqual(assetDeletes, [`card:${cardId}`])
+})
+
+test('a failed cold Session read still closes its persistence handle', async () => {
+  const cardId = '00000000-0000-0000-0000-000000000051'
+  let closeCount = 0
+  const ctx = {
+    sessions: { list: () => [] },
+    agents: { get: () => undefined },
+    sessionPersistence: {
+      list: async () => [{ header: { id: 'unreadable-rp' }, revision: 'revision-unreadable-rp' }],
+      open: async () => ({
+        read: async () => { throw new Error('corrupt session log') },
+        close: async () => { closeCount += 1 },
+      }),
+    },
+    rpCharacterCards: {
+      detail: async () => ({ id: cardId, name: 'Unreadable Hero', revision: 1, linkedLorebookIds: [], embeddedLorebooks: [] }),
+    },
+    rpLoreBooks: { listDeletionCandidates: async () => [] },
+  }
+
+  const preview = await dispatch(ctx, 'character/delete-preview', { id: cardId })
+
+  assert.deepEqual(preview.sessions, [])
+  assert.equal(preview.sessionScanComplete, false)
+  assert.equal(closeCount, 1)
 })
 
 test('related lorebook cleanup failures are reported but never roll back card deletion', async () => {
@@ -693,6 +731,29 @@ function sessionFixture({ events = [], ...session } = {}) {
     get seq() { return events.length },
     snapshotEvents() { return events },
     eventAt(seq) { return events[seq] },
+  }
+}
+
+function sessionPersistenceFixture(records, calls = []) {
+  return {
+    async list(options) {
+      calls.push({ operation: 'list', options })
+      return records.map(record => ({ header: { id: record.id }, revision: `revision-${record.id}` }))
+    },
+    async open(id, access, options) {
+      calls.push({ operation: 'open', id, access, options })
+      const record = records.find(candidate => candidate.id === id)
+      if (record === undefined) throw new Error(`unknown persisted session ${id}`)
+      return {
+        async read(offset, length, readOptions) {
+          calls.push({ operation: 'read', id, offset, length, options: readOptions })
+          return record.events
+        },
+        async close() {
+          calls.push({ operation: 'close', id })
+        },
+      }
+    },
   }
 }
 

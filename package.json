@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "check:compat": "node tools/check-harness-compat.mjs",
-    "test:compat": "node --test tools/check-harness-compat.test.mjs plugins/rp-core/test/harness-contract.contract.js plugins/rp-core/test/subagent-run.test.js",
+    "test:compat": "node --test tools/check-harness-compat.test.mjs plugins/rp-core/test/harness-contract.contract.js plugins/rp-core/test/subagent-run.test.js plugins/rp-standard/test/archive-cascade.test.js",
     "check:dev": "node --check scripts/dev.mjs",
     "test:dev": "node --test scripts/dev.test.mjs",
     "check": "pnpm run check:compat && pnpm run check:dev && pnpm -r --if-present run check",
@@ -22,7 +22,7 @@
     "dev:config": "node scripts/dev.mjs --dump-config"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh": "0.1.2-alpha.5",
     "typescript": "6.0.3",
     "yaml": "2.9.0"
   },

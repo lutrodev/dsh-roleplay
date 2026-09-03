@@ -116,6 +116,16 @@
   display: contents;
 }
 
+/* Roleplay replaces the native assistant controls with a complete operation
+   toolbar. Keep that toolbar visible for every retained reply even when the
+   Harness host marks an older turn tail as hover-only. The effect annotates
+   only the exact native action row that owns a mounted Roleplay slot. */
+[data-rp-message-actions-assistant-visible]:has(
+  [data-slot="conversation.chat.assistant-actions"] .assistantActionHost
+) {
+  opacity: 1;
+}
+
 /* The editor is portaled into the message body; hide the native footer until
    editing finishes so its unrelated controls do not compete with the form. */
 [data-chat-flow-kind="turn-tail"]:has(.assistantActionHost[data-rp-message-actions-editing-native]) {

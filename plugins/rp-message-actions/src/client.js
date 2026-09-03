@@ -1151,6 +1151,7 @@ function FloorActions({ sessionId, useSessions, turn, target, detail, edited = f
               pending: pending === 'reroll',
               actions: failedRecoveryActions,
             })) : nativeAssistant ? h(React.Fragment, null,
+          h(NativeAssistantActionsVisibilityEffect),
           branchAction === null ? null : h(NativeAssistantBranchEffect),
           branchAction,
           rerollAction,
@@ -1219,6 +1220,19 @@ function NativeAssistantBranchEffect() {
     return () => { branch.removeAttribute('data-rp-message-actions-hidden-native-branch') }
   }, [])
   return h('span', { ref, className: css.nativeBranchEffectAnchor, hidden: true, 'aria-hidden': true })
+}
+
+/** Keep Roleplay's complete assistant toolbar visible inside Harness's native tail. */
+function NativeAssistantActionsVisibilityEffect() {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const outlet = ref.current?.closest?.('[data-slot="conversation.chat.assistant-actions"]')
+    const actions = outlet?.parentElement
+    if (!(actions instanceof HTMLElement)) return undefined
+    actions.setAttribute('data-rp-message-actions-assistant-visible', '')
+    return () => { actions.removeAttribute('data-rp-message-actions-assistant-visible') }
+  }, [])
+  return h('span', { ref, hidden: true, 'aria-hidden': true })
 }
 
 /** Resolve the native branch control immediately following the assistant action slot. */

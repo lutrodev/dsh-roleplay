@@ -72,7 +72,7 @@ async function sessionsReferencingCard(ctx, cardId, signal) {
 
   let persisted
   try {
-    persisted = await ctx.sessionPersistence.list(signal)
+    persisted = await ctx.sessionPersistence.list(signalOptions(signal))
   } catch (cause) {
     throw lifecycleError('SESSION_SCAN_FAILED', 'Could not list persisted sessions before character deletion.', cause)
   }
@@ -83,19 +83,34 @@ async function sessionsReferencingCard(ctx, cardId, signal) {
     if (profileCardId(session.snapshotEvents()) !== cardId) continue
     matches.push(sessionReference(ctx, session.id, true))
   }
-  for (const header of persisted) {
+  for (const snapshot of persisted) {
     signal?.throwIfAborted()
-    if (sessions.has(header.id)) continue
-    let inspection
+    const { id } = snapshot.header
+    if (sessions.has(id)) continue
+    let events
     try {
-      inspection = await ctx.sessionPersistence.inspect(header.id, signal)
+      events = await readPersistedSessionEvents(ctx.sessionPersistence, id, signal)
     } catch (cause) {
-      throw lifecycleError('SESSION_SCAN_FAILED', `Could not inspect persisted session ${header.id} before character deletion.`, cause)
+      throw lifecycleError('SESSION_SCAN_FAILED', `Could not read persisted session ${id} before character deletion.`, cause)
     }
-    if (profileCardId(inspection.events) !== cardId) continue
-    matches.push(sessionReference(ctx, header.id, false))
+    if (profileCardId(events) !== cardId) continue
+    matches.push(sessionReference(ctx, id, false))
   }
   return matches.sort((left, right) => left.id.localeCompare(right.id))
+}
+
+async function readPersistedSessionEvents(persistence, id, signal) {
+  const options = signalOptions(signal)
+  const handle = await persistence.open(id, 'read', options)
+  try {
+    return await handle.read(0, undefined, options)
+  } finally {
+    await handle.close()
+  }
+}
+
+function signalOptions(signal) {
+  return signal === undefined ? undefined : { signal }
 }
 
 function sessionReference(ctx, id, live) {

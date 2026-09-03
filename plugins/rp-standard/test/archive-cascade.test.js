@@ -31,7 +31,6 @@ test('character deletion leaves real Harness live/cold Session logs intact and r
     await ctx.plugin(JsonlSessionPersistence, {
       root: join(root, 'sessions'),
       compression: 'none',
-      writeBatchMaxDelayMs: 1,
     })
     await ctx.plugin(WorkspaceRegistry)
 
@@ -41,12 +40,12 @@ test('character deletion leaves real Harness live/cold Session logs intact and r
     const cold = coldOwner.ctx.sessions.create(SessionId('rp-cold-reference'))
     appendProfile(live, cardId)
     appendProfile(cold, cardId)
-    await ctx.sessions.flush(live)
-    await ctx.sessions.flush(cold)
+    await persistSession(ctx.sessionPersistence, live)
+    await persistSession(ctx.sessionPersistence, cold)
     await coldOwner.fiber.dispose()
 
     assert.equal(ctx.sessions.get(cold.id), undefined)
-    assert.deepEqual((await ctx.sessionPersistence.list()).map(header => header.id).sort(), [cold.id, live.id])
+    assert.deepEqual((await ctx.sessionPersistence.list()).map(snapshot => snapshot.header.id).sort(), [cold.id, live.id])
 
     const rpCharacterCards = {
       detail: async () => ({
@@ -76,10 +75,10 @@ test('character deletion leaves real Harness live/cold Session logs intact and r
     assert.deepEqual(ctx.workspaceRegistry.archivedSessionIds, [])
     assert.deepEqual(deleted, [`card:${cardId}`, `lore:${lorebookId}`])
 
-    const coldSnapshot = await ctx.sessionPersistence.inspect(cold.id)
-    const liveSnapshot = await ctx.sessionPersistence.inspect(live.id)
-    assert.deepEqual(profileFromEvents(coldSnapshot.events).resources.card, { id: cardId })
-    assert.deepEqual(profileFromEvents(liveSnapshot.events).resources.card, { id: cardId })
+    const coldEvents = await readPersistedSession(ctx.sessionPersistence, cold.id)
+    const liveEvents = await readPersistedSession(ctx.sessionPersistence, live.id)
+    assert.deepEqual(profileFromEvents(coldEvents).resources.card, { id: cardId })
+    assert.deepEqual(profileFromEvents(liveEvents).resources.card, { id: cardId })
     assert.ok(ctx.sessions.get(live.id), 'deleting the card must not hide or dispose the live session')
 
     await liveOwner.fiber.dispose()
@@ -111,4 +110,25 @@ function appendProfile(session, cardId) {
     source: { kind: 'user' },
   })
   session.append('command/done', { commandId, kind: 'success' })
+}
+
+async function persistSession(persistence, session) {
+  const handle = await persistence.create(session.header, session.header.isSeeded
+    ? { inheritedEventCount: session.inheritedEventCount }
+    : undefined)
+  try {
+    await handle.append(session.snapshotEvents())
+    await handle.flush()
+  } finally {
+    await handle.close()
+  }
+}
+
+async function readPersistedSession(persistence, id) {
+  const handle = await persistence.open(id, 'read')
+  try {
+    return await handle.read()
+  } finally {
+    await handle.close()
+  }
 }

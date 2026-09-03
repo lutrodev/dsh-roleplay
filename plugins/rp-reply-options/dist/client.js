@@ -6041,7 +6041,7 @@ window.__ModuleLoader__.load({
 			const deprecatedFactoryFunction = (Component, options) => {
 				return factory(Component, options);
 			};
-			return new Proxy(deprecatedFactoryFunction, {
+			return new Proxy(deprecatedFactoryFunction, { 
 			/**
 			* Called when `motion` is referenced with a prop: `motion.div`, `motion.input` etc.
 			* The prop name is passed through as `key` and we can use that to generate a `motion`

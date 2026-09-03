@@ -115,7 +115,7 @@ function statusView(
 ) {
   return {
     roleplay: { version: '0.1.8' },
-    dsh: { version: '0.1.2-alpha.4', compatible: true },
+    dsh: { version: '0.1.2-alpha.5', compatible: true },
     compatible: true,
     problems: [],
     enabledFeatures: [...enabledFeatures],

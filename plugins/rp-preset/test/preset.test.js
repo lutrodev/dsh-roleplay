@@ -64,6 +64,16 @@ const PREVIOUS_CORRECTIVE_REPEAT = '承接前文的事实、人物声音和因�
 const TARGET_REPEAT = '承接前文的事实、人物声音和因果，根据当前内容重新组织推进路径、转折位置和收束功能；需要照应近期结构时，让照应产生新的含义或后果。'
 const PREVIOUS_CORRECTIVE_SUMMARY = '避免作者式总结和意义升华。让情绪和主题留在人物行为与后果中。'
 const TARGET_SUMMARY = '让情绪和主题落在人物行为与后果中。'
+const PREVIOUS_ENDING_GUIDANCE = `让结尾落在当前推进所形成的变化或影响上。
+
+承接前文的事实、人物声音与因果，让当前场景决定推进、转折和收束的结构；有意照应近期结构时，使照应产生新的含义或后果。
+
+让情绪和主题落在人物行为与后果中。`
+const CURRENT_ENDING_GUIDANCE = `结尾应写清本轮主要行动、交流或发现带来的变化及直接影响。
+
+根据前文已经发生的事实、人物一贯的说话与行动方式，以及事件之间的因果关系，安排本轮的推进和结束；只有当前情节需要时才写转折。不要机械重复近期回复的结构；如果使用相似结构，应让人物处境、关系或事件结果发生新的变化。
+
+需要表现人物情绪或故事主题时，通过人物的选择、行动、反应和实际后果来表达。不要在结尾另加旁白，替人物总结感受、评价事件或说明故事寓意。`
 const PREVIOUS_CORRECTIVE_CALIBRATION_DESCRIPTION = '写作前检查意图、连续性、展开重点和停笔位置。'
 const PREVIOUS_CORRECTIVE_CALIBRATION = '写作前确认用户意图与参与方式、视角和连续性、角色动机与选择边界，以及本轮在场景中的位置、应充分展开的内容和自然停笔点；保留应延后的内容，避免同时引入过多新内容或复用近期结构。确保既不强求闭合，也不以停顿代替推进。明确后立即写作，不在正文中展示规划、分析或创作说明。'
 const TARGET_CALIBRATION_DESCRIPTION = '写作前检查意图、连续性、叙事焦点和自然落点。'
@@ -176,8 +186,17 @@ function previousNaturalClosingPreset() {
   return preset
 }
 
-function previousSingleBeatScopePreset() {
+function previousEndingGuidanceClarityPreset() {
   const preset = structuredClone(DEFAULT_PRESET)
+  const writingGuidance = preset.fields.find(field => field.name === '写作指导')
+  const content = writingGuidance.content.replace(CURRENT_ENDING_GUIDANCE, PREVIOUS_ENDING_GUIDANCE)
+  assert.notEqual(content, writingGuidance.content)
+  writingGuidance.content = content
+  return preset
+}
+
+function previousSingleBeatScopePreset() {
+  const preset = previousEndingGuidanceClarityPreset()
   const writingGuidance = preset.fields.find(field => field.name === '写作指导')
   const replacements = [
     ['一个场景可以跨越多轮。每轮围绕一个主要推进点展开，使人物、关系或局势产生清楚的阶段性变化，并呈现与之直接相关的反应和影响。新的事件或转折应服务于这一推进，避免在同一轮连续跨越多个叙事阶段。各要素随场景交织，详略由其因果分量决定。', PREVIOUS_SINGLE_BEAT_TURN_SCOPE],
@@ -548,12 +567,16 @@ test('creates a blank preset or the managed example preset', async () => {
     assert.match(writingGuidance, /让进展沿已有矛盾和互动纵向生长/)
     assert.match(writingGuidance, /回报可以逐步形成，并在条件成熟时自然兑现/)
     assert.doesNotMatch(writingGuidance, /篇幅|字数|段数|对白比例/)
-    assert.match(writingGuidance, /让结尾落在当前推进所形成的变化或影响上/)
+    assert.match(writingGuidance, /结尾应写清本轮主要行动、交流或发现带来的变化及直接影响/)
     assert.doesNotMatch(writingGuidance, /为下一轮保留自然空间|不因仍有可写内容而继续启动下一段主要情节|在收束时再扩大叙事范围/)
     assert.doesNotMatch(writingGuidance, /完整可读的进展/)
-    assert.match(writingGuidance, /让当前场景决定推进、转折和收束的结构/)
-    assert.match(writingGuidance, /有意照应近期结构时，使照应产生新的含义或后果/)
-    assert.match(writingGuidance, /让情绪和主题落在人物行为与后果中/)
+    assert.match(writingGuidance, /根据前文已经发生的事实、人物一贯的说话与行动方式，以及事件之间的因果关系/)
+    assert.match(writingGuidance, /只有当前情节需要时才写转折/)
+    assert.match(writingGuidance, /不要机械重复近期回复的结构/)
+    assert.match(writingGuidance, /如果使用相似结构，应让人物处境、关系或事件结果发生新的变化/)
+    assert.match(writingGuidance, /需要表现人物情绪或故事主题时，通过人物的选择、行动、反应和实际后果来表达/)
+    assert.match(writingGuidance, /不要在结尾另加旁白，替人物总结感受、评价事件或说明故事寓意/)
+    assert.doesNotMatch(writingGuidance, /让结尾落在|让当前场景决定|有意照应|让情绪和主题落在/)
     assert.match(writingGuidance, /助手式开场、确认、道歉、选项列表/)
     assert.match(writingGuidance, /围着主角旋转、只负责提供情绪服务/)
     assert.doesNotMatch(writingGuidance, /本轮只需完成当前最必要|至少发生一项可感变化|停笔取决于|不为结束本轮|不靠新增设定/)
@@ -630,6 +653,7 @@ test('seeds one managed default and preserves an explicit default across service
 
 test('migrates each recent managed preset without replacing field identities', async () => {
   const stages = [
+    ['before-ending-guidance-clarification', previousEndingGuidanceClarityPreset],
     ['before-single-beat-scope', previousSingleBeatScopePreset],
     ['before-natural-closing-refinement', previousNaturalClosingPreset],
     ['before-length-balance', previousLengthBalancePreset],

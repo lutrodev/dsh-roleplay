@@ -47,20 +47,20 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.2-alpha.5",
     "dsh-roleplay-rp-library": "^0.1.0",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.5",
     "dsh-roleplay-rp-remote": "^0.1.8"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.4",
-    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.5",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.2-alpha.5",
     "dsh-roleplay-rp-library": "workspace:^",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "tsdown": "0.22.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.5",
     "dsh-roleplay-rp-remote": "workspace:^"
   },
   "engines": {

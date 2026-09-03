@@ -166,9 +166,25 @@ describe('Roleplay message action presentation', () => {
       useChat: selector => selector(sessionSnapshot.chat),
       useSessions: selector => selector(sessionsSnapshot),
     }
-    const view = render(React.createElement(AssistantActions, props))
+    const hoverRoot = document.createElement('div')
+    hoverRoot.setAttribute('data-actions-reveal', 'hover')
+    const nativeActions = document.createElement('div')
+    nativeActions.setAttribute('data-native-assistant-actions', '')
+    const outlet = document.createElement('div')
+    outlet.dataset.slot = 'conversation.chat.assistant-actions'
+    nativeActions.append(outlet)
+    hoverRoot.append(nativeActions)
+    document.body.append(hoverRoot)
+    const harnessStyles = document.createElement('style')
+    harnessStyles.textContent = '[data-actions-reveal="hover"] [data-native-assistant-actions] { opacity: 0; }'
+    document.head.append(harnessStyles)
+    const disposeStyles = ensureStyles()
+
+    const view = render(React.createElement(AssistantActions, props), { container: outlet })
 
     await waitFor(() => expect(screen.getByRole('button', { name: '重新生成第 2 条回复' }).disabled).toBe(false))
+    expect(nativeActions.hasAttribute('data-rp-message-actions-assistant-visible')).toBe(true)
+    expect(getComputedStyle(nativeActions).opacity).toBe('1')
     expect(screen.getByRole('button', { name: '从第 2 条回复新建对话' }).disabled).toBe(false)
     expect(screen.getByRole('button', { name: '编辑第 2 条回复' }).disabled).toBe(false)
     expect(screen.getByRole('button', { name: '删除第 2 条回复' }).disabled).toBe(false)
@@ -183,6 +199,10 @@ describe('Roleplay message action presentation', () => {
     expect(screen.getByRole('button', { name: '删除第 2 条回复' }).disabled).toBe(true)
     expect(connection.call).not.toHaveBeenCalled()
     view.unmount()
+    expect(nativeActions.hasAttribute('data-rp-message-actions-assistant-visible')).toBe(false)
+    disposeStyles()
+    harnessStyles.remove()
+    hoverRoot.remove()
   })
 
   it('renders an actionable product status when native DSH has no visible failed reply', async () => {
@@ -1655,6 +1675,7 @@ describe('Roleplay message action presentation', () => {
     expect(styles).toMatch(/data-rp-message-actions-hidden-suffix/)
     expect(styles).toMatch(/data-rp-message-actions-hidden-commit/)
     expect(styles).toMatch(/data-rp-message-actions-hidden-native-branch/)
+    expect(styles).toMatch(/data-rp-message-actions-assistant-visible/)
     expect(styles).toMatch(/assistantActionHost/)
     expect(styles).toMatch(/assistantEffectNodeMarker/)
     expect(styles).toMatch(/\.failedTurnStatus\s*\{[^}]*grid-template-columns:\s*10px minmax\(0, 1fr\) auto/s)

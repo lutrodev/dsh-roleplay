@@ -6450,7 +6450,7 @@ window.__ModuleLoader__.load({
 			const deprecatedFactoryFunction = (Component, options) => {
 				return factory(Component, options);
 			};
-			return new Proxy(deprecatedFactoryFunction, {
+			return new Proxy(deprecatedFactoryFunction, { 
 			/**
 			* Called when `motion` is referenced with a prop: `motion.div`, `motion.input` etc.
 			* The prop name is passed through as `key` and we can use that to generate a `motion`
@@ -7775,7 +7775,7 @@ get: (_target, key) => {
 			"例如：寻求帮助",
 			"例如：离开现场"
 		]);
-		/** Configure count, maximum length, and one optional main-model direction per option. */
+		/** Configure count, length guidance, and one optional generator direction per option. */
 		function ReplyOptionsSettingsDialog({ open, count, maxCharacters, keywords, writable, saving, onSave, onClose }) {
 			const basicsHelpId = (0, react.useId)();
 			const directionHelpId = (0, react.useId)();
