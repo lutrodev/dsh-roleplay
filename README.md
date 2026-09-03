@@ -30,7 +30,7 @@ dsh plugin --profile web add -w @lutrodev/dsh-roleplay
 
 npm 包已包含运行所需的插件、浏览器端资源、Skills 和示例配置，无需另外克隆源码仓库。
 
-当前兼容组合为 dsh-roleplay `0.1.8` 与 DSH `0.1.2-alpha.5`，版本变化详见 [Changelog](CHANGELOG.md)。
+当前兼容组合为 dsh-roleplay `0.1.8` 与 DSH `0.1.2-rc.1`，版本变化详见 [Changelog](CHANGELOG.md)。
 
 ## 使用
 

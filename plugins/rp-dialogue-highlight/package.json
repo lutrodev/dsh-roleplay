@@ -42,15 +42,15 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.5",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.5"
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-rc.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.5",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-rc.1",
     "react": "18.3.1",
     "tsdown": "0.22.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.5",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-rc.1",
     "dsh-roleplay-rp-ui": "workspace:^"
   },
   "engines": {

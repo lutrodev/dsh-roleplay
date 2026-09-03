@@ -45,7 +45,7 @@
     },
     "roleplay": {
       "suiteVersion": "0.1.8",
-      "requiresDsh": "0.1.2-alpha.5"
+      "requiresDsh": "0.1.2-rc.1"
     }
   },
   "dependencies": {
@@ -78,11 +78,11 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
     "@deepseek-ai/cordis-plugin-loader": "^1.0.3",
-    "@deepseek-ai/dsh-settings": "0.1.2-alpha.5",
-    "@deepseek-ai/dsh-system-prompt": "0.1.2-alpha.5",
-    "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.5",
-    "@deepseek-ai/dsh-client-ui-settings": "0.1.2-alpha.5",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.5",
+    "@deepseek-ai/dsh-settings": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-locale": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-rc.1",
     "dsh-roleplay-rp-remote": "^0.1.8"
   },
   "devDependencies": {
@@ -90,18 +90,18 @@
     "@testing-library/react": "16.3.2",
     "@deepseek-ai/cordis": "4.0.2",
     "@deepseek-ai/cordis-plugin-loader": "1.0.3",
-    "@deepseek-ai/dsh-settings": "0.1.2-alpha.5",
-    "@deepseek-ai/dsh-system-prompt": "0.1.2-alpha.5",
-    "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.5",
-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.5",
-    "@deepseek-ai/dsh-client-ui-settings": "0.1.2-alpha.5",
-    "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.5",
+    "@deepseek-ai/dsh-settings": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-locale": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.2-rc.1",
     "jsdom": "29.1.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "tsdown": "0.22.2",
     "vitest": "4.1.8",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.5",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-rc.1",
     "dsh-roleplay-rp-remote": "workspace:^"
   },
   "engines": {
