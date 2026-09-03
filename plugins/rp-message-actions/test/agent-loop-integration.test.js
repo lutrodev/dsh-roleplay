@@ -14,6 +14,7 @@ import SessionStore, {
   SESSION_FORMAT_VERSION,
   Session,
   SessionId,
+  SessionPreparation,
 } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
@@ -516,40 +517,15 @@ async function loopContext(adapter) {
 async function resumableLoopContext(adapter, persisted) {
   const ctx = await loopContext(adapter)
   ctx.provide('sessionPersistence', {
-    async open(id, access, options) {
-      options?.signal?.throwIfAborted()
+    prepare(id, signal) {
+      signal?.throwIfAborted()
       assert.equal(id, persisted.meta.id)
-      assert.equal(access, 'write')
-      const events = structuredClone(persisted.events)
-      let closed = false
-      const handle = {
-        id,
-        access,
-        header: structuredClone(persisted.meta),
+      return SessionPreparation.create(ctx.sessions.prepare(id, {
+        seed: structuredClone(persisted.events),
+        meta: structuredClone(persisted.meta),
         inheritedEventCount: persisted.inheritedEventCount,
-        async read(offset = 0, length, readOptions) {
-          readOptions?.signal?.throwIfAborted()
-          assert.equal(closed, false)
-          return structuredClone(events.slice(offset, length === undefined ? undefined : offset + length))
-        },
-        async append(batch, appendOptions) {
-          appendOptions?.signal?.throwIfAborted()
-          assert.equal(closed, false)
-          if (batch.length > 0) assert.equal(batch[0].seq, events.length)
-          events.push(...structuredClone(batch))
-        },
-        async flush(flushOptions) {
-          flushOptions?.signal?.throwIfAborted()
-          assert.equal(closed, false)
-        },
-        async close() {
-          closed = true
-        },
-        async [Symbol.asyncDispose]() {
-          await handle.close()
-        },
-      }
-      return handle
+        seedSource: 'persistence',
+      }))
     },
   })
   return ctx

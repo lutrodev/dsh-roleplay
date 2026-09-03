@@ -4,8 +4,10 @@
 
 ## Unreleased
 
+## 0.1.8 - 2026-09-03
+
 - 重整内置“示例预设”与“通用叙事”的职责和表述：保留“扮演或导演主角”的参与模式，明确核心决定边界不等同于逐句控制，要求主角持续说话、思考、临场判断和行动；伤害结果改由已发生行动、人物能力、环境与应对共同决定；配角内心使用独立段落、明确归属与单人连续切换；篇幅不再使用模糊的“中等”标准，收束以正文中可见的变化与直接影响为准。“通用叙事”恢复主角内心的间接呈现，不再用固定因果链或单一段落职责限制表达。成人亲密场景不再作为内置示例预设的独立栏位。未编辑的托管旧资料会保留既有资产、栏位 ID 与分组标签设置并升级内容。
-- 将 DSH 兼容基线从 `0.1.2-alpha.5` 提升到 `0.1.2-rc.1`：Session Event Log 继续使用 `snapshotEvents()`、`eventAt()`、`seq`、`isSeeded` 与精确的 `inheritedEventCount`；角色删除预览保持 `list()` 快照和显式关闭只读 Session handle 的持久化所有权边界；Session、Agent、Conversation、Renderer 与结构化子代理的插件接入面没有实际变化，全部 DSH 开发依赖、peer dependency、公开 lockfile 与 Typert 生成元数据精确对齐。现有 JSONL 会话格式保持兼容，无需数据改写。
+- 将 DSH 兼容基线从 `0.1.2-alpha.5` 提升到 `0.1.2-rc.1`：Session Event Log 继续使用 `snapshotEvents()`、`eventAt()`、`seq`、`isSeeded` 与精确的 `inheritedEventCount`；持久化回归测试对齐 `flush()`、`list()`、`inspect()` 与 `prepare()` 的当前所有权边界；Session、Agent、Conversation、Renderer 与结构化子代理的插件接入面没有实际变化，全部 DSH 开发依赖、peer dependency、公开 lockfile 与 Typert 生成元数据精确对齐。现有 JSONL 会话格式保持兼容，无需数据改写。
 - 修复 Chat 提交失败或纠错后偶发正文消失：每个 Turn 现在从 Session Log 折叠唯一 `rp-turn-surface`，显式区分可见正文、提交结果、失败与删除；空白或仅含工具调用的模型消息不再创建消息操作节点，也不会被误判成删除。Conversation Node 重排后仍会持续校正轨迹归属。回复选项输入会执行 trim、去空项、去重和条数截断，忽略额外注释；主角身份标签缺失时从冻结的角色上下文与对话推断。
 - 回复选项迁移为核心提交校验通过后的非阻断 artifact generator：使用最终冻结正文发起一次轻量结构化子代理调用，Provider 不支持、超时、格式错误、生成失败或单独超限时只丢弃选项并记录稳定诊断，正文、State 和其他核心产物仍正常提交。卡片设置可调整目标条数、1–200 的长度指导（默认 50）和方向关键词，这些值只指导生成而不作为硬性提交校验；`rp.reply-options` v1 持久化与客户端投影保持不变。
 - `rp_commit_turn` 保持单一全局 Tool，并让完整提交分支从全局注册 effect capability 的闭合 Schema 实时派生；模型参数声明与执行前校验共享同一 Schema，不再依赖重复的文字协议。完整提交与补丁重试仍由顶层 `oneOf` 严格互斥；首次语义失败后 Core 缓存完整草稿并签发上下文绑定 token，重试只能提交有界 JSON Pointer 补丁，revision、上下文、Writer 或轮次变化会使 token 失效。State 的 v2 `state_commit_contract` 从同一 operation specification 派生 effect envelope 与四类操作表；校验先汇总全部独立静态问题，再顺序执行条件、应用和最终 Schema 校验，错误保留到具体 change 字段的 JSON Pointer 及 namespace、changeIndex、ruleId。
